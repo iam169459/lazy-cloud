@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => {
       minify: 'esbuild',
     },
     server: {
+      host: '0.0.0.0',
+      port: 5173,
       fs: {
         allow: ['..'],
       },
