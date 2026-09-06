@@ -1,0 +1,71 @@
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { StorageProvider } from './db';
+
+function extractRegion(endpointUrl: string): string {
+  const match = endpointUrl.match(/s3\.([^.]+)\.backblazeb2\.com/);
+  return match ? match[1] : 'us-east-005';
+}
+
+export function createS3Client(provider: StorageProvider): S3Client {
+  return new S3Client({
+    region: extractRegion(provider.endpoint_url),
+    endpoint: provider.endpoint_url,
+    credentials: {
+      accessKeyId: provider.access_key_id,
+      secretAccessKey: provider.secret_access_key,
+    },
+    forcePathStyle: true,
+  });
+}
+
+export async function uploadToProvider(
+  provider: StorageProvider,
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
+  const client = createS3Client(provider);
+  await client.send(
+    new PutObjectCommand({
+      Bucket: provider.bucket_name,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  );
+}
+
+export async function deleteFromProvider(
+  provider: StorageProvider,
+  key: string
+): Promise<void> {
+  const client = createS3Client(provider);
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: provider.bucket_name,
+      Key: key,
+    })
+  );
+}
+
+export async function getPresignedDownloadUrl(
+  provider: StorageProvider,
+  key: string,
+  filename: string,
+  contentType: string
+): Promise<string> {
+  const client = createS3Client(provider);
+  const command = new GetObjectCommand({
+    Bucket: provider.bucket_name,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${encodeURIComponent(filename)}"`,
+    ResponseContentType: contentType,
+  });
+  return getSignedUrl(client, command, { expiresIn: 3600 });
+}
