@@ -1,4 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
+import { timingSafeEqual } from 'crypto';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
@@ -42,6 +43,22 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+function safeCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+function sanitize(str: unknown): string {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[<>'"&;]/g, '').trim().slice(0, 500);
 }
 
 /**
@@ -230,15 +247,23 @@ export async function handleApiRequest(
       const DEFAULT_USER = process.env.ADMIN_USERNAME || 'admin';
       const DEFAULT_PASS = process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024';
 
+      const inputUser = sanitize(body.username);
+      const inputPass = sanitize(body.password);
+
+      if (!inputUser || !inputPass) {
+        sendError(res, 400, 'Username and password are required');
+        return true;
+      }
+
       let valid = false;
       let token = DEFAULT_PASS;
 
-      if (body.username === DEFAULT_USER && body.password === DEFAULT_PASS) {
+      if (safeCompare(inputUser, DEFAULT_USER) && safeCompare(inputPass, DEFAULT_PASS)) {
         valid = true;
       } else {
         try {
           const creds = await getAdminCredentials();
-          if (body.username === creds.username && body.password === creds.password) {
+          if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
             valid = true;
             token = creds.password;
           }
@@ -320,19 +345,28 @@ export async function handleApiRequest(
     if (path === '/api/admin/providers/add' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      if (!body.provider_name || !body.endpoint_url || !body.bucket_name || !body.access_key_id || !body.secret_access_key) {
+      const name = sanitize(body.provider_name);
+      const endpoint = sanitize(body.endpoint_url);
+      const bucket = sanitize(body.bucket_name);
+      const accessKey = sanitize(body.access_key_id);
+      const secretKey = sanitize(body.secret_access_key);
+      if (!name || !endpoint || !bucket || !accessKey || !secretKey) {
         sendError(res, 400, 'All fields are required');
+        return true;
+      }
+      if (endpoint.length > 512) {
+        sendError(res, 400, 'Endpoint URL too long');
         return true;
       }
       const settings = await getAppSettings();
       const defaultMaxBytes = parseInt(settings.maxStoragePerBucket) || 10188208025;
       const provider = await addProvider({
-        provider_type: body.provider_type || 'custom',
-        provider_name: body.provider_name,
-        endpoint_url: body.endpoint_url,
-        bucket_name: body.bucket_name,
-        access_key_id: body.access_key_id,
-        secret_access_key: body.secret_access_key,
+        provider_type: sanitize(body.provider_type) || 'custom',
+        provider_name: name,
+        endpoint_url: endpoint,
+        bucket_name: bucket,
+        access_key_id: accessKey,
+        secret_access_key: secretKey,
         max_bytes: body.max_bytes || defaultMaxBytes,
       });
       sendJson(res, 200, { provider: { ...provider, secret_access_key: '--------' } });
@@ -380,12 +414,18 @@ export async function handleApiRequest(
     if (path === '/api/admin/credentials/update' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      if (!body.username || !body.password) {
+      const newUsername = sanitize(body.username);
+      const newPassword = sanitize(body.password);
+      if (!newUsername || !newPassword) {
         sendError(res, 400, 'Username and password are required');
         return true;
       }
-      await updateAdminCredentials(body.username, body.password);
-      sendJson(res, 200, { success: true, username: body.username });
+      if (newPassword.length < 8) {
+        sendError(res, 400, 'Password must be at least 8 characters');
+        return true;
+      }
+      await updateAdminCredentials(newUsername, newPassword);
+      sendJson(res, 200, { success: true, username: newUsername });
       return true;
     }
 
