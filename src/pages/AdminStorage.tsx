@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, ChevronDown, HardDrive, Info } from 'lucide-react';
+import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -19,7 +19,6 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
-  const [showProviderList, setShowProviderList] = useState(false);
   const [form, setForm] = useState({
     provider_name: '',
     endpoint_url: '',
@@ -33,22 +32,29 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   function handleSelectProvider(p: CloudProvider) {
     sounds.click();
     setSelectedProvider(p);
-    setShowProviderList(false);
-    const endpoint = p.endpoint.replace('{region}', form.region || p.regionPlaceholder).replace('{account_id}', '');
+    const endpoint = p.endpoint.replace('{region}', p.regionPlaceholder).replace('{account_id}', '');
     setForm({
-      ...form,
       provider_name: p.name,
       endpoint_url: endpoint,
-      region: form.region || p.regionPlaceholder,
+      bucket_name: '',
+      access_key_id: '',
+      secret_access_key: '',
+      max_bytes: '10188208025',
+      region: p.regionPlaceholder,
     });
   }
 
   function handleRegionChange(region: string) {
-    setForm({ ...form, region });
     if (selectedProvider) {
       const endpoint = selectedProvider.endpoint.replace('{region}', region).replace('{account_id}', '');
       setForm(prev => ({ ...prev, region, endpoint_url: endpoint }));
+    } else {
+      setForm(prev => ({ ...prev, region }));
     }
+  }
+
+  function updateField(field: string, value: string) {
+    setForm(prev => ({ ...prev, [field]: value }));
   }
 
   async function handleAdd(e: React.FormEvent) {
@@ -67,8 +73,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       }, token);
       sounds.store();
       onNotify('success', 'Storage bucket added');
-      setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: '' });
-      setSelectedProvider(null);
+      resetForm();
       setShowForm(false);
       onRefresh();
     } catch (e: any) {
@@ -77,6 +82,11 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     } finally {
       setSaving(false);
     }
+  }
+
+  function resetForm() {
+    setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: '' });
+    setSelectedProvider(null);
   }
 
   async function handleDelete(id: string, name: string) {
@@ -129,7 +139,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         <div className="flex items-center gap-2">
           <ThemeSwitcher />
           <button
-            onClick={() => { setShowForm(!showForm); sounds.click(); }}
+            onClick={() => { setShowForm(!showForm); resetForm(); sounds.click(); }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm btn-sci"
             style={{ background: colors.gradient, color: colors.bg }}
           >
@@ -148,7 +158,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           </h3>
 
           {/* Provider Selector Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-6">
             {cloudProviders.map((p) => (
               <button
                 key={p.id}
@@ -176,7 +186,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             {/* Custom option */}
             <button
               type="button"
-              onClick={() => { setSelectedProvider(null); sounds.click(); }}
+              onClick={() => { setSelectedProvider(null); setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: '' }); sounds.click(); }}
               className="relative p-3 rounded-xl border text-left transition-all duration-300"
               style={{
                 background: !selectedProvider ? `${colors.primary}15` : colors.cardBg,
@@ -199,7 +209,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                   <span className="text-2xl">{selectedProvider.icon}</span>
                   <div>
                     <h4 className="font-semibold text-sm" style={{ color: colors.text }}>{selectedProvider.name}</h4>
-                    <p className="text-xs font-mono" style={{ color: selectedProvider.color }}>{selectedProvider.protocol} • {selectedProvider.freeTier}</p>
+                    <p className="text-xs font-mono" style={{ color: selectedProvider.color }}>{selectedProvider.protocol} — {selectedProvider.freeTier}</p>
                   </div>
                 </div>
                 <a href={selectedProvider.signupUrl} target="_blank" rel="noopener" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-all" style={{ borderColor: `${selectedProvider.color}30`, color: selectedProvider.color }}>
@@ -211,49 +221,45 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             </div>
           )}
 
-          {/* Form Fields */}
+          {/* Form Fields - ALWAYS VISIBLE */}
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <FormField label="Provider name" required>
-                <input type="text" value={form.provider_name} onChange={(e) => { setForm({ ...form, provider_name: e.target.value }); sounds.type(); }} placeholder="My Storage" required className="form-input" />
+                <input type="text" value={form.provider_name} onChange={(e) => updateField('provider_name', e.target.value)} placeholder="My Storage" required className="form-input" />
               </FormField>
 
-              {selectedProvider && selectedProvider.endpoint.includes('{region}') && (
+              {selectedProvider?.endpoint.includes('{region}') && (
                 <FormField label="Region" required>
-                  <div className="relative">
-                    <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider.regionPlaceholder} required className="form-input" />
-                  </div>
+                  <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider?.regionPlaceholder || 'us-east-1'} required className="form-input" />
                 </FormField>
               )}
 
               <FormField label="Endpoint URL" required>
-                <input type="url" value={form.endpoint_url} onChange={(e) => { setForm({ ...form, endpoint_url: e.target.value }); sounds.type(); }} placeholder="https://s3.amazonaws.com" required className="form-input" />
+                <input type="url" value={form.endpoint_url} onChange={(e) => updateField('endpoint_url', e.target.value)} placeholder="https://s3.amazonaws.com" required className="form-input" />
               </FormField>
 
               <FormField label="Bucket name" required>
-                <input type="text" value={form.bucket_name} onChange={(e) => { setForm({ ...form, bucket_name: e.target.value }); sounds.type(); }} placeholder="my-bucket" required className="form-input" />
+                <input type="text" value={form.bucket_name} onChange={(e) => updateField('bucket_name', e.target.value)} placeholder="my-bucket" required className="form-input" />
               </FormField>
 
               <FormField label="Max bytes (default ~9.5 GB)">
-                <input type="number" value={form.max_bytes} onChange={(e) => setForm({ ...form, max_bytes: e.target.value })} className="form-input" />
+                <input type="number" value={form.max_bytes} onChange={(e) => updateField('max_bytes', e.target.value)} className="form-input" />
               </FormField>
 
               <FormField label="Access key ID" required>
-                <input type="text" value={form.access_key_id} onChange={(e) => { setForm({ ...form, access_key_id: e.target.value }); sounds.type(); }} required className="form-input" />
+                <input type="text" value={form.access_key_id} onChange={(e) => updateField('access_key_id', e.target.value)} required className="form-input" />
               </FormField>
 
               <FormField label="Secret access key" required>
-                <input type="password" value={form.secret_access_key} onChange={(e) => { setForm({ ...form, secret_access_key: e.target.value }); sounds.type(); }} required className="form-input" />
+                <input type="password" value={form.secret_access_key} onChange={(e) => updateField('secret_access_key', e.target.value)} required className="form-input" />
               </FormField>
             </div>
 
-            {/* Help text */}
             {selectedProvider && (
               <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: `${colors.primary}05`, border: `1px solid ${colors.primary}10` }}>
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.primary }} />
                 <div className="text-xs" style={{ color: colors.textDim }}>
                   <p>Get your credentials from <a href={selectedProvider.docsUrl} target="_blank" rel="noopener" className="underline" style={{ color: selectedProvider.color }}>{selectedProvider.name} docs</a></p>
-                  <p className="mt-1">Paste your Access Key ID and Secret Access Key from your provider's dashboard.</p>
                 </div>
               </div>
             )}
@@ -263,7 +269,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Save bucket
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setSelectedProvider(null); sounds.click(); }} className="px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
+              <button type="button" onClick={() => { setShowForm(false); resetForm(); sounds.click(); }} className="px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
                 Cancel
               </button>
             </div>
@@ -284,7 +290,6 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             const providerInfo = getProviderById(type);
             return (
               <div key={type} className="animate-fade-in-up">
-                {/* Group Header */}
                 <div className="flex items-center gap-2 mb-3 px-1">
                   {providerInfo ? (
                     <>
@@ -301,10 +306,11 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                   <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>{typeProviders.length} bucket{typeProviders.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                {/* Provider Cards */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {typeProviders.map((p, i) => {
-                    const pct = p.max_bytes > 0 ? (p.current_bytes / p.max_bytes) * 100 : 0;
+                    const currentBytes = p.current_bytes || 0;
+                    const maxBytes = p.max_bytes || 10188208025;
+                    const pct = maxBytes > 0 ? (currentBytes / maxBytes) * 100 : 0;
                     const isFull = pct >= 95;
                     const pInfo = getProviderById(p.provider_type);
                     return (
@@ -331,7 +337,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
 
                         <div className="mb-3">
                           <div className="flex justify-between text-xs mb-1.5 font-mono" style={{ color: colors.textMuted }}>
-                            <span>{formatBytes(p.current_bytes)} / {formatBytes(p.max_bytes)}</span>
+                            <span>{formatBytes(currentBytes)} / {formatBytes(maxBytes)}</span>
                             <span style={{ color: isFull ? colors.warning : colors.textDim }}>{pct.toFixed(1)}%</span>
                           </div>
                           <div className="h-2 rounded-full overflow-hidden" style={{ background: `${colors.text}05` }}>

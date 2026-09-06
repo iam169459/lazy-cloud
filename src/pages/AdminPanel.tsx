@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield, Activity, Sliders,
+  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield, Activity, Sliders, Users,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -11,9 +11,10 @@ import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
 import AdminAdvanced from './AdminAdvanced';
+import AdminUsers from './AdminUsers';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'advanced';
+type Tab = 'dashboard' | 'storage' | 'users' | 'security' | 'advanced';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
@@ -67,13 +68,14 @@ export default function AdminPanel() {
 
   if (!token) return null;
 
-  const totalUsed = stats ? parseInt(stats.providers.used_bytes) : 0;
-  const totalCap = stats ? parseInt(stats.providers.capacity_bytes) : 0;
+  const totalUsed = stats ? parseInt(stats.providers.used_bytes || '0') : 0;
+  const totalCap = stats ? parseInt(stats.providers.capacity_bytes || '0') : 0;
   const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
+    { id: 'users', label: 'Users', icon: <Users className="w-4 h-4" /> },
     { id: 'security', label: 'Security', icon: <Shield className="w-4 h-4" /> },
     { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-4 h-4" /> },
   ];
@@ -182,6 +184,8 @@ export default function AdminPanel() {
           <AdminDashboard files={files} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
         ) : tab === 'storage' ? (
           <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
+        ) : tab === 'users' ? (
+          <AdminUsers token={token!} onNotify={showNotification} />
         ) : tab === 'security' ? (
           <AdminSecurity
             token={token!}

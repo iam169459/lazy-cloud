@@ -249,6 +249,7 @@ export async function handleApiRequest(
         return true;
       }
       const provider = await addProvider({
+        provider_type: body.provider_type || 'custom',
         provider_name: body.provider_name,
         endpoint_url: body.endpoint_url,
         bucket_name: body.bucket_name,

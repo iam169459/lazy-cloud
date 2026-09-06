@@ -1,10 +1,32 @@
 import { Link } from 'react-router-dom';
-import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network, Smartphone, Upload, Download } from 'lucide-react';
+import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network, Smartphone, Upload, Download, Rocket } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { useState, useEffect } from 'react';
 
 export default function Landing() {
   const { colors } = useTheme();
+  const [rocketActive, setRocketActive] = useState(false);
+  const [rocketPhase, setRocketPhase] = useState<'idle' | 'launch' | 'fly' | 'arrive' | 'done'>('idle');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setRocketActive(true), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!rocketActive) return;
+    setRocketPhase('launch');
+    let p = 0;
+    const interval = setInterval(() => {
+      p += 1;
+      if (p < 25) setRocketPhase('launch');
+      else if (p < 70) setRocketPhase('fly');
+      else if (p < 100) setRocketPhase('arrive');
+      else { clearInterval(interval); setRocketPhase('done'); setTimeout(() => { setRocketPhase('idle'); setTimeout(() => setRocketActive(true), 2000); }, 3000); }
+    }, 60);
+    return () => clearInterval(interval);
+  }, [rocketActive]);
 
   return (
     <div className="min-h-screen overflow-hidden relative grid-bg" style={{ color: colors.text }}>
@@ -87,6 +109,83 @@ export default function Landing() {
           >
             Learn more
           </a>
+        </div>
+      </section>
+
+      {/* Rocket Transfer Animation */}
+      <section className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
+        <div className="relative h-64 sm:h-80 rounded-2xl overflow-hidden card-sci corner-accent">
+          {/* Stars */}
+          <div className="absolute inset-0">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <div key={i} className="absolute rounded-full animate-pulse-glow" style={{ background: colors.text, width: `${1 + Math.random() * 2}px`, height: `${1 + Math.random() * 2}px`, left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 3}s`, opacity: 0.15 + Math.random() * 0.3 }} />
+            ))}
+          </div>
+
+          {/* Earth */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2">
+            <div className="w-48 h-24 rounded-t-full" style={{ background: `linear-gradient(180deg, ${colors.accent}, ${colors.primary})`, opacity: 0.4 }}>
+              <div className="w-full h-full rounded-t-full" style={{ background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.3), transparent 60%)' }} />
+            </div>
+          </div>
+
+          {/* Cloud/Server */}
+          <div className="absolute top-8 right-[15%]">
+            <div className="flex flex-col items-center gap-1.5">
+              <Cloud className="w-10 h-10" style={{ color: colors.secondary, opacity: 0.6 }} />
+              <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>BUCKET</span>
+            </div>
+          </div>
+
+          {/* Rocket */}
+          <div className="absolute transition-all duration-300" style={{
+            left: '50%',
+            bottom: rocketPhase === 'launch' ? '25%' : rocketPhase === 'fly' ? '55%' : rocketPhase === 'arrive' ? '70%' : '25%',
+            transform: 'translateX(-50%)',
+          }}>
+            {/* Flame */}
+            {(rocketPhase === 'launch' || rocketPhase === 'fly') && (
+              <div className="absolute -bottom-5 left-1/2 -translate-x-1/2">
+                <div className="w-3 h-7 rounded-b-full bg-gradient-to-b from-orange-400 via-red-500 to-transparent animate-pulse" />
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-5 rounded-b-full bg-gradient-to-b from-yellow-300 to-orange-400 animate-pulse" style={{ animationDelay: '0.1s' }} />
+              </div>
+            )}
+            {/* Rocket body */}
+            <div className="relative w-8 h-14 animate-float" style={{ animationDuration: '0.5s' }}>
+              <div className="absolute inset-0 rounded-t-full bg-gradient-to-b from-white via-gray-200 to-gray-400" />
+              <div className="absolute top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-300 to-cyan-500" />
+              <div className="absolute bottom-0 left-0 w-2.5 h-3 bg-gradient-to-t from-red-500 to-red-400 rounded-bl-full -rotate-12 origin-bottom-right" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-3 bg-gradient-to-t from-red-500 to-red-400 rounded-br-full rotate-12 origin-bottom-left" />
+            </div>
+            {/* Files orbiting */}
+            {(rocketPhase === 'fly' || rocketPhase === 'arrive') && (
+              <>
+                <div className="absolute -left-7 top-1 text-sm animate-float" style={{ animationDelay: '0.2s' }}>📄</div>
+                <div className="absolute -right-7 top-0 text-sm animate-float" style={{ animationDelay: '0.4s' }}>📁</div>
+                <div className="absolute -left-5 top-7 text-xs animate-float" style={{ animationDelay: '0.6s' }}>📎</div>
+                <div className="absolute -right-5 top-5 text-xs animate-float" style={{ animationDelay: '0.8s' }}>💾</div>
+              </>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-48">
+            <div className="flex justify-between text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>
+              <span>{rocketPhase === 'launch' ? 'UPLOADING' : rocketPhase === 'fly' ? 'IN TRANSIT' : rocketPhase === 'arrive' ? 'DELIVERING' : rocketPhase === 'done' ? 'COMPLETE' : 'READY'}</span>
+              <span>{rocketPhase === 'done' ? '100%' : rocketPhase === 'idle' ? '0%' : ''}</span>
+            </div>
+            <div className="h-1 rounded-full overflow-hidden" style={{ background: `${colors.text}10` }}>
+              <div className="h-full rounded-full transition-all duration-100" style={{
+                width: rocketPhase === 'done' ? '100%' : rocketPhase === 'idle' ? '0%' : rocketPhase === 'launch' ? '25%' : rocketPhase === 'fly' ? '55%' : '80%',
+                background: colors.gradient,
+              }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 text-center">
+          <h3 className="text-lg sm:text-xl font-bold mb-2" style={{ color: colors.text }}>Rocket-fast transfers</h3>
+          <p className="text-sm" style={{ color: colors.textMuted }}>Files launch to the cloud instantly via direct S3 upload — no server bottleneck</p>
         </div>
       </section>
 
