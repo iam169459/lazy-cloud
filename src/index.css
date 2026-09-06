@@ -259,24 +259,6 @@ select.form-input {
 /* ═══════════════════════════════════════════
    ROCKET ANIMATION — CSS keyframes
    ═══════════════════════════════════════════ */
-@keyframes rocket-journey-fly {
-  0% { left: 20%; bottom: 16%; opacity: 0; transform: scale(0.6) rotate(-3deg); }
-  3% { left: 20%; bottom: 16%; opacity: 1; transform: scale(1) rotate(0deg); }
-  8% { left: 22%; bottom: 22%; transform: scale(1) rotate(1deg); }
-  15% { left: 35%; bottom: 50%; transform: scale(1) rotate(-0.5deg); }
-  25% { left: 50%; bottom: 70%; transform: scale(0.95) rotate(0.3deg); }
-  35% { left: 65%; bottom: 80%; transform: scale(0.9) rotate(-0.2deg); }
-  40% { left: 72%; bottom: 84%; transform: scale(0.85) rotate(0deg); }
-  45% { left: 78%; bottom: 86%; transform: scale(0.85) rotate(0deg); opacity: 1; }
-  55% { left: 78%; bottom: 86%; transform: scale(0.85) rotate(0deg); opacity: 1; }
-  60% { left: 72%; bottom: 80%; transform: scale(0.9) rotate(0.5deg); }
-  70% { left: 50%; bottom: 60%; transform: scale(0.95) rotate(-0.3deg); }
-  80% { left: 30%; bottom: 30%; transform: scale(1) rotate(0.2deg); }
-  85% { left: 22%; bottom: 18%; transform: scale(1) rotate(0deg); }
-  90% { left: 20%; bottom: 16%; transform: scale(1) rotate(0deg); opacity: 1; }
-  95% { left: 20%; bottom: 16%; transform: scale(0.9) rotate(1deg); opacity: 0.7; }
-  100% { left: 20%; bottom: 16%; transform: scale(0.6) rotate(-2deg); opacity: 0; }
-}
 @keyframes rocket-journey-flame-flicker {
   0%, 100% { transform: translateX(-50%) scaleY(1); opacity: 1; }
   25% { transform: translateX(-50%) scaleY(1.2); opacity: 0.85; }
@@ -299,94 +281,16 @@ select.form-input {
   0%, 100% { box-shadow: 0 0 10px rgba(255,255,255,0.1); }
   50% { box-shadow: 0 0 25px rgba(255,255,255,0.2); }
 }
-@keyframes rocket-journey-hud-fill {
-  0%, 3% { width: 0%; }
-  15% { width: 15%; }
-  40% { width: 45%; }
-  55% { width: 55%; }
-  85% { width: 95%; }
-  95%, 100% { width: 100%; }
-}
-@keyframes rocket-journey-status-anim {
-  0%, 3% { content: 'LOADING FILES...'; }
-  4%, 14% { content: 'LAUNCHING...'; }
-  15%, 39% { content: 'IN TRANSIT TO MOON...'; }
-  40%, 54% { content: 'UNLOADING AT MOON...'; }
-  55%, 84% { content: 'RETURNING TO EARTH...'; }
-  85%, 94% { content: 'LANDING...'; }
-  95%, 100% { content: 'COMPLETE'; }
-}
-@keyframes rocket-journey-pct-anim {
-  0%, 3% { content: '0%'; }
-  15% { content: '15%'; }
-  40% { content: '45%'; }
-  55% { content: '55%'; }
-  85% { content: '95%'; }
-  95%, 100% { content: '100%'; }
-}
-
 .rocket-backdrop { animation: rocket-backdrop-in 0.4s ease-out forwards; }
 @keyframes rocket-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 .rocket-earth { animation: rocket-earth-pulse 2s ease-in-out infinite; }
 @keyframes rocket-earth-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
 .rocket-moon { animation: rocket-journey-moon-glow 3s ease-in-out infinite; }
 
-.rocket-journey {
-  position: absolute;
-  animation: rocket-journey-fly 8.4s cubic-bezier(0.42, 0, 0.58, 1) forwards;
-  will-change: transform, left, bottom, opacity;
-}
-.rocket-journey-flame { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); }
-.rocket-journey-flame-outer { width: 14px; height: 28px; border-radius: 0 0 50% 50%; background: linear-gradient(to bottom, #f97316, #ef4444, transparent); animation: rocket-journey-flame-flicker 0.13s ease-in-out infinite; }
-.rocket-journey-flame-inner { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); width: 7px; height: 20px; border-radius: 0 0 50% 50%; background: linear-gradient(to bottom, #fde047, #f97316); animation: rocket-journey-flame-inner 0.1s ease-in-out infinite; }
-.rocket-journey-files { position: absolute; top: 50%; left: 50%; width: 0; height: 0; }
-.rjf { position: absolute; font-size: 13px; opacity: 0; animation: rocket-journey-file-orbit 2s linear infinite; }
-.rjf-1 { animation-delay: 0s; }
-.rjf-2 { animation-delay: 0.5s; }
-.rjf-3 { animation-delay: 1s; }
-.rjf-4 { animation-delay: 1.5s; }
-.rocket-journey .rjf { opacity: 0.7; }
-.rocket-journey-trail { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); width: 3px; height: 60px; border-radius: 2px; background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent); animation: rocket-journey-trail-anim 0.25s ease-in-out infinite; }
 .rocket-hud { animation: rocket-hud-in 0.5s ease-out forwards; }
 @keyframes rocket-hud-in { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-.rocket-journey-bar { animation: rocket-journey-hud-fill 8.4s linear forwards; }
-.rocket-journey-status { animation: rocket-journey-status-anim 8.4s linear forwards; }
-.rocket-journey-pct { animation: rocket-journey-pct-anim 8.4s linear forwards; }
 
-/* ═══ Landing Page Rocket ═══ */
-@keyframes landing-rocket-journey {
-  0% { left: 15%; bottom: 10%; opacity: 0; transform: scale(0.5) rotate(-3deg); }
-  4% { left: 15%; bottom: 10%; opacity: 1; transform: scale(1) rotate(0deg); }
-  12% { left: 25%; bottom: 40%; transform: scale(1) rotate(1deg); }
-  22% { left: 40%; bottom: 65%; transform: scale(0.95) rotate(-0.5deg); }
-  32% { left: 60%; bottom: 80%; transform: scale(0.9) rotate(0.3deg); }
-  40% { left: 75%; bottom: 85%; transform: scale(0.85) rotate(0deg); }
-  48% { left: 78%; bottom: 86%; transform: scale(0.85); opacity: 1; }
-  55% { left: 78%; bottom: 86%; transform: scale(0.85); opacity: 1; }
-  62% { left: 65%; bottom: 70%; transform: scale(0.9) rotate(0.5deg); }
-  72% { left: 45%; bottom: 45%; transform: scale(0.95) rotate(-0.3deg); }
-  82% { left: 25%; bottom: 20%; transform: scale(1) rotate(0.2deg); }
-  90% { left: 15%; bottom: 10%; transform: scale(1); opacity: 1; }
-  96% { left: 15%; bottom: 10%; transform: scale(0.8); opacity: 0.5; }
-  100% { left: 15%; bottom: 10%; transform: scale(0.5); opacity: 0; }
-}
-@keyframes landing-moon-glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
-@keyframes landing-hud-fill { 0%, 4% { width: 0%; } 22% { width: 22%; } 40% { width: 48%; } 55% { width: 55%; } 82% { width: 90%; } 96%, 100% { width: 100%; } }
-@keyframes landing-hud-status { 0%, 4% { content: 'LOADING'; } 5%, 21% { content: 'LAUNCHING'; } 22%, 39% { content: 'IN TRANSIT'; } 40%, 54% { content: 'UNLOADING'; } 55%, 81% { content: 'RETURNING'; } 82%, 95% { content: 'LANDING'; } 96%, 100% { content: 'DONE'; } }
-@keyframes landing-hud-pct { 0%, 4% { content: '0%'; } 22% { content: '22%'; } 40% { content: '48%'; } 55% { content: '55%'; } 82% { content: '90%'; } 96%, 100% { content: '100%'; } }
-
-.landing-rocket { position: absolute; animation: landing-rocket-journey 7s cubic-bezier(0.42, 0, 0.58, 1) infinite; will-change: transform, left, bottom, opacity; }
-.landing-rocket-flame { position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%); }
-.landing-rocket-flame-outer { width: 10px; height: 20px; border-radius: 0 0 50% 50%; background: linear-gradient(to bottom, #f97316, #ef4444, transparent); animation: rocket-journey-flame-flicker 0.12s ease-in-out infinite; }
-.landing-rocket-flame-inner { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); width: 5px; height: 14px; border-radius: 0 0 50% 50%; background: linear-gradient(to bottom, #fde047, #f97316); animation: rocket-journey-flame-inner 0.09s ease-in-out infinite; }
-.landing-rocket-files { position: absolute; top: 50%; left: 50%; width: 0; height: 0; }
-.landing-file { position: absolute; font-size: 11px; opacity: 0; animation: rocket-journey-file-orbit 2.5s linear infinite; }
-.lf-1 { animation-delay: 0s; }
-.lf-2 { animation-delay: 0.6s; }
-.lf-3 { animation-delay: 1.2s; }
-.lf-4 { animation-delay: 1.8s; }
-.landing-rocket .landing-file { opacity: 0.6; }
-.landing-rocket-trail { position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); width: 2px; height: 40px; border-radius: 2px; background: linear-gradient(to bottom, rgba(255,255,255,0.2), transparent); animation: rocket-journey-trail-anim 0.2s ease-in-out infinite; }
+/* ═══ Landing Page Rocket — removed, JS-driven ═══ */
 .landing-moon { animation: landing-moon-glow 3s ease-in-out infinite; }
 .landing-cloud-icon { animation: hud-float 3s ease-in-out infinite; }
 .landing-hud-status { animation: landing-hud-status 7s linear infinite; }

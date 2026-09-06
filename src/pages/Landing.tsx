@@ -4,6 +4,7 @@ import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network, Smartph
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
+import LandingRocket from '@/components/LandingRocket';
 
 export default function Landing() {
   const { colors } = useTheme();
@@ -127,37 +128,8 @@ export default function Landing() {
             <span className="text-[9px] font-mono px-2 py-1 rounded border landing-chip" style={{ borderColor: `${colors.secondary}25`, background: `${colors.bg}55`, color: colors.secondary, animationDelay: '1.8s' }}>EGRESS 0</span>
           </div>
 
-          {/* Rocket — full journey */}
-          <div className="landing-rocket">
-            <div className="landing-rocket-flame">
-              <div className="landing-rocket-flame-outer" />
-              <div className="landing-rocket-flame-inner" />
-            </div>
-            <div className="relative w-8 h-14">
-              <div className="absolute inset-0 rounded-t-full bg-gradient-to-b from-white via-gray-200 to-gray-400" />
-              <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-cyan-300 to-cyan-500" />
-              <div className="absolute bottom-0 left-0 w-2.5 h-3 bg-gradient-to-t from-red-500 to-red-400 rounded-bl-full -rotate-12 origin-bottom-right" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-3 bg-gradient-to-t from-red-500 to-red-400 rounded-br-full rotate-12 origin-bottom-left" />
-            </div>
-            <div className="landing-rocket-files">
-              <span className="landing-file lf-1">📄</span>
-              <span className="landing-file lf-2">📁</span>
-              <span className="landing-file lf-3">📎</span>
-              <span className="landing-file lf-4">💾</span>
-            </div>
-            <div className="landing-rocket-trail" />
-          </div>
-
-          {/* Progress HUD */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-52">
-            <div className="flex justify-between text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>
-              <span className="landing-hud-status">LOADING</span>
-              <span className="landing-hud-pct">0%</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
-              <div className="h-full rounded-full landing-hud-bar" style={{ background: colors.gradient }} />
-            </div>
-          </div>
+          {/* Rocket — JS-driven 60fps */}
+          <LandingRocket />
         </div>
 
         <div className="mt-6 text-center">
