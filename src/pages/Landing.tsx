@@ -96,7 +96,9 @@ export default function Landing() {
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+import { memo } from 'react';
+
+const FeatureCard = memo(function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
     <div className="group p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.05] transition-all">
       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400/20 to-teal-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
@@ -106,4 +108,6 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: stri
       <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
     </div>
   );
-}
+});
+
+export { FeatureCard };

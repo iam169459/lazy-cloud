@@ -118,7 +118,9 @@ export default function DownloadPage() {
   );
 }
 
-function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+import { memo } from 'react';
+
+const DetailRow = memo(function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between py-2.5 px-4 rounded-xl bg-white/[0.02] border border-white/5">
       <div className="flex items-center gap-2 text-gray-400 text-sm">
@@ -130,4 +132,4 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
       </span>
     </div>
   );
-}
+});
