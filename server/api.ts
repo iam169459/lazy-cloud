@@ -218,8 +218,10 @@ export async function handleApiRequest(
       if (provider) {
         try {
           await deleteFromProvider(provider, file.r2_key);
-        } catch {
-          // continue even if delete from R2 fails
+        } catch (e: any) {
+          console.error('Failed to delete from storage provider:', e.message);
+          sendError(res, 500, `File removed from database but failed to delete from storage: ${e.message}`);
+          return true;
         }
         await updateProviderBytes(provider.id, -file.file_size);
       }
