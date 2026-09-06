@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield, Activity,
+  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield, Activity, Sliders,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -10,9 +10,10 @@ import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/li
 import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
+import AdminAdvanced from './AdminAdvanced';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security';
+type Tab = 'dashboard' | 'storage' | 'security' | 'advanced';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
@@ -24,6 +25,7 @@ export default function AdminPanel() {
   const [providers, setProviders] = useState<StorageProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showNotification = useCallback((type: 'success' | 'error', msg: string) => {
     setNotification({ type, msg });
@@ -69,23 +71,32 @@ export default function AdminPanel() {
   const totalCap = stats ? parseInt(stats.providers.capacity_bytes) : 0;
   const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
 
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
+    { id: 'security', label: 'Security', icon: <Shield className="w-4 h-4" /> },
+    { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-4 h-4" /> },
+  ];
+
   return (
     <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
       <div className="scanline-overlay" />
 
       {/* Header */}
       <header className="sticky top-0 z-20 backdrop-blur-xl border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3 animate-fade-in-left">
-            <div className="relative w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-left">
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4" style={{ color: colors.bg }} strokeWidth={2.5} />
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-bold tracking-tight text-gradient-sci">LazyDrop</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase tracking-widest" style={{ color: `${colors.primary}90`, background: `${colors.primary}10`, border: `1px solid ${colors.primary}20` }}>Admin</span>
+              <span className="font-bold tracking-tight text-gradient-sci text-sm sm:text-base">LazyDrop</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase tracking-widest hidden sm:inline-block" style={{ color: `${colors.primary}90`, background: `${colors.primary}10`, border: `1px solid ${colors.primary}20` }}>Admin</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 animate-fade-in-up">
+
+          {/* Desktop nav */}
+          <div className="hidden sm:flex items-center gap-3 animate-fade-in-up">
             <Link to="/" className="text-sm flex items-center gap-1.5 transition-colors" style={{ color: colors.textMuted }} onClick={() => sounds.click()}>
               <Activity className="w-3 h-3" />
               View site
@@ -96,13 +107,36 @@ export default function AdminPanel() {
               Logout
             </button>
           </div>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => { setMobileMenuOpen(!mobileMenuOpen); sounds.click(); }}
+            className="sm:hidden p-2 rounded-lg"
+            style={{ color: colors.textMuted }}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden border-t px-4 py-3 space-y-2 animate-slide-down" style={{ borderColor: colors.border, background: `${colors.bg}ee` }}>
+            <Link to="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ color: colors.textMuted }} onClick={() => { sounds.click(); setMobileMenuOpen(false); }}>
+              <Activity className="w-4 h-4" />
+              View site
+            </Link>
+            <ThemeSwitcher />
+            <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full" style={{ color: colors.textMuted }}>
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
+        )}
       </header>
 
-      {/* Main */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <StatCard icon={<FileText className="w-4 h-4" />} label="Files" value={stats ? stats.files.total_files : '—'} delay="0" colorKey="emerald" />
           <StatCard icon={<Download className="w-4 h-4" />} label="Downloads" value={stats ? stats.files.total_downloads : '—'} delay="100" colorKey="cyan" />
           <StatCard icon={<Cloud className="w-4 h-4" />} label="Buckets" value={stats ? stats.providers.total_providers : '—'} delay="200" colorKey="blue" />
@@ -116,17 +150,23 @@ export default function AdminPanel() {
           />
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-8 p-1 rounded-xl w-fit animate-fade-in-up delay-400" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
-          <TabButton active={tab === 'dashboard'} onClick={() => { setTab('dashboard'); sounds.click(); }} icon={<BarChart3 className="w-4 h-4" />}>
-            Dashboard
-          </TabButton>
-          <TabButton active={tab === 'storage'} onClick={() => { setTab('storage'); sounds.click(); }} icon={<Settings className="w-4 h-4" />}>
-            Storage
-          </TabButton>
-          <TabButton active={tab === 'security'} onClick={() => { setTab('security'); sounds.click(); }} icon={<Shield className="w-4 h-4" />}>
-            Security
-          </TabButton>
+        {/* Tabs - horizontal scroll on mobile */}
+        <div className="flex gap-1 mb-6 sm:mb-8 p-1 rounded-xl w-full overflow-x-auto animate-fade-in-up delay-400" style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, WebkitOverflowScrolling: 'touch' }}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => { setTab(t.id); sounds.click(); }}
+              className="relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap flex-shrink-0"
+              style={{
+                background: tab === t.id ? `${colors.primary}15` : 'transparent',
+                color: tab === t.id ? colors.primary : colors.textDim,
+                border: tab === t.id ? `1px solid ${colors.primary}30` : '1px solid transparent',
+              }}
+            >
+              {t.icon}
+              <span className="hidden sm:inline">{t.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Content */}
@@ -142,7 +182,7 @@ export default function AdminPanel() {
           <AdminDashboard files={files} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
         ) : tab === 'storage' ? (
           <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
-        ) : (
+        ) : tab === 'security' ? (
           <AdminSecurity
             token={token!}
             onNotify={showNotification}
@@ -151,20 +191,22 @@ export default function AdminPanel() {
               navigate('/admin/login');
             }}
           />
+        ) : (
+          <AdminAdvanced token={token!} onNotify={showNotification} />
         )}
       </div>
 
       {/* Notification */}
       {notification && (
         <div
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl border backdrop-blur-xl transition-all animate-slide-in-bottom"
+          className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl border backdrop-blur-xl transition-all animate-slide-in-bottom max-w-[90vw]"
           style={{
             background: notification.type === 'success' ? `${colors.success}15` : `${colors.danger}15`,
             borderColor: notification.type === 'success' ? `${colors.success}40` : `${colors.danger}40`,
             color: notification.type === 'success' ? colors.success : colors.danger,
           }}
         >
-          {notification.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {notification.type === 'success' ? <Check className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
           <span className="text-sm">{notification.msg}</span>
         </div>
       )}
@@ -185,35 +227,17 @@ function StatCard({ icon, label, value, progress, delay, colorKey }: {
   const c = colorMap[colorKey] || colors.primary;
 
   return (
-    <div className="group p-4 rounded-2xl card-sci corner-accent animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="w-9 h-9 rounded-lg border flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300" style={{ background: `${c}15`, borderColor: `${c}25`, color: c }}>
+    <div className="group p-3 sm:p-4 rounded-2xl card-sci corner-accent animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
+      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-300" style={{ background: `${c}15`, borderColor: `${c}25`, color: c }}>
         {icon}
       </div>
       <div className="text-[10px] mb-1 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>{label}</div>
-      <div className="text-lg font-bold truncate" style={{ color: colors.text }}>{value}</div>
+      <div className="text-base sm:text-lg font-bold truncate" style={{ color: colors.text }}>{value}</div>
       {progress !== undefined && (
-        <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
+        <div className="mt-2 sm:mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
           <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(progress, 100)}%`, background: colors.gradient }} />
         </div>
       )}
     </div>
-  );
-}
-
-function TabButton({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <button
-      onClick={onClick}
-      className="relative flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all duration-300"
-      style={{
-        background: active ? `${colors.primary}15` : 'transparent',
-        color: active ? colors.primary : colors.textDim,
-        border: active ? `1px solid ${colors.primary}30` : '1px solid transparent',
-      }}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
