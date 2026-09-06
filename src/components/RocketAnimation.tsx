@@ -201,9 +201,9 @@ export default function RocketAnimation({ active, onComplete }: RocketAnimationP
       {/* Rocket — GPU-accelerated via transform only */}
       <div
         ref={rocketRef}
-        className="absolute"
         style={{
-          left: 0, bottom: 0,
+          position: 'fixed',
+          inset: 0,
           willChange: 'transform, opacity',
           transform: 'translate(20vw, 84vh) scale(0.5) rotate(-3deg)',
         }}
