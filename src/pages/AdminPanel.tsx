@@ -70,21 +70,22 @@ export default function AdminPanel() {
   const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
 
   return (
-    <div className="min-h-screen text-white grid-bg">
+    <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
       <div className="scanline-overlay" />
 
+      {/* Header */}
       <header className="sticky top-0 z-20 backdrop-blur-xl border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 animate-fade-in-left">
             <div className="relative w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4" style={{ color: colors.bg }} strokeWidth={2.5} />
             </div>
-            <div>
+            <div className="flex items-center gap-2">
               <span className="font-bold tracking-tight text-gradient-sci">LazyDrop</span>
-              <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full font-mono uppercase tracking-widest" style={{ color: `${colors.primary}90`, background: `${colors.primary}10`, border: `1px solid ${colors.primary}20` }}>Admin</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase tracking-widest" style={{ color: `${colors.primary}90`, background: `${colors.primary}10`, border: `1px solid ${colors.primary}20` }}>Admin</span>
             </div>
           </div>
-          <div className="flex items-center gap-4 animate-fade-in-up">
+          <div className="flex items-center gap-3 animate-fade-in-up">
             <Link to="/" className="text-sm flex items-center gap-1.5 transition-colors" style={{ color: colors.textMuted }} onClick={() => sounds.click()}>
               <Activity className="w-3 h-3" />
               View site
@@ -98,7 +99,9 @@ export default function AdminPanel() {
         </div>
       </header>
 
+      {/* Main */}
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard icon={<FileText className="w-4 h-4" />} label="Files" value={stats ? stats.files.total_files : '—'} delay="0" colorKey="emerald" />
           <StatCard icon={<Download className="w-4 h-4" />} label="Downloads" value={stats ? stats.files.total_downloads : '—'} delay="100" colorKey="cyan" />
@@ -113,7 +116,8 @@ export default function AdminPanel() {
           />
         </div>
 
-        <div className="flex gap-1 mb-8 p-1 rounded-xl w-fit animate-fade-in-up delay-400" style={{ background: `${colors.bgCard}`, border: `1px solid ${colors.border}` }}>
+        {/* Tabs */}
+        <div className="flex gap-1 mb-8 p-1 rounded-xl w-fit animate-fade-in-up delay-400" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
           <TabButton active={tab === 'dashboard'} onClick={() => { setTab('dashboard'); sounds.click(); }} icon={<BarChart3 className="w-4 h-4" />}>
             Dashboard
           </TabButton>
@@ -125,6 +129,7 @@ export default function AdminPanel() {
           </TabButton>
         </div>
 
+        {/* Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="relative w-12 h-12">
@@ -149,6 +154,7 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* Notification */}
       {notification && (
         <div
           className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl border backdrop-blur-xl transition-all animate-slide-in-bottom"
@@ -184,13 +190,10 @@ function StatCard({ icon, label, value, progress, delay, colorKey }: {
         {icon}
       </div>
       <div className="text-[10px] mb-1 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>{label}</div>
-      <div className="text-lg font-bold truncate">{value}</div>
+      <div className="text-lg font-bold truncate" style={{ color: colors.text }}>{value}</div>
       {progress !== undefined && (
         <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
-          <div
-            className="h-full rounded-full transition-all duration-1000"
-            style={{ width: `${Math.min(progress, 100)}%`, background: colors.gradient }}
-          />
+          <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(progress, 100)}%`, background: colors.gradient }} />
         </div>
       )}
     </div>
@@ -211,7 +214,6 @@ function TabButton({ active, onClick, icon, children }: { active: boolean; onCli
     >
       {icon}
       {children}
-      {active && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-px" style={{ background: colors.primary }} />}
     </button>
   );
 }

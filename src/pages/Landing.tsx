@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network, Sparkles } from 'lucide-react';
+import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 
@@ -7,21 +7,24 @@ export default function Landing() {
   const { colors } = useTheme();
 
   return (
-    <div className="min-h-screen text-white overflow-hidden relative grid-bg">
+    <div className="min-h-screen overflow-hidden relative grid-bg" style={{ color: colors.text }}>
       <div className="scanline-overlay" />
 
+      {/* Background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb1 }} />
         <div className="absolute bottom-[-20%] right-[5%] w-[500px] h-[500px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb2, animationDelay: '2s' }} />
         <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] rounded-full blur-[120px] animate-float" style={{ background: colors.orb3, animationDelay: '4s' }} />
       </div>
 
+      {/* Rotating rings */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] pointer-events-none opacity-[0.03]">
         <div className="w-full h-full rounded-full border animate-rotate-slow" style={{ borderColor: colors.primary }} />
         <div className="absolute inset-8 rounded-full border animate-rotate-slow" style={{ borderColor: colors.secondary, animationDirection: 'reverse', animationDuration: '30s' }} />
         <div className="absolute inset-16 rounded-full border animate-rotate-slow" style={{ borderColor: colors.accent, animationDuration: '25s' }} />
       </div>
 
+      {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
         <div className="flex items-center gap-3 animate-fade-in-left">
           <div className="relative w-10 h-10 rounded-lg flex items-center justify-center animate-glow-pulse" style={{ background: colors.gradient }}>
@@ -44,13 +47,17 @@ export default function Landing() {
         </Link>
       </nav>
 
+      {/* Hero */}
       <section className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20 md:pt-32">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm mb-8 animate-fade-in-up corner-accent" style={{ background: colors.primaryGlow, border: `1px solid ${colors.primary}30`, color: colors.primary }}>
+        <div
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm mb-8 animate-fade-in-up corner-accent"
+          style={{ background: colors.primaryGlow, border: `1px solid ${colors.primary}30`, color: colors.primary }}
+        >
           <span className="w-2 h-2 rounded-full animate-pulse-glow" style={{ background: colors.primary }} />
           Multi-account storage routing
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight max-w-4xl leading-[1.05] mb-6 animate-fade-in-up delay-200">
+        <h1 className="text-5xl md:text-7xl font-bold tracking-tight max-w-4xl leading-[1.05] mb-6 animate-fade-in-up delay-200" style={{ color: colors.text }}>
           Fast, private,
           <br />
           <span className="text-gradient-sci">link-only file sharing</span>
@@ -64,8 +71,8 @@ export default function Landing() {
         <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up delay-400">
           <Link
             to="/admin"
-            className="group flex items-center gap-2 px-8 py-4 rounded-xl text-[#06060c] font-bold text-sm btn-sci"
-            style={{ background: colors.gradient }}
+            className="group flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm btn-sci"
+            style={{ background: colors.gradient, color: colors.bg }}
             onMouseEnter={() => sounds.hover()}
             onClick={() => sounds.click()}
           >
@@ -83,6 +90,7 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Features */}
       <section id="features" className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
         <div className="grid md:grid-cols-3 gap-5">
           <FeatureCard
@@ -106,8 +114,10 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Bottom line */}
       <div className="absolute bottom-0 left-0 right-0 h-px" style={{ background: `linear-gradient(to right, transparent, ${colors.primary}30, transparent)` }} />
 
+      {/* Footer */}
       <footer className="relative z-10 border-t px-6 py-8 text-center" style={{ borderColor: colors.border }}>
         <p className="text-sm flex items-center justify-center gap-2" style={{ color: colors.textDim }}>
           <Network className="w-3 h-3" style={{ color: `${colors.primary}80` }} />

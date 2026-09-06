@@ -31,27 +31,30 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen text-white flex flex-col items-center justify-center px-6 relative overflow-hidden grid-bg">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden grid-bg" style={{ color: colors.text }}>
       <div className="scanline-overlay" />
 
+      {/* Background orbs */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[20%] left-[30%] w-[400px] h-[400px] rounded-full blur-[120px] animate-float-slow" style={{ background: colors.orb1 }} />
         <div className="absolute bottom-[20%] right-[20%] w-[300px] h-[300px] rounded-full blur-[100px] animate-float" style={{ background: colors.orb2, animationDelay: '2s' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-sm">
+        {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-3 mb-10 animate-fade-in-up" onClick={() => sounds.click()}>
           <div className="relative w-10 h-10 rounded-lg flex items-center justify-center animate-glow-pulse" style={{ background: colors.gradient }}>
             <Zap className="w-5 h-5" style={{ color: colors.bg }} strokeWidth={2.5} />
           </div>
           <div>
             <span className="text-xl font-bold tracking-tight text-gradient-sci">LazyDrop</span>
-            <div className="h-px bg-gradient-to-r from-emerald-400/50 to-transparent mt-0.5" />
+            <div className="h-px mt-0.5" style={{ background: `linear-gradient(to right, ${colors.primary}80, transparent)` }} />
           </div>
         </Link>
 
+        {/* Login Card */}
         <div className="card-sci corner-accent rounded-3xl p-8 animate-scale-in">
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent animate-hologram" />
+          <div className="absolute top-0 left-0 right-0 h-px animate-hologram" style={{ background: `linear-gradient(to right, transparent, ${colors.primary}50, transparent)` }} />
 
           <div className="flex justify-center mb-6">
             <div className="relative w-16 h-16 rounded-2xl border flex items-center justify-center animate-pulse-glow" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}20` }}>
@@ -91,14 +94,15 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-[#06060c] font-bold text-sm btn-sci disabled:opacity-60"
-              style={{ background: colors.gradient }}
+              className="w-full flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-bold text-sm btn-sci disabled:opacity-60"
+              style={{ background: colors.gradient, color: colors.bg }}
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign in'}
             </button>
           </form>
         </div>
 
+        {/* Back link */}
         <Link to="/" className="flex items-center justify-center gap-1.5 mt-8 text-sm transition-colors animate-fade-in-up delay-300" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
           <ArrowLeft className="w-4 h-4" />
           Back to home

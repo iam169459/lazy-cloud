@@ -94,8 +94,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           <ThemeSwitcher />
           <button
             onClick={() => { setShowForm(!showForm); sounds.click(); }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[#06060c] font-bold text-sm btn-sci"
-            style={{ background: colors.gradient }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm btn-sci"
+            style={{ background: colors.gradient, color: colors.bg }}
           >
             {showForm ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {showForm ? 'Done' : 'Add bucket'}
@@ -126,7 +126,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             </FormField>
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[#06060c] font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient }}>
+            <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Save bucket
             </button>

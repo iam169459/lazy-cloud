@@ -99,7 +99,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
           <p className="text-xs mt-1.5 font-mono" style={{ color: colors.textDim }}>You will be logged out after saving</p>
         </div>
 
-        <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-3 rounded-xl text-[#06060c] font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient }}>
+        <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save credentials
         </button>

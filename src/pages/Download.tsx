@@ -38,7 +38,7 @@ export default function DownloadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen text-white flex items-center justify-center grid-bg">
+      <div className="min-h-screen flex items-center justify-center grid-bg" style={{ color: colors.text }}>
         <div className="scanline-overlay" />
         <div className="flex flex-col items-center gap-4 animate-fade-in-up">
           <div className="relative w-14 h-14">
@@ -53,7 +53,7 @@ export default function DownloadPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen text-white flex flex-col items-center justify-center px-6 grid-bg">
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 grid-bg" style={{ color: colors.text }}>
         <div className="scanline-overlay" />
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[30%] left-[20%] w-[300px] h-[300px] rounded-full blur-[120px]" style={{ background: `${colors.danger}08` }} />
@@ -76,7 +76,7 @@ export default function DownloadPage() {
   if (!file) return null;
 
   return (
-    <div className="min-h-screen text-white relative overflow-hidden grid-bg">
+    <div className="min-h-screen relative overflow-hidden grid-bg" style={{ color: colors.text }}>
       <div className="scanline-overlay" />
 
       <div className="absolute inset-0 pointer-events-none">
@@ -113,8 +113,8 @@ export default function DownloadPage() {
             <button
               onClick={handleDownload}
               disabled={downloading}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl text-[#06060c] font-bold text-sm btn-sci disabled:opacity-60 animate-fade-in-up delay-500"
-              style={{ background: colors.gradient }}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-bold text-sm btn-sci disabled:opacity-60 animate-fade-in-up delay-500"
+              style={{ background: colors.gradient, color: colors.bg }}
             >
               {downloading ? (
                 <>
