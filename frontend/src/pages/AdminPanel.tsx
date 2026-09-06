@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
   Database,
@@ -15,14 +15,15 @@ import {
   Loader2,
   AlertCircle,
   Save,
-  Menu,
   LogOut,
+  ChevronRight,
 } from 'lucide-react';
 
-// Custom navigate function (injected by App.tsx)
-const navigate = (window as any).navigate || ((path: string) => {
-  window.location.href = path;
-});
+// Simple navigation without react-router-dom
+const navigateTo = (path: string) => {
+  window.history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
 
 // Storage provider type
 interface StorageProvider {
@@ -57,7 +58,6 @@ interface DashboardData {
 }
 
 export function AdminPanel() {
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'storage' | 'files' | 'security'>('dashboard');
   const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('admin_token'));
   const [providers, setProviders] = useState<StorageProvider[]>([]);
@@ -85,9 +85,8 @@ export function AdminPanel() {
 
   // Check auth on mount
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    if (!token) {
-      navigate('/admin/login');
+    const token = localStorage.getItem('admin_token');      if (!token) {
+      navigateTo('/admin/login');
       return;
     }
 
@@ -108,7 +107,7 @@ export function AdminPanel() {
       if (!response.ok) {
         if (response.status === 401) {
           localStorage.removeItem('admin_token');
-          navigate('/admin/login');
+          navigateTo('/admin/login');
           return;
         }
         throw new Error('Failed to fetch dashboard');
@@ -138,7 +137,7 @@ export function AdminPanel() {
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
-    navigate('/admin/login');
+    navigateTo('/admin/login');
   };
 
   const formatBytes = (bytes: number) => {
@@ -491,7 +490,7 @@ export function AdminPanel() {
                           No storage providers configured.{' '}
                           <button
                             onClick={() => setActiveTab('storage')}
-                            className="text-blue-400 hover:underline"
+                            className="text-blue-400 hover:underline flex items-center gap-1"
                           >
                             Add one now
                           </button>

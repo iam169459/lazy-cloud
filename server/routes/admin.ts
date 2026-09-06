@@ -336,7 +336,7 @@ router.put('/security', async (req: Request, res: Response) => {
   }
 });
 
-// Upload initiation
+// Admin upload initiation (protected - requires auth)
 router.post('/upload/init', async (req: Request, res: Response) => {
   try {
     if (!verifyToken(req)) {
@@ -386,6 +386,25 @@ router.post('/upload/init', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Upload init error:', error);
     res.status(500).json({ error: 'Failed to initialize upload' });
+  }
+});
+
+// Delete all files endpoint
+router.delete('/files', async (req: Request, res: Response) => {
+  try {
+    if (!verifyToken(req)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    await sql`DELETE FROM files`;
+
+    // Reset all provider bytes
+    await sql`UPDATE storage_providers SET current_bytes = 0`;
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete all files error:', error);
+    res.status(500).json({ error: 'Failed to delete all files' });
   }
 });
 

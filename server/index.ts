@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 
 app.use(cors());
 app.use(express.json());
@@ -26,20 +26,19 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-async function startServer() {
-  try {
-    // Initialize database
-    await initDatabase();
+function startServer() {
+  // Initialize database (non-fatal if DB is unavailable)
+  initDatabase().then(() => {
+    console.log('Database initialized successfully');
+  }).catch((dbError) => {
+    console.warn('Warning: Database initialization failed (server will run without DB):', dbError.message);
+  });
 
-    const server = createServer(app);
+  const server = createServer(app);
 
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  }
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
 }
 
 startServer();

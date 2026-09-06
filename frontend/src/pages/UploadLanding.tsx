@@ -66,11 +66,10 @@ export function UploadLanding() {
 
     try {
       // Get presigned upload URL from server
-      const initResponse = await fetch('/api/admin/upload/init', {
+      const initResponse = await fetch('/api/public/upload/init', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
         },
         body: JSON.stringify({
           fileName: file.name,
