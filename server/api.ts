@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
 
 let dbInitialized = false;
@@ -166,7 +166,12 @@ export async function handleApiRequest(
 
           const provider = await findProviderForSize(fileSize);
           if (!provider) {
-            sendError(res, 507, 'No storage provider with enough space. Add another bucket in Storage Settings.');
+            const allProviders = await listProviders();
+            if (allProviders.length === 0) {
+              sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
+            } else {
+              sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
+            }
             return resolve(true);
           }
 
@@ -213,8 +218,10 @@ export async function handleApiRequest(
       if (provider) {
         try {
           await deleteFromProvider(provider, file.r2_key);
-        } catch {
-          // continue even if delete from R2 fails
+        } catch (e: any) {
+          console.error('Failed to delete from storage provider:', e.message);
+          sendError(res, 500, `File removed from database but failed to delete from storage: ${e.message}`);
+          return true;
         }
         await updateProviderBytes(provider.id, -file.file_size);
       }
@@ -258,6 +265,16 @@ export async function handleApiRequest(
       const body = await parseJsonBody(req);
       await deleteProvider(body.id);
       sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/providers/toggle' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      if (!body.id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const provider = await toggleProviderActive(body.id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      sendJson(res, 200, { provider: { ...provider, secret_access_key: provider.secret_access_key ? '--------' : '' } });
       return true;
     }
 

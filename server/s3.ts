@@ -8,8 +8,24 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { StorageProvider } from './db';
 
 function extractRegion(endpointUrl: string): string {
-  const match = endpointUrl.match(/s3\.([^.]+)\.backblazeb2\.com/);
-  return match ? match[1] : 'us-east-005';
+  const url = endpointUrl.toLowerCase();
+
+  const backblazeMatch = url.match(/s3\.([^.]+)\.backblazeb2\.com/);
+  if (backblazeMatch) return backblazeMatch[1];
+
+  const awsMatch = url.match(/s3\.([^.]+)\.amazonaws\.com/);
+  if (awsMatch) return awsMatch[1];
+
+  const doMatch = url.match(/([^.]+)\.digitaloceanspaces\.com/);
+  if (doMatch) return doMatch[1];
+
+  const gcpMatch = url.match(/storage\.googleapis\.com/);
+  if (gcpMatch) return 'auto';
+
+  const wasabiMatch = url.match(/s3\.([^.]+)\.wasabisys\.com/);
+  if (wasabiMatch) return wasabiMatch[1];
+
+  return 'auto';
 }
 
 export function createS3Client(provider: StorageProvider): S3Client {

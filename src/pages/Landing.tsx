@@ -1,61 +1,74 @@
 import { Link } from 'react-router-dom';
-import { Zap, Shield, Cloud, ArrowRight, Lock } from 'lucide-react';
+import { Zap, Shield, Cloud, ArrowRight, Lock, Orbit, Database, Network } from 'lucide-react';
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white overflow-hidden relative">
+    <div className="min-h-screen bg-[#06060c] text-white overflow-hidden relative grid-bg">
+      <div className="scanline-overlay" />
+
+      {/* Animated orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] rounded-full bg-emerald-500/10 blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[5%] w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-[120px]" />
-        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] rounded-full bg-teal-500/5 blur-[100px]" />
+        <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] rounded-full bg-emerald-500/8 blur-[150px] animate-float-slow" />
+        <div className="absolute bottom-[-20%] right-[5%] w-[500px] h-[500px] rounded-full bg-cyan-500/8 blur-[150px] animate-float-slow" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[40%] left-[50%] w-[400px] h-[400px] rounded-full bg-purple-500/5 blur-[120px] animate-float" style={{ animationDelay: '4s' }} />
+      </div>
+
+      {/* Rotating ring decoration */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] pointer-events-none opacity-[0.03]">
+        <div className="w-full h-full rounded-full border border-emerald-400 animate-rotate-slow" />
+        <div className="absolute inset-8 rounded-full border border-cyan-400 animate-rotate-slow" style={{ animationDirection: 'reverse', animationDuration: '30s' }} />
+        <div className="absolute inset-16 rounded-full border border-purple-400 animate-rotate-slow" style={{ animationDuration: '25s' }} />
       </div>
 
       <nav className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-[#0a0a0f]" strokeWidth={2.5} />
+        <div className="flex items-center gap-3 animate-fade-in-left">
+          <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center glow-emerald">
+            <Zap className="w-5 h-5 text-[#06060c]" strokeWidth={2.5} />
           </div>
-          <span className="text-xl font-bold tracking-tight">LazyDrop</span>
+          <div>
+            <span className="text-xl font-bold tracking-tight text-gradient-sci">LazyDrop</span>
+            <div className="h-px bg-gradient-to-r from-emerald-400/50 to-transparent mt-0.5" />
+          </div>
         </div>
         <Link
           to="/admin"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 transition-all border border-white/10 hover:border-white/20"
+          className="group flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-emerald-300 hover:bg-emerald-500/5 transition-all border border-white/10 hover:border-emerald-400/30 animate-fade-in-up"
         >
           <Lock className="w-4 h-4" />
           Admin
         </Link>
       </nav>
 
-      <section className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-24 pb-20 md:pt-32">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-300 mb-8 animate-[fadeIn_0.6s_ease]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+      <section className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-20 pb-20 md:pt-32">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/20 text-sm text-emerald-300 mb-8 animate-fade-in-up glow-emerald corner-accent">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse-glow" />
           Multi-account storage routing
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight max-w-4xl leading-[1.05] mb-6">
+        <h1 className="text-5xl md:text-7xl font-bold tracking-tight max-w-4xl leading-[1.05] mb-6 animate-fade-in-up delay-200">
           Fast, private,
           <br />
-          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400 bg-clip-text text-transparent">
+          <span className="text-gradient-sci">
             link-only file sharing
           </span>
         </h1>
 
-        <p className="text-lg md:text-xl text-gray-400 max-w-xl mb-10 leading-relaxed">
+        <p className="text-lg md:text-xl text-gray-400 max-w-xl mb-10 leading-relaxed animate-fade-in-up delay-300">
           Upload once, share with a link. No browsing, no searching, no noise.
           Files are stored across multiple buckets for unlimited capacity.
         </p>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 animate-fade-in-up delay-400">
           <Link
             to="/admin"
-            className="group flex items-center gap-2 px-7 py-3.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-[#0a0a0f] font-semibold text-sm hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all"
+            className="group flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-500 text-[#06060c] font-bold text-sm btn-sci"
           >
             Go to Admin Panel
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
           <a
             href="#features"
-            className="flex items-center gap-2 px-7 py-3.5 rounded-xl border border-white/10 text-white font-medium text-sm hover:bg-white/5 transition-all"
+            className="flex items-center gap-2 px-8 py-4 rounded-xl border border-white/10 text-white font-medium text-sm hover:bg-white/5 hover:border-emerald-400/20 transition-all"
           >
             Learn more
           </a>
@@ -65,49 +78,48 @@ export default function Landing() {
       <section id="features" className="relative z-10 max-w-5xl mx-auto px-6 pb-24">
         <div className="grid md:grid-cols-3 gap-5">
           <FeatureCard
-            icon={<Zap className="w-5 h-5" />}
+            icon={<Orbit className="w-5 h-5" />}
             title="Lightning fast"
             desc="Files are served directly from the edge via presigned links. No server bottleneck."
+            delay="100"
           />
           <FeatureCard
             icon={<Shield className="w-5 h-5" />}
             title="Private by design"
             desc="No public directory. Files are only accessible through their unique, unguessable link."
+            delay="200"
           />
           <FeatureCard
-            icon={<Cloud className="w-5 h-5" />}
+            icon={<Database className="w-5 h-5" />}
             title="Unlimited storage"
             desc="Multiple S3-compatible buckets are pooled into one virtual drive. Scale without limits."
+            delay="300"
           />
         </div>
       </section>
 
-      <footer className="relative z-10 border-t border-white/5 px-6 py-8 text-center text-sm text-gray-500">
-        LazyDrop — link-only file sharing
-      </footer>
+      {/* Bottom accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
 
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+      <footer className="relative z-10 border-t border-white/5 px-6 py-8 text-center">
+        <p className="text-sm text-gray-500 flex items-center justify-center gap-2">
+          <Network className="w-3 h-3 text-emerald-400/50" />
+          LazyDrop — link-only file sharing
+          <Network className="w-3 h-3 text-emerald-400/50" />
+        </p>
+      </footer>
     </div>
   );
 }
 
-import { memo } from 'react';
-
-const FeatureCard = memo(function FeatureCard({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function FeatureCard({ icon, title, desc, delay }: { icon: React.ReactNode; title: string; desc: string; delay: string }) {
   return (
-    <div className="group p-6 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.05] transition-all">
-      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400/20 to-teal-500/20 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
+    <div className={`group p-6 rounded-2xl card-sci corner-accent animate-fade-in-up`} style={{ animationDelay: `${delay}ms` }}>
+      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400/10 to-cyan-500/10 border border-emerald-400/10 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 group-hover:glow-emerald transition-all duration-300">
         {icon}
       </div>
-      <h3 className="text-base font-semibold mb-2">{title}</h3>
+      <h3 className="text-base font-semibold mb-2 group-hover:text-emerald-300 transition-colors">{title}</h3>
       <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
     </div>
   );
-});
-
-export { FeatureCard };
+}

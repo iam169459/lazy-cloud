@@ -135,6 +135,13 @@ export const api = {
       body: JSON.stringify({ id }),
     }) as Promise<{ success: boolean }>,
 
+  toggleProvider: (id: string, token: string) =>
+    request('/api/admin/providers/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    }) as Promise<{ provider: StorageProvider }>,
+
   getCredentials: (token: string) =>
     request('/api/admin/credentials', {
       headers: { Authorization: `Bearer ${token}` },

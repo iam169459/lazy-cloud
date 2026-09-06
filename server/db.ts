@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { randomUUID } from 'crypto';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -108,13 +109,8 @@ export function getDb() {
   return getSql();
 }
 
-export function generateId(length = 10): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return result;
+export function generateId(_length?: number): string {
+  return randomUUID();
 }
 
 export async function findProviderForSize(fileSize: number): Promise<StorageProvider | null> {
@@ -157,6 +153,17 @@ export async function updateProviderBytes(providerId: string, delta: number): Pr
     SET current_bytes = current_bytes + ${delta}
     WHERE id = ${providerId}
   `;
+}
+
+export async function toggleProviderActive(providerId: string): Promise<StorageProvider | null> {
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE storage_providers
+    SET is_active = NOT is_active
+    WHERE id = ${providerId}
+    RETURNING *
+  `) as unknown[];
+  return (rows[0] as StorageProvider) ?? null;
 }
 
 export async function createFileRecord(file: Omit<FileRecord, 'download_count' | 'created_at'>): Promise<FileRecord> {
