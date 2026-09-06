@@ -82,7 +82,6 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
-      <div className="scanline-overlay" />
 
       {/* Header */}
       <header className="sticky top-0 z-20 backdrop-blur-xl border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>

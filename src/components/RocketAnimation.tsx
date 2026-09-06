@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { Rocket, Star } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 
@@ -10,136 +9,92 @@ interface RocketAnimationProps {
 
 export default function RocketAnimation({ active, onComplete }: RocketAnimationProps) {
   const { colors } = useTheme();
-  const [phase, setPhase] = useState<'idle' | 'launch' | 'fly' | 'arrive' | 'done'>('idle');
-  const [progress, setProgress] = useState(0);
-  const [flame, setFlame] = useState(false);
-  const timerRef = useRef<number | null>(null);
+  const [run, setRun] = useState(false);
 
   useEffect(() => {
-    if (!active) {
-      setPhase('idle');
-      setProgress(0);
-      setFlame(false);
-      return;
-    }
-
-    setPhase('launch');
-    setFlame(true);
+    if (!active) { setRun(false); return; }
+    setRun(true);
     sounds.rocket();
-
-    let p = 0;
-    const interval = setInterval(() => {
-      p += 1;
-      setProgress(p);
-      if (p < 30) {
-        setPhase('launch');
-      } else if (p < 80) {
-        setPhase('fly');
-      } else if (p < 100) {
-        setPhase('arrive');
-      } else {
-        clearInterval(interval);
-        setPhase('done');
-        setFlame(false);
-        sounds.success();
-        setTimeout(() => onComplete?.(), 800);
-      }
-    }, 80);
-
-    return () => clearInterval(interval);
+    const t = setTimeout(() => {
+      sounds.success();
+      setRun(false);
+      onComplete?.();
+    }, 4200);
+    return () => clearTimeout(t);
   }, [active, onComplete]);
 
-  if (phase === 'idle') return null;
+  if (!run) return null;
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center">
-      {/* Stars background */}
-      <div className="absolute inset-0 overflow-hidden">
-        {Array.from({ length: 40 }).map((_, i) => (
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rocket-backdrop" />
+
+      {/* Stars */}
+      <div className="absolute inset-0 overflow-hidden rocket-stars">
+        {Array.from({ length: 50 }).map((_, i) => (
           <div
             key={i}
-            className="absolute rounded-full bg-white animate-pulse-glow"
+            className="absolute rounded-full"
             style={{
-              width: `${1 + Math.random() * 2}px`,
-              height: `${1 + Math.random() * 2}px`,
+              width: `${1 + Math.random() * 2.5}px`,
+              height: `${1 + Math.random() * 2.5}px`,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              opacity: 0.3 + Math.random() * 0.5,
+              background: '#fff',
+              opacity: 0.2 + Math.random() * 0.6,
+              animation: `pulse-glow ${1.5 + Math.random() * 2}s ease-in-out ${Math.random() * 2}s infinite`,
             }}
           />
         ))}
       </div>
 
       {/* Earth */}
-      <div className="absolute bottom-[15%] left-1/2 -translate-x-1/2">
+      <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2">
         <div
-          className="w-32 h-16 rounded-t-full overflow-hidden"
-          style={{
-            background: `linear-gradient(180deg, ${colors.accent}, ${colors.primary})`,
-            opacity: phase === 'idle' ? 0 : 0.6,
-            transition: 'opacity 0.5s',
-          }}
+          className="w-40 h-20 rounded-t-full overflow-hidden rocket-earth"
+          style={{ background: `linear-gradient(180deg, ${colors.accent}, ${colors.primary})`, opacity: 0.5 }}
         >
-          <div className="w-full h-full opacity-30"
-            style={{
-              background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.4), transparent 60%)',
-            }}
-          />
+          <div className="w-full h-full" style={{ background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.3), transparent 60%)' }} />
         </div>
       </div>
 
-      {/* Rocket */}
-      <div
-        className="absolute transition-all duration-300"
-        style={{
-          left: '50%',
-          bottom: phase === 'launch' ? '18%' : phase === 'fly' ? '60%' : phase === 'arrive' ? '80%' : '18%',
-          transform: 'translateX(-50%)',
-          opacity: 1,
-        }}
-      >
+      {/* Rocket container — pure CSS animation */}
+      <div className="rocket-ship">
         {/* Flame */}
-        {flame && (
-          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2">
-            <div className="w-4 h-8 rounded-b-full bg-gradient-to-b from-orange-400 via-red-500 to-transparent animate-pulse" />
-            <div className="absolute top-1 left-1/2 -translate-x-1/2 w-2 h-6 rounded-b-full bg-gradient-to-b from-yellow-300 to-orange-400 animate-pulse" style={{ animationDelay: '0.1s' }} />
-          </div>
-        )}
+        <div className="rocket-flame">
+          <div className="rocket-flame-outer" />
+          <div className="rocket-flame-inner" />
+        </div>
 
         {/* Rocket body */}
-        <div className="relative w-10 h-16 animate-float" style={{ animationDuration: '0.5s' }}>
+        <div className="relative w-10 h-16">
           <div className="absolute inset-0 rounded-t-full bg-gradient-to-b from-white via-gray-200 to-gray-400" />
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gradient-to-br from-cyan-300 to-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.5)]" />
+          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-gradient-to-br from-cyan-300 to-cyan-500 shadow-[0_0_12px_rgba(34,211,238,0.6)]" />
           <div className="absolute bottom-0 left-0 w-3 h-4 bg-gradient-to-t from-red-500 to-red-400 rounded-bl-full -rotate-12 origin-bottom-right" />
           <div className="absolute bottom-0 right-0 w-3 h-4 bg-gradient-to-t from-red-500 to-red-400 rounded-br-full rotate-12 origin-bottom-left" />
         </div>
 
-        {/* File icons around rocket */}
-        {(phase === 'fly' || phase === 'arrive') && (
-          <>
-            <div className="absolute -left-8 top-2 text-lg animate-float" style={{ animationDelay: '0.2s' }}>📄</div>
-            <div className="absolute -right-8 top-0 text-lg animate-float" style={{ animationDelay: '0.4s' }}>📁</div>
-            <div className="absolute -left-6 top-8 text-sm animate-float" style={{ animationDelay: '0.6s' }}>📎</div>
-            <div className="absolute -right-6 top-6 text-sm animate-float" style={{ animationDelay: '0.8s' }}>💾</div>
-          </>
-        )}
+        {/* Orbiting files */}
+        <div className="rocket-files">
+          <span className="rocket-file rf-1">📄</span>
+          <span className="rocket-file rf-2">📁</span>
+          <span className="rocket-file rf-3">📎</span>
+          <span className="rocket-file rf-4">💾</span>
+        </div>
+
+        {/* Trail */}
+        <div className="rocket-trail" />
       </div>
 
-      {/* Progress bar at bottom */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-64">
+      {/* Progress HUD */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-72 rocket-hud">
         <div className="flex justify-between text-xs font-mono mb-1.5" style={{ color: colors.textMuted }}>
-          <span>{phase === 'launch' ? 'LAUNCHING...' : phase === 'fly' ? 'IN TRANSIT...' : phase === 'arrive' ? 'DELIVERING...' : 'COMPLETE'}</span>
-          <span>{Math.min(progress, 100)}%</span>
+          <span className="rocket-status">LAUNCHING...</span>
+          <span className="rocket-pct">0%</span>
         </div>
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: colors.bgCard, border: `1px solid ${colors.border}` }}>
-          <div
-            className="h-full rounded-full transition-all duration-100"
-            style={{
-              width: `${Math.min(progress, 100)}%`,
-              background: colors.gradient,
-            }}
-          />
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-card, #111)', border: '1px solid var(--border)' }}>
+          <div className="h-full rounded-full rocket-progress-bar" style={{ background: colors.gradient }} />
         </div>
       </div>
     </div>
