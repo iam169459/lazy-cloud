@@ -17,6 +17,7 @@ function getSql() {
 
 export interface StorageProvider {
   id: string;
+  provider_type: string;
   provider_name: string;
   endpoint_url: string;
   bucket_name: string;
@@ -44,6 +45,7 @@ export async function initDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS storage_providers (
       id TEXT PRIMARY KEY,
+      provider_type TEXT DEFAULT 's3',
       provider_name TEXT,
       endpoint_url TEXT,
       bucket_name TEXT,
@@ -129,8 +131,8 @@ export async function addProvider(provider: Omit<StorageProvider, 'id' | 'curren
   const sql = getSql();
   const id = generateId(12);
   const rows = (await sql`
-    INSERT INTO storage_providers (id, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, max_bytes, current_bytes, is_active)
-    VALUES (${id}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.max_bytes}, 0, true)
+    INSERT INTO storage_providers (id, provider_type, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, max_bytes, current_bytes, is_active)
+    VALUES (${id}, ${provider.provider_type || 's3'}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.max_bytes}, 0, true)
     RETURNING *
   `) as unknown[];
   return rows[0] as StorageProvider;

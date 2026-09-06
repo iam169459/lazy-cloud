@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Cloud, Plus, Trash2, Loader2, Check, HardDrive, Server, Power, Palette } from 'lucide-react';
+import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, ChevronDown, HardDrive, Info } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { cloudProviders, CloudProvider, getProviderById } from '@/lib/providers';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 interface Props {
@@ -17,6 +18,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
+  const [showProviderList, setShowProviderList] = useState(false);
   const [form, setForm] = useState({
     provider_name: '',
     endpoint_url: '',
@@ -24,7 +27,29 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     access_key_id: '',
     secret_access_key: '',
     max_bytes: '10188208025',
+    region: '',
   });
+
+  function handleSelectProvider(p: CloudProvider) {
+    sounds.click();
+    setSelectedProvider(p);
+    setShowProviderList(false);
+    const endpoint = p.endpoint.replace('{region}', form.region || p.regionPlaceholder).replace('{account_id}', '');
+    setForm({
+      ...form,
+      provider_name: p.name,
+      endpoint_url: endpoint,
+      region: form.region || p.regionPlaceholder,
+    });
+  }
+
+  function handleRegionChange(region: string) {
+    setForm({ ...form, region });
+    if (selectedProvider) {
+      const endpoint = selectedProvider.endpoint.replace('{region}', region).replace('{account_id}', '');
+      setForm(prev => ({ ...prev, region, endpoint_url: endpoint }));
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +57,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     setSaving(true);
     try {
       await api.addProvider({
+        provider_type: selectedProvider?.id || 'custom',
         provider_name: form.provider_name,
         endpoint_url: form.endpoint_url,
         bucket_name: form.bucket_name,
@@ -41,7 +67,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       }, token);
       sounds.store();
       onNotify('success', 'Storage bucket added');
-      setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025' });
+      setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: '' });
+      setSelectedProvider(null);
       setShowForm(false);
       onRefresh();
     } catch (e: any) {
@@ -80,8 +107,17 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     }
   }
 
+  // Group providers by type
+  const groupedProviders: Record<string, StorageProvider[]> = {};
+  providers.forEach(p => {
+    const type = p.provider_type || 'custom';
+    if (!groupedProviders[type]) groupedProviders[type] = [];
+    groupedProviders[type].push(p);
+  });
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-up">
         <div>
           <h2 className="font-semibold flex items-center gap-2">
@@ -103,40 +139,139 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         </div>
       </div>
 
+      {/* Add Provider Form */}
       {showForm && (
-        <form onSubmit={handleAdd} className="card-sci corner-accent rounded-2xl p-6 space-y-4 animate-slide-down">
-          <div className="grid md:grid-cols-2 gap-4">
-            <FormField label="Provider name" required>
-              <input type="text" value={form.provider_name} onChange={(e) => { setForm({ ...form, provider_name: e.target.value }); sounds.type(); }} placeholder="My R2 Account" required className="form-input" />
-            </FormField>
-            <FormField label="Endpoint URL" required>
-              <input type="url" value={form.endpoint_url} onChange={(e) => { setForm({ ...form, endpoint_url: e.target.value }); sounds.type(); }} placeholder="https://xxx.r2.cloudflarestorage.com" required className="form-input" />
-            </FormField>
-            <FormField label="Bucket name" required>
-              <input type="text" value={form.bucket_name} onChange={(e) => { setForm({ ...form, bucket_name: e.target.value }); sounds.type(); }} placeholder="my-bucket" required className="form-input" />
-            </FormField>
-            <FormField label="Max bytes (default ~9.5 GB)">
-              <input type="number" value={form.max_bytes} onChange={(e) => setForm({ ...form, max_bytes: e.target.value })} className="form-input" />
-            </FormField>
-            <FormField label="Access key ID" required>
-              <input type="text" value={form.access_key_id} onChange={(e) => { setForm({ ...form, access_key_id: e.target.value }); sounds.type(); }} required className="form-input" />
-            </FormField>
-            <FormField label="Secret access key" required>
-              <input type="password" value={form.secret_access_key} onChange={(e) => { setForm({ ...form, secret_access_key: e.target.value }); sounds.type(); }} required className="form-input" />
-            </FormField>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Save bucket
+        <div className="card-sci corner-accent rounded-2xl p-6 animate-slide-down">
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: colors.text }}>
+            <Server className="w-4 h-4" style={{ color: colors.primary }} />
+            Select Cloud Provider
+          </h3>
+
+          {/* Provider Selector Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-6">
+            {cloudProviders.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectProvider(p)}
+                className="relative p-3 rounded-xl border text-left transition-all duration-300"
+                style={{
+                  background: selectedProvider?.id === p.id ? `${p.color}15` : colors.cardBg,
+                  borderColor: selectedProvider?.id === p.id ? `${p.color}50` : colors.border,
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-lg">{p.icon}</span>
+                  <span className="text-xs font-semibold truncate" style={{ color: colors.text }}>{p.name}</span>
+                </div>
+                <span className="text-[10px] font-mono" style={{ color: p.color }}>{p.freeTier}</span>
+                {selectedProvider?.id === p.id && (
+                  <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: p.color }}>
+                    <Check className="w-2.5 h-2.5" style={{ color: '#fff' }} />
+                  </div>
+                )}
+              </button>
+            ))}
+
+            {/* Custom option */}
+            <button
+              type="button"
+              onClick={() => { setSelectedProvider(null); sounds.click(); }}
+              className="relative p-3 rounded-xl border text-left transition-all duration-300"
+              style={{
+                background: !selectedProvider ? `${colors.primary}15` : colors.cardBg,
+                borderColor: !selectedProvider ? `${colors.primary}50` : colors.border,
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">⚙️</span>
+                <span className="text-xs font-semibold" style={{ color: colors.text }}>Custom S3</span>
+              </div>
+              <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>Any endpoint</span>
             </button>
-            <button type="button" onClick={() => { setShowForm(false); sounds.click(); }} className="px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
-              Cancel
-            </button>
           </div>
-        </form>
+
+          {/* Selected Provider Info */}
+          {selectedProvider && (
+            <div className="mb-6 p-4 rounded-xl border animate-fade-in-up" style={{ background: `${selectedProvider.color}08`, borderColor: `${selectedProvider.color}20` }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{selectedProvider.icon}</span>
+                  <div>
+                    <h4 className="font-semibold text-sm" style={{ color: colors.text }}>{selectedProvider.name}</h4>
+                    <p className="text-xs font-mono" style={{ color: selectedProvider.color }}>{selectedProvider.protocol} • {selectedProvider.freeTier}</p>
+                  </div>
+                </div>
+                <a href={selectedProvider.signupUrl} target="_blank" rel="noopener" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-all" style={{ borderColor: `${selectedProvider.color}30`, color: selectedProvider.color }}>
+                  Sign up free
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <p className="text-xs mt-2" style={{ color: colors.textDim }}>{selectedProvider.maxStorage}</p>
+            </div>
+          )}
+
+          {/* Form Fields */}
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField label="Provider name" required>
+                <input type="text" value={form.provider_name} onChange={(e) => { setForm({ ...form, provider_name: e.target.value }); sounds.type(); }} placeholder="My Storage" required className="form-input" />
+              </FormField>
+
+              {selectedProvider && selectedProvider.endpoint.includes('{region}') && (
+                <FormField label="Region" required>
+                  <div className="relative">
+                    <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider.regionPlaceholder} required className="form-input" />
+                  </div>
+                </FormField>
+              )}
+
+              <FormField label="Endpoint URL" required>
+                <input type="url" value={form.endpoint_url} onChange={(e) => { setForm({ ...form, endpoint_url: e.target.value }); sounds.type(); }} placeholder="https://s3.amazonaws.com" required className="form-input" />
+              </FormField>
+
+              <FormField label="Bucket name" required>
+                <input type="text" value={form.bucket_name} onChange={(e) => { setForm({ ...form, bucket_name: e.target.value }); sounds.type(); }} placeholder="my-bucket" required className="form-input" />
+              </FormField>
+
+              <FormField label="Max bytes (default ~9.5 GB)">
+                <input type="number" value={form.max_bytes} onChange={(e) => setForm({ ...form, max_bytes: e.target.value })} className="form-input" />
+              </FormField>
+
+              <FormField label="Access key ID" required>
+                <input type="text" value={form.access_key_id} onChange={(e) => { setForm({ ...form, access_key_id: e.target.value }); sounds.type(); }} required className="form-input" />
+              </FormField>
+
+              <FormField label="Secret access key" required>
+                <input type="password" value={form.secret_access_key} onChange={(e) => { setForm({ ...form, secret_access_key: e.target.value }); sounds.type(); }} required className="form-input" />
+              </FormField>
+            </div>
+
+            {/* Help text */}
+            {selectedProvider && (
+              <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: `${colors.primary}05`, border: `1px solid ${colors.primary}10` }}>
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.primary }} />
+                <div className="text-xs" style={{ color: colors.textDim }}>
+                  <p>Get your credentials from <a href={selectedProvider.docsUrl} target="_blank" rel="noopener" className="underline" style={{ color: selectedProvider.color }}>{selectedProvider.name} docs</a></p>
+                  <p className="mt-1">Paste your Access Key ID and Secret Access Key from your provider's dashboard.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Save bucket
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); setSelectedProvider(null); sounds.click(); }} className="px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
+      {/* Provider List */}
       {providers.length === 0 ? (
         <div className="card-sci rounded-2xl py-20 text-center animate-fade-in-up">
           <Cloud className="w-12 h-12 mx-auto mb-4" style={{ color: `${colors.text}15` }} />
@@ -144,56 +279,84 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>CLICK_ADD_BUCKET_TO_CONNECT</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
-          {providers.map((p, i) => {
-            const pct = p.max_bytes > 0 ? (p.current_bytes / p.max_bytes) * 100 : 0;
-            const isFull = pct >= 95;
+        <div className="space-y-6">
+          {Object.entries(groupedProviders).map(([type, typeProviders]) => {
+            const providerInfo = getProviderById(type);
             return (
-              <div
-                key={p.id}
-                className="card-sci corner-accent rounded-2xl p-5 group animate-fade-in-up"
-                style={{ animationDelay: `${i * 100}ms` }}
-                onMouseEnter={() => sounds.hover()}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300" style={{ background: `${colors.primary}10`, borderColor: p.is_active ? `${colors.primary}25` : `${colors.text}08`, color: p.is_active ? colors.primary : colors.textDim }}>
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">{p.provider_name}</h3>
-                      <p className="text-xs font-mono" style={{ color: colors.textDim }}>{p.bucket_name}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2 rounded-lg transition-all disabled:opacity-50" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }}>
-                    {deletingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                  </button>
+              <div key={type} className="animate-fade-in-up">
+                {/* Group Header */}
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  {providerInfo ? (
+                    <>
+                      <span className="text-sm">{providerInfo.icon}</span>
+                      <span className="text-xs font-semibold" style={{ color: providerInfo.color }}>{providerInfo.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-mono" style={{ background: `${providerInfo.color}15`, color: providerInfo.color }}>{providerInfo.protocol}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Server className="w-3 h-3" style={{ color: colors.textDim }} />
+                      <span className="text-xs font-semibold" style={{ color: colors.textDim }}>Custom / Other</span>
+                    </>
+                  )}
+                  <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>{typeProviders.length} bucket{typeProviders.length !== 1 ? 's' : ''}</span>
                 </div>
 
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs mb-1.5 font-mono" style={{ color: colors.textMuted }}>
-                    <span>{formatBytes(p.current_bytes)} / {formatBytes(p.max_bytes)}</span>
-                    <span style={{ color: isFull ? colors.warning : colors.textDim }}>{pct.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: `${colors.text}05` }}>
-                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(pct, 100)}%`, background: isFull ? `linear-gradient(to right, ${colors.warning}, ${colors.danger})` : colors.gradient }} />
-                  </div>
-                </div>
+                {/* Provider Cards */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {typeProviders.map((p, i) => {
+                    const pct = p.max_bytes > 0 ? (p.current_bytes / p.max_bytes) * 100 : 0;
+                    const isFull = pct >= 95;
+                    const pInfo = getProviderById(p.provider_type);
+                    return (
+                      <div
+                        key={p.id}
+                        className="card-sci corner-accent rounded-2xl p-5 group animate-fade-in-up"
+                        style={{ animationDelay: `${i * 80}ms` }}
+                        onMouseEnter={() => sounds.hover()}
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-300" style={{ background: `${pInfo?.color || colors.primary}10`, borderColor: p.is_active ? `${pInfo?.color || colors.primary}25` : `${colors.text}08`, color: p.is_active ? (pInfo?.color || colors.primary) : colors.textDim }}>
+                              {pInfo ? <span className="text-xl">{pInfo.icon}</span> : <Server className="w-5 h-5" />}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-sm">{p.provider_name}</h3>
+                              <p className="text-xs font-mono" style={{ color: colors.textDim }}>{p.bucket_name}</p>
+                            </div>
+                          </div>
+                          <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2 rounded-lg transition-all disabled:opacity-50" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }}>
+                            {deletingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </button>
+                        </div>
 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t" style={{ borderColor: `${colors.text}08` }}>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleToggleActive(p.id)}
-                      className="relative w-10 h-5 rounded-full transition-all duration-300"
-                      style={{ background: p.is_active ? colors.gradient : `${colors.text}15` }}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-300 flex items-center justify-center`} style={{ background: colors.bg, transform: p.is_active ? 'translateX(20px)' : 'translateX(0)' }}>
-                        {p.is_active && <Power className="w-2 h-2" style={{ color: colors.primary }} />}
-                      </span>
-                    </button>
-                    <span className="text-xs font-mono" style={{ color: colors.textDim }}>{p.is_active ? 'ONLINE' : 'OFFLINE'}</span>
-                  </div>
-                  <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+                        <div className="mb-3">
+                          <div className="flex justify-between text-xs mb-1.5 font-mono" style={{ color: colors.textMuted }}>
+                            <span>{formatBytes(p.current_bytes)} / {formatBytes(p.max_bytes)}</span>
+                            <span style={{ color: isFull ? colors.warning : colors.textDim }}>{pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="h-2 rounded-full overflow-hidden" style={{ background: `${colors.text}05` }}>
+                            <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(pct, 100)}%`, background: isFull ? `linear-gradient(to right, ${colors.warning}, ${colors.danger})` : `linear-gradient(to right, ${pInfo?.color || colors.primary}, ${colors.secondary})` }} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-4 pt-3 border-t" style={{ borderColor: `${colors.text}08` }}>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleToggleActive(p.id)}
+                              className="relative w-10 h-5 rounded-full transition-all duration-300"
+                              style={{ background: p.is_active ? (pInfo?.color || colors.gradient) : `${colors.text}15` }}
+                            >
+                              <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-300 flex items-center justify-center" style={{ background: colors.bg, transform: p.is_active ? 'translateX(20px)' : 'translateX(0)' }}>
+                                {p.is_active && <Power className="w-2 h-2" style={{ color: pInfo?.color || colors.primary }} />}
+                              </span>
+                            </button>
+                            <span className="text-xs font-mono" style={{ color: colors.textDim }}>{p.is_active ? 'ONLINE' : 'OFFLINE'}</span>
+                          </div>
+                          <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );

@@ -15,6 +15,7 @@ export interface FileWithProvider extends FileInfo {
 
 export interface StorageProvider {
   id: string;
+  provider_type: string;
   provider_name: string;
   endpoint_url: string;
   bucket_name: string;
