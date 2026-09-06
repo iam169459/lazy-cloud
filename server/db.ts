@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { randomUUID } from 'crypto';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -108,13 +109,8 @@ export function getDb() {
   return getSql();
 }
 
-export function generateId(length = 10): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return result;
+export function generateId(_length?: number): string {
+  return randomUUID();
 }
 
 export async function findProviderForSize(fileSize: number): Promise<StorageProvider | null> {

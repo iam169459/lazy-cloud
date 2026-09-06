@@ -166,7 +166,12 @@ export async function handleApiRequest(
 
           const provider = await findProviderForSize(fileSize);
           if (!provider) {
-            sendError(res, 507, 'No storage provider with enough space. Add another bucket in Storage Settings.');
+            const allProviders = await listProviders();
+            if (allProviders.length === 0) {
+              sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
+            } else {
+              sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
+            }
             return resolve(true);
           }
 
