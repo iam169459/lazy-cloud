@@ -59,6 +59,15 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     }
   }
 
+  async function handleToggleActive(id: string) {
+    try {
+      await api.toggleProvider(id, token);
+      onRefresh();
+    } catch (e: any) {
+      onNotify('error', e.message);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -151,7 +160,12 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                 </div>
 
                 <div className="flex items-center gap-2 mt-3">
-                  <span className={`w-2 h-2 rounded-full ${p.is_active ? 'bg-emerald-400' : 'bg-gray-600'}`} />
+                  <button
+                    onClick={() => handleToggleActive(p.id)}
+                    className={`relative w-9 h-5 rounded-full transition-colors ${p.is_active ? 'bg-emerald-400' : 'bg-gray-600'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${p.is_active ? 'translate-x-4' : ''}`} />
+                  </button>
                   <span className="text-xs text-gray-500">{p.is_active ? 'Active' : 'Inactive'}</span>
                   <span className="text-xs text-gray-600 ml-auto truncate">{p.endpoint_url}</span>
                 </div>

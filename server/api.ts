@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
 
 let dbInitialized = false;
@@ -265,6 +265,16 @@ export async function handleApiRequest(
       const body = await parseJsonBody(req);
       await deleteProvider(body.id);
       sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/providers/toggle' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      if (!body.id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const provider = await toggleProviderActive(body.id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      sendJson(res, 200, { provider: { ...provider, secret_access_key: provider.secret_access_key ? '--------' : '' } });
       return true;
     }
 

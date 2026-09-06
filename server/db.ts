@@ -155,6 +155,17 @@ export async function updateProviderBytes(providerId: string, delta: number): Pr
   `;
 }
 
+export async function toggleProviderActive(providerId: string): Promise<StorageProvider | null> {
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE storage_providers
+    SET is_active = NOT is_active
+    WHERE id = ${providerId}
+    RETURNING *
+  `) as unknown[];
+  return (rows[0] as StorageProvider) ?? null;
+}
+
 export async function createFileRecord(file: Omit<FileRecord, 'download_count' | 'created_at'>): Promise<FileRecord> {
   const sql = getSql();
   const rows = (await sql`
