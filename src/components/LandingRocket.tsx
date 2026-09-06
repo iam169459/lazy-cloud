@@ -122,12 +122,15 @@ export default function LandingRocket() {
       {/* Rocket */}
       <div
         ref={rocketRef}
-        className="absolute"
         style={{
           position: 'fixed',
-          inset: 0,
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
           willChange: 'transform, opacity',
           transform: 'translate(15vw, 88vh) scale(0.5) rotate(-3deg)',
+          overflow: 'visible',
         }}
       >
         {/* Flame */}

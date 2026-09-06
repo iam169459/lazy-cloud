@@ -203,9 +203,13 @@ export default function RocketAnimation({ active, onComplete }: RocketAnimationP
         ref={rocketRef}
         style={{
           position: 'fixed',
-          inset: 0,
+          top: 0,
+          left: 0,
+          width: 0,
+          height: 0,
           willChange: 'transform, opacity',
           transform: 'translate(20vw, 84vh) scale(0.5) rotate(-3deg)',
+          overflow: 'visible',
         }}
       >
         {/* Flame */}
