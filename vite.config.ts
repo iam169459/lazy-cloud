@@ -23,28 +23,9 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: ['lucide-react'],
     },
-    esbuild: {
-      pure: ['Math.floor', 'Math.random'],
-      drop: ['console', 'debugger'],
-    },
-    css: {
-      minify: 'esbuild',
-    },
     server: {
       fs: {
         allow: ['..'],
-      },
-    },
-    build: {
-      minify: 'esbuild',
-      target: 'es2022',
-      sourcemap: 'hidden',
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom'],
-          },
-        },
       },
     },
   };
