@@ -58,56 +58,54 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <div className="animate-fade-in-up">
         <h2 className="font-semibold flex items-center gap-2">
           <Shield className="w-4 h-4" style={{ color: colors.primary }} />
           <span className="text-gradient-sci">Security / Credentials</span>
         </h2>
-        <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Update your admin username and password</p>
+        <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Update your admin username and password</p>
       </div>
 
-      <form onSubmit={handleSave} className="max-w-lg card-sci corner-accent rounded-2xl p-6 space-y-5 animate-fade-in-up delay-100">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent animate-hologram" />
-
+      <form onSubmit={handleSave} className="max-w-lg card-sci corner-accent rounded-2xl p-5 sm:p-6 space-y-4 sm:space-y-5 animate-fade-in-up delay-100">
         <div>
-          <label className="block text-[10px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Current username</label>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Current username</label>
           <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: `${colors.text}02`, borderColor: `${colors.text}05`, color: colors.textDim }}>
-            <Fingerprint className="w-4 h-4" style={{ color: `${colors.primary}80` }} />
-            {currentUsername || 'admin'}
+            <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: `${colors.primary}80` }} />
+            <span className="truncate">{currentUsername || 'admin'}</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-[10px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
             New username <span style={{ color: colors.primary }}>*</span>
           </label>
-          <div className="relative">
-            <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: colors.textDim }} />
-            <input type="text" value={formUsername} onChange={(e) => { setFormUsername(e.target.value); sounds.type(); }} placeholder="admin" required className="form-input pl-11" />
+          <div className="input-icon-wrap">
+            <span className="input-icon"><User className="w-4 h-4" style={{ color: colors.textDim }} /></span>
+            <input type="text" value={formUsername} onChange={(e) => { setFormUsername(e.target.value); sounds.type(); }} placeholder="admin" required className="form-input" />
           </div>
         </div>
 
         <div>
-          <label className="block text-[10px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
             New password <span style={{ color: colors.primary }}>*</span>
           </label>
-          <div className="relative">
-            <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: colors.textDim }} />
-            <input type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); sounds.type(); }} placeholder="Enter new password" required className="form-input pl-11" />
+          <div className="input-icon-wrap">
+            <span className="input-icon"><KeyRound className="w-4 h-4" style={{ color: colors.textDim }} /></span>
+            <input type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); sounds.type(); }} placeholder="Enter new password" required className="form-input" />
           </div>
-          <p className="text-xs mt-1.5 font-mono" style={{ color: colors.textDim }}>You will be logged out after saving</p>
+          <p className="text-[11px] mt-1.5 font-mono" style={{ color: colors.textDim }}>You will be logged out after saving</p>
         </div>
 
-        <button type="submit" disabled={saving} className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
+        <button type="submit" disabled={saving} className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save credentials
         </button>
       </form>
 
-      <div className="max-w-lg rounded-2xl p-4 flex items-start gap-3 animate-fade-in-up delay-200" style={{ background: `${colors.warning}08`, border: `1px solid ${colors.warning}15` }}>
+      <div className="max-w-lg rounded-2xl p-3 sm:p-4 flex items-start gap-3 animate-fade-in-up delay-200" style={{ background: `${colors.warning}08`, border: `1px solid ${colors.warning}15` }}>
         <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: `${colors.warning}90` }} />
-        <p className="text-xs leading-relaxed font-mono" style={{ color: `${colors.warning}80` }}>
+        <p className="text-[11px] sm:text-xs leading-relaxed font-mono" style={{ color: `${colors.warning}80` }}>
           If no custom credentials have been set, the system falls back to default credentials (username: <span style={{ color: colors.warning }}>admin</span>).
         </p>
       </div>

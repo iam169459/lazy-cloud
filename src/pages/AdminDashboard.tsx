@@ -79,7 +79,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <RocketAnimation active={rocketActive} onComplete={() => setRocketActive(false)} />
 
       {/* Upload Zone */}
@@ -88,7 +88,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => !uploading && fileInputRef.current?.click()}
-        className="relative rounded-2xl border-2 border-dashed p-10 text-center cursor-pointer transition-all duration-500 corner-accent animate-fade-in-up ripple-effect"
+        className="relative rounded-2xl border-2 border-dashed p-6 sm:p-10 text-center cursor-pointer transition-all duration-500 animate-fade-in-up"
         style={{
           borderColor: dragOver ? colors.primary : colors.border,
           background: dragOver ? `${colors.primary}08` : colors.cardBg,
@@ -96,9 +96,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       >
         <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
         {uploading ? (
-          <div className="flex flex-col items-center gap-4 animate-scale-in">
+          <div className="flex flex-col items-center gap-3 sm:gap-4 animate-scale-in">
             <div className="relative">
-              <Loader2 className="w-12 h-12 animate-spin" style={{ color: colors.primary }} />
+              <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin" style={{ color: colors.primary }} />
               <div className="absolute inset-0 rounded-full border-2 animate-ping" style={{ borderColor: `${colors.primary}30` }} />
             </div>
             <div className="w-full max-w-xs">
@@ -113,13 +113,13 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 animate-fade-in-up">
-            <div className="relative w-14 h-14 rounded-2xl border flex items-center justify-center transition-transform hover:scale-110" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}15` }}>
-              <Upload className="w-7 h-7" style={{ color: colors.primary }} />
+            <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border flex items-center justify-center" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}15` }}>
+              <Upload className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: colors.primary }} />
               <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse-glow" style={{ background: colors.primary }} />
             </div>
             <div>
-              <p className="font-medium" style={{ color: colors.text }}>Drop a file here or click to browse</p>
-              <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Files are routed to the next available bucket</p>
+              <p className="text-sm sm:text-base font-medium" style={{ color: colors.text }}>Drop a file here or click to browse</p>
+              <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Files are routed to the next available bucket</p>
             </div>
           </div>
         )}
@@ -127,67 +127,63 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
 
       {/* File List */}
       <div className="rounded-2xl card-sci overflow-hidden animate-fade-in-up delay-200">
-        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: `${colors.text}08` }}>
+        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b flex items-center justify-between" style={{ borderColor: `${colors.text}08` }}>
           <h2 className="font-semibold flex items-center gap-2">
             <Terminal className="w-4 h-4" style={{ color: colors.primary }} />
-            <span className="text-gradient-sci">Uploaded Files</span>
+            <span className="text-gradient-sci text-sm sm:text-base">Uploaded Files</span>
           </h2>
-          <span className="text-xs font-mono px-3 py-1 rounded-full" style={{ color: colors.textDim, background: `${colors.text}05`, border: `1px solid ${colors.text}08` }}>
+          <span className="text-[10px] sm:text-xs font-mono px-2 sm:px-3 py-0.5 sm:py-1 rounded-full" style={{ color: colors.textDim, background: `${colors.text}05`, border: `1px solid ${colors.text}08` }}>
             {files.length} file{files.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {files.length === 0 ? (
-          <div className="py-20 text-center">
-            <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: `${colors.text}15` }} />
-            <p style={{ color: colors.textMuted }}>No files yet. Upload one above to get started.</p>
+          <div className="py-16 sm:py-20 text-center px-4">
+            <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4" style={{ color: `${colors.text}15` }} />
+            <p className="text-sm" style={{ color: colors.textMuted }}>No files yet. Upload one above to get started.</p>
             <p className="text-xs mt-1 font-mono" style={{ color: colors.textDim }}>AWAITING_FIRST_UPLOAD</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[500px]">
               <thead>
                 <tr className="text-left text-[10px] border-b font-mono uppercase tracking-wider" style={{ color: colors.textDim, borderColor: `${colors.text}08` }}>
-                  <th className="px-5 py-3">Name</th>
-                  <th className="px-5 py-3">Size</th>
-                  <th className="px-5 py-3 hidden md:table-cell">Bucket</th>
-                  <th className="px-5 py-3 hidden md:table-cell">Uploaded</th>
-                  <th className="px-5 py-3 hidden sm:table-cell">Downloads</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
+                  <th className="px-4 sm:px-5 py-3">Name</th>
+                  <th className="px-4 sm:px-5 py-3">Size</th>
+                  <th className="px-4 sm:px-5 py-3 hidden md:table-cell">Bucket</th>
+                  <th className="px-4 sm:px-5 py-3 hidden lg:table-cell">Uploaded</th>
+                  <th className="px-4 sm:px-5 py-3 hidden sm:table-cell">Downloads</th>
+                  <th className="px-4 sm:px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {files.map((file, i) => (
                   <tr
                     key={file.id}
-                    className="border-b transition-all duration-300 group animate-fade-in-up"
+                    className="border-b transition-all duration-300 animate-fade-in-up"
                     style={{ borderColor: `${colors.text}05`, animationDelay: `${i * 50}ms` }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = colors.cardHover; sounds.hover(); }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 transition-all" style={{ background: `${colors.primary}08`, borderColor: `${colors.primary}15`, color: colors.primary }}>
-                          <FileText className="w-4 h-4" />
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border flex items-center justify-center flex-shrink-0" style={{ background: `${colors.primary}08`, borderColor: `${colors.primary}15`, color: colors.primary }}>
+                          <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </div>
-                        <span className="text-sm font-medium truncate max-w-[200px]">{file.original_name}</span>
+                        <span className="text-xs sm:text-sm font-medium truncate max-w-[120px] sm:max-w-[200px]">{file.original_name}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-sm whitespace-nowrap font-mono" style={{ color: colors.textMuted }}>{formatBytes(file.file_size)}</td>
-                    <td className="px-5 py-3.5 text-sm hidden md:table-cell">
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-xs sm:text-sm whitespace-nowrap font-mono" style={{ color: colors.textMuted }}>{formatBytes(file.file_size)}</td>
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-sm hidden md:table-cell">
                       <span className="px-2 py-0.5 rounded text-xs font-mono" style={{ background: `${colors.text}05`, border: `1px solid ${colors.text}08` }}>{file.provider_name || '—'}</span>
                     </td>
-                    <td className="px-5 py-3.5 text-sm hidden md:table-cell whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(file.created_at)}</td>
-                    <td className="px-5 py-3.5 text-sm hidden sm:table-cell font-mono" style={{ color: colors.textMuted }}>{file.download_count}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-sm hidden lg:table-cell whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(file.created_at)}</td>
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-sm hidden sm:table-cell font-mono" style={{ color: colors.textMuted }}>{file.download_count}</td>
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5">
+                      <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                         <button
                           onClick={() => copyLink(file.id)}
                           title="Copy link"
-                          className="p-2 rounded-lg transition-all duration-300 ripple-effect"
+                          className="p-2 sm:p-2.5 rounded-lg transition-all duration-300"
                           style={{ color: copiedId === file.id ? colors.success : colors.textDim }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.primary}15`; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                         >
                           {copiedId === file.id ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                         </button>
@@ -195,10 +191,8 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
                           onClick={() => deleteFile(file.id, file.original_name)}
                           title="Delete file"
                           disabled={deletingId === file.id}
-                          className="p-2 rounded-lg transition-all duration-300 disabled:opacity-50"
+                          className="p-2 sm:p-2.5 rounded-lg transition-all duration-300 disabled:opacity-50"
                           style={{ color: colors.textDim }}
-                          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }}
-                          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }}
                         >
                           {deletingId === file.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                         </button>
