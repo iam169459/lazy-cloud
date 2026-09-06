@@ -1,16 +1,16 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-
 let sql: ReturnType<typeof neon> | null = null;
 
 function getSql() {
-  if (!DATABASE_URL) {
+  // Read lazily so .env values loaded by vite after module import are picked up
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
     throw new Error('DATABASE_URL is not set');
   }
   if (!sql) {
-    sql = neon(DATABASE_URL);
+    sql = neon(databaseUrl);
   }
   return sql;
 }
@@ -64,7 +64,7 @@ export async function initDatabase() {
       file_size BIGINT NOT NULL,
       mime_type TEXT,
       r2_key TEXT NOT NULL,
-      provider_id TEXT REFERENCES storage_providers(id),
+      provider_id TEXT,
       download_count INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -75,9 +75,30 @@ export async function initDatabase() {
       id TEXT PRIMARY KEY DEFAULT 'singleton',
       username TEXT NOT NULL,
       password TEXT NOT NULL,
+      settings TEXT DEFAULT '{}',
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
+
+  // --- Schema migrations (idempotent, safe on every startup) ---
+
+  // Recreate the files→providers FK with ON DELETE SET NULL so removing a
+  // bucket no longer fails when files reference it; the file record survives
+  // with provider_id = NULL (matches the UI warning text).
+  try {
+    await sql`ALTER TABLE files DROP CONSTRAINT IF EXISTS files_provider_id_fkey`;
+    await sql`ALTER TABLE files ADD CONSTRAINT files_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES storage_providers(id) ON DELETE SET NULL`;
+  } catch (e: any) {
+    console.warn('[lazydrop] FK migration skipped:', e.message);
+  }
+
+  // Settings JSON on admin_settings (idempotent — safe on every startup)
+  await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'`;
+
+  // Indexes for the hot query paths
+  await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_files_provider_id ON files (provider_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_storage_providers_active ON storage_providers (is_active)`;
 }
 
 export interface AdminCredentials {
@@ -107,11 +128,65 @@ export async function updateAdminCredentials(username: string, password: string)
   `;
 }
 
+export interface AppSettings {
+  siteName: string;
+  maxFileSize: string;
+  allowedTypes: string;
+  autoDelete: boolean;
+  autoDeleteDays: string;
+  enableDownloadCounter: boolean;
+  enablePublicUpload: boolean;
+  maxStoragePerBucket: string;
+}
+
+const DEFAULT_SETTINGS: AppSettings = {
+  siteName: 'LazyDrop',
+  maxFileSize: '10737418240',
+  allowedTypes: '*',
+  autoDelete: false,
+  autoDeleteDays: '30',
+  enableDownloadCounter: true,
+  enablePublicUpload: false,
+  maxStoragePerBucket: '10188208025',
+};
+
+export async function getAppSettings(): Promise<AppSettings> {
+  const sql = getSql();
+  const rows = (await sql`SELECT settings FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  const raw = rows[0] as { settings?: string } | undefined;
+  if (raw?.settings) {
+    try {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw.settings) };
+    } catch {
+      // corrupt settings — fall back to defaults
+    }
+  }
+  return DEFAULT_SETTINGS;
+}
+
+export async function updateAppSettings(patch: Partial<AppSettings>): Promise<AppSettings> {
+  const sql = getSql();
+  const next = { ...(await getAppSettings()), ...patch };
+  await sql`
+    INSERT INTO admin_settings (id, username, password, settings, updated_at)
+    VALUES (
+      'singleton',
+      ${process.env.ADMIN_USERNAME || 'admin'},
+      ${process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024'},
+      ${JSON.stringify(next)},
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT (id) DO UPDATE
+    SET settings = ${JSON.stringify(next)}, updated_at = CURRENT_TIMESTAMP
+  `;
+  return next;
+}
+
 export function getDb() {
   return getSql();
 }
 
-export function generateId(_length?: number): string {
+export function generateId(): string {
   return randomUUID();
 }
 
@@ -129,7 +204,7 @@ export async function findProviderForSize(fileSize: number): Promise<StorageProv
 
 export async function addProvider(provider: Omit<StorageProvider, 'id' | 'current_bytes' | 'is_active'>): Promise<StorageProvider> {
   const sql = getSql();
-  const id = generateId(12);
+  const id = generateId();
   const rows = (await sql`
     INSERT INTO storage_providers (id, provider_type, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, max_bytes, current_bytes, is_active)
     VALUES (${id}, ${provider.provider_type || 's3'}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.max_bytes}, 0, true)
@@ -182,6 +257,15 @@ export async function getFileRecord(id: string): Promise<FileRecord | null> {
   const sql = getSql();
   const rows = (await sql`SELECT * FROM files WHERE id = ${id}`) as unknown[];
   return (rows[0] as FileRecord) ?? null;
+}
+
+export async function listExpiredFiles(days: number): Promise<FileRecord[]> {
+  const sql = getSql();
+  return (await sql`
+    SELECT * FROM files
+    WHERE created_at < NOW() - make_interval(days => ${days})
+    ORDER BY created_at ASC
+  `) as unknown as FileRecord[];
 }
 
 export async function listFiles(): Promise<(FileRecord & { provider_name: string })[]> {

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Copy, Check, Loader2, Link2, Terminal, Package } from 'lucide-react';
+import { Upload, FileText, Trash2, Check, Loader2, Link2, Terminal } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';

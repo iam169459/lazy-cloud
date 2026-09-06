@@ -1,5 +1,12 @@
 let audioCtx: AudioContext | null = null;
 
+let soundEnabled = true;
+try {
+  soundEnabled = localStorage.getItem('lazydrop-sound-enabled') !== 'false';
+} catch {
+  soundEnabled = true;
+}
+
 function getCtx(): AudioContext {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -8,6 +15,7 @@ function getCtx(): AudioContext {
 }
 
 function playTone(freq: number, duration: number, type: OscillatorType = 'sine', volume = 0.1) {
+  if (!soundEnabled) return;
   try {
     const ctx = getCtx();
     const osc = ctx.createOscillator();
@@ -24,6 +32,7 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'sine',
 }
 
 function playNoise(duration: number, volume = 0.05) {
+  if (!soundEnabled) return;
   try {
     const ctx = getCtx();
     const bufferSize = ctx.sampleRate * duration;
@@ -43,6 +52,19 @@ function playNoise(duration: number, volume = 0.05) {
 }
 
 export const sounds = {
+  setEnabled(v: boolean) {
+    soundEnabled = v;
+    try {
+      localStorage.setItem('lazydrop-sound-enabled', v ? 'true' : 'false');
+    } catch {
+      soundEnabled = v;
+    }
+  },
+
+  isEnabled(): boolean {
+    return soundEnabled;
+  },
+
   click() {
     playTone(800, 0.08, 'sine', 0.08);
     setTimeout(() => playTone(1200, 0.05, 'sine', 0.05), 30);

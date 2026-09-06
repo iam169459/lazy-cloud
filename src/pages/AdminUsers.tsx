@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Users, Loader2, UserPlus, Trash2, Shield, Eye, Calendar, FileText, Download, Search } from 'lucide-react';
-import { api } from '@/lib/api';
+import { Users, Loader2, UserPlus, Trash2, Shield, Search } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 
 interface Props {
-  token: string;
   onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
@@ -23,7 +21,7 @@ const defaultUsers: UserEntry[] = [
   { id: '1', username: 'admin', role: 'admin', uploads: 0, downloads: 0, lastActive: new Date().toISOString(), createdAt: new Date().toISOString() },
 ];
 
-export default function AdminUsers({ token, onNotify }: Props) {
+export default function AdminUsers({ onNotify }: Props) {
   const { colors } = useTheme();
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [loading, setLoading] = useState(true);

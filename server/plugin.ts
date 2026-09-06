@@ -1,6 +1,6 @@
 import { Plugin, ViteDevServer } from 'vite';
 import { IncomingMessage, ServerResponse } from 'http';
-import { handleApiRequest } from './api';
+import { handleApiRequest, cleanupExpiredFiles } from './api';
 import { initDatabase } from './db';
 
 let dbReady = false;
@@ -16,6 +16,24 @@ export function lazyDropApiPlugin(): Plugin {
   return {
     name: 'lazydrop-api',
     configureServer(server: ViteDevServer) {
+      // Periodic auto-delete sweep (honors the autoDelete / autoDeleteDays settings)
+      const sweep = async () => {
+        try {
+          await ensureDb();
+          await cleanupExpiredFiles();
+        } catch (e: any) {
+          console.error('[lazydrop] auto-delete sweep failed:', e.message);
+        }
+      };
+      const sweepTimer = setInterval(sweep, 60 * 60 * 1000);
+      sweepTimer.unref?.();
+      const startupTimer = setTimeout(sweep, 3000);
+      startupTimer.unref?.();
+      server.httpServer?.on('close', () => {
+        clearInterval(sweepTimer);
+        clearTimeout(startupTimer);
+      });
+
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         const url = req.url || '';
 

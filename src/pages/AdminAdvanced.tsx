@@ -1,78 +1,111 @@
 import { useState, useEffect } from 'react';
-import { Settings, Loader2, Save, Globe, Lock, Palette, Volume2, VolumeX, Eye, EyeOff, Trash2, RefreshCw, Download, Upload, Shield } from 'lucide-react';
+import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, Upload, Shield, RotateCcw } from 'lucide-react';
 import { useTheme, ThemeId, themes } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import { api } from '@/lib/api';
+import { api, AppSettings } from '@/lib/api';
 
 interface Props {
   token: string;
   onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
-interface AppSettings {
-  siteName: string;
-  maxFileSize: string;
-  allowedTypes: string;
-  autoDelete: boolean;
-  autoDeleteDays: string;
-  enableDownloadCounter: boolean;
-  enablePublicUpload: boolean;
-  requireAuth: boolean;
-  maxStoragePerBucket: string;
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : 'Something went wrong';
 }
+
+const DEFAULT_SETTINGS: AppSettings = {
+  siteName: 'LazyDrop',
+  maxFileSize: '10737418240',
+  allowedTypes: '*',
+  autoDelete: false,
+  autoDeleteDays: '30',
+  enableDownloadCounter: true,
+  enablePublicUpload: false,
+  maxStoragePerBucket: '10188208025',
+};
 
 export default function AdminAdvanced({ token, onNotify }: Props) {
   const { theme, setTheme, colors } = useTheme();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showSecrets, setShowSecrets] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({
-    siteName: 'LazyDrop',
-    maxFileSize: '10737418240',
-    allowedTypes: '*',
-    autoDelete: false,
-    autoDeleteDays: '30',
-    enableDownloadCounter: true,
-    enablePublicUpload: false,
-    requireAuth: true,
-    maxStoragePerBucket: '10188208025',
-  });
+  const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    // Load from localStorage
-    const saved = localStorage.getItem('lazydrop-settings');
-    if (saved) {
-      try { setSettings({ ...settings, ...JSON.parse(saved) }); } catch {}
-    }
-    setLoading(false);
-  }, []);
+    (async () => {
+      try {
+        let loaded = await api.getSettings();
+
+        // One-time migration from the old localStorage-only settings
+        const legacy = localStorage.getItem('lazydrop-settings');
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            loaded = { ...loaded, ...parsed };
+            await api.updateSettings(loaded, token);
+            localStorage.removeItem('lazydrop-settings');
+          } catch {
+            // ignore broken legacy data
+          }
+        }
+
+        setSettings(loaded);
+      } catch (e: unknown) {
+        onNotify('error', errMsg(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, onNotify]);
 
   function handleSave() {
     sounds.click();
     setSaving(true);
-    try {
-      localStorage.setItem('lazydrop-settings', JSON.stringify(settings));
-      sounds.success();
-      onNotify('success', 'Settings saved successfully');
-    } catch (e: any) {
-      sounds.error();
-      onNotify('error', e.message);
-    } finally {
-      setSaving(false);
-    }
+    sounds.setEnabled(soundEnabled);
+    api.updateSettings(settings, token)
+      .then(() => {
+        sounds.success();
+        onNotify('success', 'Settings saved — new limits are enforced on uploads');
+      })
+      .catch((e: unknown) => {
+        sounds.error();
+        onNotify('error', errMsg(e));
+      })
+      .finally(() => setSaving(false));
   }
 
-  function handleClearData() {
-    if (!confirm('Clear all local settings? This will not affect your database.')) return;
+  function handleReset() {
+    if (!confirm('Reset all settings to defaults?')) return;
+    sounds.click();
+    setSaving(true);
+    api.updateSettings(DEFAULT_SETTINGS, token)
+      .then(() => {
+        setSettings(DEFAULT_SETTINGS);
+        sounds.success();
+        onNotify('success', 'Settings reset to defaults');
+      })
+      .catch((e: unknown) => {
+        sounds.error();
+        onNotify('error', errMsg(e));
+      })
+      .finally(() => setSaving(false));
+  }
+
+  function handleClearLocal() {
+    if (!confirm('Clear local sound preference and theme? Server settings are kept.')) return;
     sounds.delete();
-    localStorage.removeItem('lazydrop-settings');
-    onNotify('success', 'Local settings cleared');
+    localStorage.removeItem('lazydrop-sound-enabled');
+    localStorage.removeItem('lazydrop-theme');
+    setSoundEnabled(true);
+    sounds.setEnabled(true);
+    onNotify('success', 'Local preferences cleared');
   }
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
+        <p className="text-sm font-mono animate-pulse-glow" style={{ color: colors.textMuted }}>LOADING_SETTINGS...</p>
       </div>
     );
   }
@@ -84,7 +117,9 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
           <Settings className="w-4 h-4" style={{ color: colors.primary }} />
           <span className="text-gradient-sci">Advanced Settings</span>
         </h2>
-        <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Configure app behavior and preferences</p>
+        <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
+          Saved to the server and enforced on every upload and download
+        </p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -108,21 +143,29 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
               ))}
             </div>
           </SettingsRow>
+          <SettingsRow label="Site name" desc="Shown on the landing page and browser title">
+            <input
+              type="text"
+              value={settings.siteName}
+              onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
+              className="form-input text-xs w-36"
+            />
+          </SettingsRow>
         </SettingsCard>
 
         {/* Sound */}
-        <SettingsCard title="Sound Effects" icon={<Volume2 className="w-4 h-4" />}>
+        <SettingsCard title="Sound Effects" icon={soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}>
           <SettingsRow label="Enable sounds" desc="Play sounds on interactions">
             <Toggle
-              checked={settings.requireAuth}
-              onChange={(v) => setSettings({ ...settings, requireAuth: v })}
+              checked={soundEnabled}
+              onChange={(v) => setSoundEnabled(v)}
             />
           </SettingsRow>
         </SettingsCard>
 
         {/* File Settings */}
         <SettingsCard title="File Management" icon={<Download className="w-4 h-4" />}>
-          <SettingsRow label="Max file size" desc="Maximum upload size in bytes">
+          <SettingsRow label="Max file size" desc="Maximum upload size in bytes (0 = unlimited)">
             <input
               type="number"
               value={settings.maxFileSize}
@@ -156,7 +199,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
             />
           </SettingsRow>
           {settings.autoDelete && (
-            <SettingsRow label="Days before deletion" desc="Files older than this are deleted">
+            <SettingsRow label="Days before deletion" desc="Files older than this are deleted (checked hourly)">
               <input
                 type="number"
                 value={settings.autoDeleteDays}
@@ -169,7 +212,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
 
         {/* Storage Limits */}
         <SettingsCard title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
-          <SettingsRow label="Max bytes per bucket" desc="Default storage limit">
+          <SettingsRow label="Max bytes per bucket" desc="Default limit used for new buckets">
             <input
               type="number"
               value={settings.maxStoragePerBucket}
@@ -181,7 +224,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
 
         {/* Security */}
         <SettingsCard title="Security" icon={<Shield className="w-4 h-4" />}>
-          <SettingsRow label="Public upload" desc="Allow uploads without authentication">
+          <SettingsRow label="Public upload" desc="Allow anyone to upload from the landing page">
             <Toggle
               checked={settings.enablePublicUpload}
               onChange={(v) => setSettings({ ...settings, enablePublicUpload: v })}
@@ -196,7 +239,11 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save Settings
         </button>
-        <button onClick={handleClearData} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: `${colors.danger}30`, color: colors.danger }}>
+        <button onClick={handleReset} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
+          <RotateCcw className="w-4 h-4" />
+          Reset to Defaults
+        </button>
+        <button onClick={handleClearLocal} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: `${colors.danger}30`, color: colors.danger }}>
           <Trash2 className="w-4 h-4" />
           Clear Local Data
         </button>

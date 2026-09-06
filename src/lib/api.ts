@@ -39,6 +39,17 @@ export interface Stats {
   };
 }
 
+export interface AppSettings {
+  siteName: string;
+  maxFileSize: string;
+  allowedTypes: string;
+  autoDelete: boolean;
+  autoDeleteDays: string;
+  enableDownloadCounter: boolean;
+  enablePublicUpload: boolean;
+  maxStoragePerBucket: string;
+}
+
 async function request(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
     ...options,
@@ -73,37 +84,20 @@ export const api = {
     }) as Promise<Stats>,
 
   uploadFile: (file: File, token: string, onProgress?: (pct: number) => void) =>
-    new Promise<{ id: string; name: string; size: number }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formData = new FormData();
-      formData.append('file', file);
+    uploadRequest(file, '/api/admin/upload', token, onProgress),
 
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable && onProgress) {
-          onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      });
+  uploadPublic: (file: File, onProgress?: (pct: number) => void) =>
+    uploadRequest(file, '/api/upload', null, onProgress),
 
-      xhr.addEventListener('load', () => {
-        try {
-          const data = JSON.parse(xhr.responseText);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(data);
-          } else {
-            reject(new Error(data.error || 'Upload failed'));
-          }
-        } catch {
-          reject(new Error('Upload failed'));
-        }
-      });
+  getSettings: () =>
+    request('/api/settings') as Promise<AppSettings>,
 
-      xhr.addEventListener('error', () => reject(new Error('Network error')));
-      xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
-
-      xhr.open('POST', '/api/admin/upload');
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(formData);
-    }),
+  updateSettings: (settings: Partial<AppSettings>, token: string) =>
+    request('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(settings),
+    }) as Promise<{ settings: AppSettings }>,
 
   listFiles: (token: string) =>
     request('/api/admin/files', {
@@ -155,6 +149,45 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }) as Promise<{ success: boolean; username: string }>,
 };
+
+function uploadRequest(
+  file: File,
+  url: string,
+  token: string | null,
+  onProgress?: (pct: number) => void
+): Promise<{ id: string; name: string; size: number }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data);
+        } else {
+          reject(new Error(data.error || 'Upload failed'));
+        }
+      } catch {
+        reject(new Error('Upload failed'));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Network error')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+
+    xhr.open('POST', url);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.send(formData);
+  });
+}
 
 export function formatBytes(bytes: number | undefined | null): string {
   if (!bytes || bytes === 0) return '0 B';

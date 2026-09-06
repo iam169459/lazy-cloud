@@ -184,7 +184,7 @@ export default function AdminPanel() {
         ) : tab === 'storage' ? (
           <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
         ) : tab === 'users' ? (
-          <AdminUsers token={token!} onNotify={showNotification} />
+          <AdminUsers onNotify={showNotification} />
         ) : tab === 'security' ? (
           <AdminSecurity
             token={token!}
