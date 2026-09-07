@@ -3,7 +3,7 @@ import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info,
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import { cloudProviders, CloudProvider, getProviderById } from '@/lib/providers';
+import { cloudProviders, CloudProvider, getProviderById, detectProviderFromEndpoint } from '@/lib/providers';
 
 interface Props {
  providers: StorageProvider[];
@@ -35,13 +35,13 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  setSelectedProvider(p);
  const endpoint = p.endpoint.replace('{region}', p.regionPlaceholder).replace('{account_id}', '');
  setForm({
- provider_name: p.name,
- endpoint_url: endpoint,
- bucket_name: '',
- access_key_id: '',
- secret_access_key: '',
- max_bytes: '10188208025',
- region: p.regionPlaceholder,
+   provider_name: p.name,
+   endpoint_url: endpoint,
+   bucket_name: '',
+   access_key_id: '',
+   secret_access_key: '',
+   max_bytes: String(p.maxBytes),
+   region: p.regionPlaceholder,
  });
  }
 
@@ -279,18 +279,33 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <input type="text" value={form.provider_name} onChange={(e) => updateField('provider_name', e.target.value)} placeholder="My Storage" required className="input" />
  </FormField>
 
-
-
  <FormField label="Endpoint URL" required>
- <input type="url" value={form.endpoint_url} onChange={(e) => updateField('endpoint_url', e.target.value)} placeholder="https://s3.amazonaws.com" required className="input" />
+ <input
+   type="url"
+   value={form.endpoint_url}
+   onChange={(e) => {
+     updateField('endpoint_url', e.target.value);
+     const detected = detectProviderFromEndpoint(e.target.value);
+     if (detected && !selectedProvider) {
+       setSelectedProvider(detected);
+       setForm(prev => ({ ...prev, provider_name: detected.name, max_bytes: String(detected.maxBytes) }));
+     }
+   }}
+   onBlur={(e) => {
+     const detected = detectProviderFromEndpoint(e.target.value);
+     if (detected) {
+       setSelectedProvider(detected);
+       setForm(prev => ({ ...prev, provider_name: detected.name, max_bytes: String(detected.maxBytes) }));
+     }
+   }}
+   placeholder="https://s3.amazonaws.com"
+   required
+   className="input"
+ />
  </FormField>
 
  <FormField label="Bucket name" required>
  <input type="text" value={form.bucket_name} onChange={(e) => updateField('bucket_name', e.target.value)} placeholder="my-bucket" required className="input" />
- </FormField>
-
- <FormField label="Max bytes (default ~9.5 GB)">
- <input type="number" value={form.max_bytes} onChange={(e) => updateField('max_bytes', e.target.value)} className="input" />
  </FormField>
 
  <FormField label="Region">

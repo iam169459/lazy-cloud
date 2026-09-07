@@ -7,6 +7,7 @@ export interface CloudProvider {
   regionPlaceholder: string;
   freeTier: string;
   maxStorage: string;
+  maxBytes: number;
   protocol: string;
   signupUrl: string;
   docsUrl: string;
@@ -22,6 +23,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'us-west-005',
     freeTier: '10 GB free',
     maxStorage: '10 GB free, then $0.005/GB/mo',
+    maxBytes: 10737418240,
     protocol: 'S3 Compatible',
     signupUrl: 'https://secure.backblaze.com/signup',
     docsUrl: 'https://help.backblaze.com/hc/en-us/articles/1260803698569',
@@ -35,6 +37,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'auto',
     freeTier: '10 GB free, no egress',
     maxStorage: '10 GB free, zero egress fees',
+    maxBytes: 10737418240,
     protocol: 'S3 Compatible',
     signupUrl: 'https://dash.cloudflare.com/sign-up',
     docsUrl: 'https://developers.cloudflare.com/r2/',
@@ -48,6 +51,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'us-east-1',
     freeTier: '5 GB free (12 months)',
     maxStorage: '5 GB free tier for 12 months',
+    maxBytes: 5368709120,
     protocol: 'S3 Native',
     signupUrl: 'https://portal.aws.amazon.com/billing/signup',
     docsUrl: 'https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html',
@@ -61,6 +65,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'auto',
     freeTier: '5 GB free',
     maxStorage: '5 GB always-free, then $0.020/GB/mo',
+    maxBytes: 5368709120,
     protocol: 'XML API (S3 Compatible)',
     signupUrl: 'https://console.cloud.google.com/freetrial',
     docsUrl: 'https://cloud.google.com/storage/docs',
@@ -74,6 +79,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'us-east-1',
     freeTier: '10 GB free',
     maxStorage: '10 GB free, then $0.005/GB/mo',
+    maxBytes: 10737418240,
     protocol: 'S3 Compatible',
     signupUrl: 'https://www.idrive.com/e2/signup',
     docsUrl: 'https://www.idrive.com/e2/help',
@@ -87,6 +93,7 @@ export const cloudProviders: CloudProvider[] = [
     regionPlaceholder: 'us-east-1',
     freeTier: 'Unlimited (self-hosted)',
     maxStorage: 'Your own storage — completely free',
+    maxBytes: 1099511627776,
     protocol: 'S3 Compatible',
     signupUrl: 'https://min.io/download',
     docsUrl: 'https://min.io/docs/minio/linux/index.html',
@@ -95,6 +102,17 @@ export const cloudProviders: CloudProvider[] = [
 
 export function getProviderById(id: string): CloudProvider | undefined {
   return cloudProviders.find(p => p.id === id);
+}
+
+export function detectProviderFromEndpoint(endpoint: string): CloudProvider | undefined {
+  const url = endpoint.toLowerCase();
+  if (url.includes('backblazeb2.com')) return cloudProviders.find(p => p.id === 'backblaze-b2');
+  if (url.includes('r2.cloudflarestorage.com')) return cloudProviders.find(p => p.id === 'cloudflare-r2');
+  if (url.includes('amazonaws.com')) return cloudProviders.find(p => p.id === 'aws-s3');
+  if (url.includes('storage.googleapis.com')) return cloudProviders.find(p => p.id === 'google-cloud');
+  if (url.includes('idrive.com')) return cloudProviders.find(p => p.id === 'idrive-e2');
+  if (url.includes(':9000') && !url.includes('amazonaws.com')) return cloudProviders.find(p => p.id === 'minio');
+  return undefined;
 }
 
 export function getProviderColors(id: string): string {
