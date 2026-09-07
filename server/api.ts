@@ -883,6 +883,33 @@ export async function handleApiRequest(
       return true;
     }
 
+    // ── System: Pull latest ──
+    if (path === '/api/admin/system/pull' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      try {
+        execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 });
+        sendJson(res, 200, { message: 'Pulled latest changes from dev branch' });
+      } catch (e: any) {
+        sendError(res, 500, `Pull failed: ${e.message}`);
+      }
+      return true;
+    }
+
+    // ── System: Rebuild ──
+    if (path === '/api/admin/system/rebuild' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      try {
+        execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
+        execSync('npm run build', { cwd: process.cwd(), timeout: 120000 });
+        sendJson(res, 200, { message: 'Rebuild complete — deps installed and bundle built' });
+      } catch (e: any) {
+        sendError(res, 500, `Rebuild failed: ${e.message}`);
+      }
+      return true;
+    }
+
     return false;
   } catch (e: any) {
     console.error('API error:', e);

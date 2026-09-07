@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
-  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight
+  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -13,9 +13,10 @@ import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
 import AdminAdvanced from './AdminAdvanced';
 import AdminScan from './AdminScan';
+import AdminSystem from './AdminSystem';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan';
+type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan' | 'system';
 
 const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Files', icon: <FileText className="w-[18px] h-[18px]" /> },
@@ -23,6 +24,7 @@ const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'security', label: 'Credentials', icon: <Shield className="w-[18px] h-[18px]" /> },
   { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
   { id: 'scan', label: 'Scan', icon: <Scan className="w-[18px] h-[18px]" /> },
+  { id: 'system', label: 'System', icon: <Terminal className="w-[18px] h-[18px]" /> },
 ];
 
 const pageDescriptions: Record<Tab, string> = {
@@ -31,6 +33,7 @@ const pageDescriptions: Record<Tab, string> = {
   security: 'Update admin credentials and security settings.',
   advanced: 'Configure themes, file TTL, and system preferences.',
   scan: 'Scan storage buckets for orphaned or mismatched files.',
+  system: 'System info, update, and maintenance.',
 };
 
 export default function AdminPanel() {
@@ -276,6 +279,7 @@ export default function AdminPanel() {
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
             : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
+            : tab === 'system' ? <AdminSystem token={token!} onNotify={notify} />
             : <AdminAdvanced token={token!} onNotify={notify} />}
           </div>
         </div>
@@ -308,6 +312,7 @@ const pageTitles: Record<Tab, string> = {
   security: 'Credentials',
   advanced: 'Settings',
   scan: 'Scan',
+  system: 'System',
 };
 
 function SummaryCard({ icon, label, value, accent, progress }: {
