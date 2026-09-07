@@ -116,6 +116,9 @@ export async function initDatabase() {
   // Add region to storage_providers if missing (migration for existing DBs)
   await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS region TEXT DEFAULT 'auto'`;
 
+  // Add provider_type to storage_providers if missing (migration for existing DBs)
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS provider_type TEXT DEFAULT 's3'`;
+
   // Indexes for the hot query paths
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_files_provider_id ON files (provider_id)`;
