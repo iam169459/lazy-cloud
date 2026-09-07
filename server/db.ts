@@ -17,14 +17,17 @@ function getSql() {
 
 export interface StorageProvider {
   id: string;
+  provider_type: string;
   provider_name: string;
   endpoint_url: string;
   bucket_name: string;
   access_key_id: string;
   secret_access_key: string;
+  region: string;
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface FileRecord {
@@ -44,14 +47,17 @@ export async function initDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS storage_providers (
       id TEXT PRIMARY KEY,
+      provider_type TEXT DEFAULT 's3',
       provider_name TEXT,
       endpoint_url TEXT,
       bucket_name TEXT,
       access_key_id TEXT,
       secret_access_key TEXT,
+      region TEXT DEFAULT 'auto',
       max_bytes BIGINT DEFAULT 10188208025,
       current_bytes BIGINT DEFAULT 0,
-      is_active BOOLEAN DEFAULT true
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
 
@@ -76,6 +82,11 @@ export async function initDatabase() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
+
+  // --- Schema migrations (idempotent, safe on every startup) ---
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS provider_type TEXT DEFAULT 's3'`;
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS region TEXT DEFAULT 'auto'`;
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 }
 
 export interface AdminCredentials {
@@ -129,8 +140,8 @@ export async function addProvider(provider: Omit<StorageProvider, 'id' | 'curren
   const sql = getSql();
   const id = generateId(12);
   const rows = (await sql`
-    INSERT INTO storage_providers (id, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, max_bytes, current_bytes, is_active)
-    VALUES (${id}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.max_bytes}, 0, true)
+    INSERT INTO storage_providers (id, provider_type, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, region, max_bytes, current_bytes, is_active)
+    VALUES (${id}, ${provider.provider_type || 's3'}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.region || 'auto'}, ${provider.max_bytes}, 0, true)
     RETURNING *
   `) as unknown[];
   return rows[0] as StorageProvider;

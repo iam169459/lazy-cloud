@@ -15,14 +15,17 @@ export interface FileWithProvider extends FileInfo {
 
 export interface StorageProvider {
   id: string;
+  provider_type: string;
   provider_name: string;
   endpoint_url: string;
   bucket_name: string;
   access_key_id: string;
   secret_access_key: string;
+  region: string;
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface Stats {

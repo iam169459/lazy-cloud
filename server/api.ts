@@ -249,11 +249,13 @@ export async function handleApiRequest(
         return true;
       }
       const provider = await addProvider({
+        provider_type: body.provider_type || 'custom',
         provider_name: body.provider_name,
         endpoint_url: body.endpoint_url,
         bucket_name: body.bucket_name,
         access_key_id: body.access_key_id,
         secret_access_key: body.secret_access_key,
+        region: body.region || 'auto',
         max_bytes: body.max_bytes || 10188208025,
       });
       sendJson(res, 200, { provider: { ...provider, secret_access_key: '--------' } });

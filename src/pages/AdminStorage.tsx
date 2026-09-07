@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Cloud, Plus, Trash2, Loader2, Check, HardDrive } from 'lucide-react';
+import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, HardDrive } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
+import { cloudProviders, CloudProvider, getProviderById, detectProviderFromEndpoint } from '@/lib/providers';
 
 interface Props {
   providers: StorageProvider[];
@@ -13,6 +14,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
   const [form, setForm] = useState({
     provider_name: '',
     endpoint_url: '',
@@ -20,22 +23,44 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     access_key_id: '',
     secret_access_key: '',
     max_bytes: '10188208025',
+    region: 'auto',
   });
+
+  function handleSelectProvider(p: CloudProvider) {
+    setSelectedProvider(p);
+    const endpoint = p.endpoint.replace('{region}', p.regionPlaceholder).replace('{account_id}', '');
+    setForm({
+      provider_name: p.name,
+      endpoint_url: endpoint,
+      bucket_name: '',
+      access_key_id: '',
+      secret_access_key: '',
+      max_bytes: '10188208025',
+      region: p.regionPlaceholder,
+    });
+  }
+
+  function resetForm() {
+    setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: 'auto' });
+    setSelectedProvider(null);
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
       await api.addProvider({
+        provider_type: selectedProvider?.id || 'custom',
         provider_name: form.provider_name,
         endpoint_url: form.endpoint_url,
         bucket_name: form.bucket_name,
         access_key_id: form.access_key_id,
         secret_access_key: form.secret_access_key,
+        region: form.region || 'auto',
         max_bytes: parseInt(form.max_bytes) || 10188208025,
       }, token);
       onNotify('success', 'Storage bucket added');
-      setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025' });
+      resetForm();
       setShowForm(false);
       onRefresh();
     } catch (e: any) {
@@ -79,7 +104,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           <p className="text-sm text-gray-500 mt-1">Manage S3-compatible storage accounts. Files auto-route to the next bucket with space.</p>
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { setShowForm(!showForm); resetForm(); }}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-[#0a0a0f] font-semibold text-sm hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all"
         >
           {showForm ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -88,37 +113,109 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} className="rounded-2xl bg-white/[0.03] border border-white/10 p-6 space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <FormField label="Provider name" required>
-              <input type="text" value={form.provider_name} onChange={(e) => setForm({ ...form, provider_name: e.target.value })} placeholder="My R2 Account" required className="form-input" />
-            </FormField>
-            <FormField label="Endpoint URL" required>
-              <input type="url" value={form.endpoint_url} onChange={(e) => setForm({ ...form, endpoint_url: e.target.value })} placeholder="https://xxx.r2.cloudflarestorage.com" required className="form-input" />
-            </FormField>
-            <FormField label="Bucket name" required>
-              <input type="text" value={form.bucket_name} onChange={(e) => setForm({ ...form, bucket_name: e.target.value })} placeholder="my-bucket" required className="form-input" />
-            </FormField>
-            <FormField label="Max bytes (default ~9.5 GB)">
-              <input type="number" value={form.max_bytes} onChange={(e) => setForm({ ...form, max_bytes: e.target.value })} className="form-input" />
-            </FormField>
-            <FormField label="Access key ID" required>
-              <input type="text" value={form.access_key_id} onChange={(e) => setForm({ ...form, access_key_id: e.target.value })} required className="form-input" />
-            </FormField>
-            <FormField label="Secret access key" required>
-              <input type="password" value={form.secret_access_key} onChange={(e) => setForm({ ...form, secret_access_key: e.target.value })} required className="form-input" />
-            </FormField>
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 text-[#0a0a0f] font-semibold text-sm hover:bg-emerald-300 transition-all disabled:opacity-60">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Save bucket
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 rounded-xl border border-white/10 text-sm text-gray-400 hover:text-white transition-colors">
-              Cancel
-            </button>
-          </div>
-        </form>
+        <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-6 space-y-4">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Server className="w-4 h-4 text-gray-400" />
+            {!selectedProvider ? 'Select Cloud Provider' : 'Connect Bucket'}
+          </h3>
+
+          {!selectedProvider && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              {cloudProviders.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectProvider(p)}
+                  className="relative p-3 rounded-xl border text-left transition-all duration-300 hover:border-white/30"
+                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{p.icon}</span>
+                    <span className="text-xs font-semibold truncate text-white">{p.name}</span>
+                  </div>
+                  <span className="text-[10px] font-mono" style={{ color: p.color }}>{p.freeTier}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedProvider && (
+            <div className="p-4 rounded-xl border" style={{ background: `${selectedProvider.color}08`, borderColor: `${selectedProvider.color}20` }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{selectedProvider.icon}</span>
+                  <div>
+                    <h4 className="font-semibold text-sm text-white">{selectedProvider.name}</h4>
+                    <p className="text-xs font-mono" style={{ color: selectedProvider.color }}>{selectedProvider.protocol} — {selectedProvider.freeTier}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={selectedProvider.signupUrl} target="_blank" rel="noopener" className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-all" style={{ borderColor: `${selectedProvider.color}30`, color: selectedProvider.color }}>
+                    Sign up free
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button type="button" onClick={() => { setSelectedProvider(null); setForm(prev => ({ ...prev, provider_name: '' })); }} className="text-[10px] px-2 py-1.5 rounded-lg border border-white/10 text-gray-400 font-mono">
+                    Change
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs mt-2 text-gray-500">{selectedProvider.maxStorage}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <FormField label="Bucket name" required>
+                <input type="text" value={form.bucket_name} onChange={(e) => setForm({ ...form, bucket_name: e.target.value })} placeholder="my-bucket" required className="form-input" />
+              </FormField>
+
+              <FormField label="Access key ID" required>
+                <input type="text" value={form.access_key_id} onChange={(e) => setForm({ ...form, access_key_id: e.target.value })} required className="form-input" />
+              </FormField>
+
+              <FormField label="Secret access key" required>
+                <input type="password" value={form.secret_access_key} onChange={(e) => setForm({ ...form, secret_access_key: e.target.value })} required className="form-input" />
+              </FormField>
+
+              {!selectedProvider && (
+                <FormField label="Endpoint URL" required>
+                  <input
+                    type="url"
+                    value={form.endpoint_url}
+                    onChange={(e) => {
+                      setForm({ ...form, endpoint_url: e.target.value });
+                      const detected = detectProviderFromEndpoint(e.target.value);
+                      if (detected && !selectedProvider) {
+                        setSelectedProvider(detected);
+                        setForm(prev => ({ ...prev, endpoint_url: e.target.value, provider_name: detected.name }));
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const detected = detectProviderFromEndpoint(e.target.value);
+                      if (detected) {
+                        setSelectedProvider(detected);
+                        setForm(prev => ({ ...prev, provider_name: detected.name }));
+                      }
+                    }}
+                    placeholder="https://s3.amazonaws.com"
+                    required
+                    className="form-input"
+                  />
+                </FormField>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button type="submit" disabled={saving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-400 text-[#0a0a0f] font-semibold text-sm hover:bg-emerald-300 transition-all disabled:opacity-60">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Connect
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); resetForm(); }} className="px-5 py-2.5 rounded-xl border border-white/10 text-sm text-gray-400 hover:text-white transition-colors">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {providers.length === 0 ? (
@@ -132,12 +229,13 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           {providers.map((p) => {
             const pct = p.max_bytes > 0 ? (p.current_bytes / p.max_bytes) * 100 : 0;
             const isFull = pct >= 95;
+            const pInfo = getProviderById(p.provider_type);
             return (
               <div key={p.id} className="rounded-2xl bg-white/[0.03] border border-white/10 p-5">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-emerald-500/20 flex items-center justify-center">
-                      <HardDrive className="w-5 h-5 text-blue-400" />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${pInfo?.color || '#3b82f6'}20` }}>
+                      {pInfo ? <span className="text-xl">{pInfo.icon}</span> : <HardDrive className="w-5 h-5 text-blue-400" />}
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">{p.provider_name}</h3>
