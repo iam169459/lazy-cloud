@@ -12,12 +12,13 @@ interface Props {
  onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
-export default function AdminStorage({ providers, token, onRefresh, onNotify }: Props) {
+ export default function AdminStorage({ providers, token, onRefresh, onNotify }: Props) {
  const { colors } = useTheme();
  const [showForm, setShowForm] = useState(false);
  const [saving, setSaving] = useState(false);
  const [deletingId, setDeletingId] = useState<string | null>(null);
  const [testingId, setTestingId] = useState<string | null>(null);
+ const [refreshingId, setRefreshingId] = useState<string | null>(null);
  const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
  const [stats, setStats] = useState<{ totalFiles: number; encryptedFiles: number; totalSize: number } | null>(null);
  const [form, setForm] = useState({
@@ -63,26 +64,35 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  sounds.click();
  setSaving(true);
  try {
- await api.addProvider({
- provider_type: selectedProvider?.id || 'custom',
- provider_name: form.provider_name,
- endpoint_url: form.endpoint_url,
- bucket_name: form.bucket_name,
- access_key_id: form.access_key_id,
- secret_access_key: form.secret_access_key,
- region: form.region || 'auto',
- max_bytes: parseInt(form.max_bytes) || 10188208025,
+ const { provider } = await api.addProvider({
+   provider_type: selectedProvider?.id || 'custom',
+   provider_name: form.provider_name,
+   endpoint_url: form.endpoint_url,
+   bucket_name: form.bucket_name,
+   access_key_id: form.access_key_id,
+   secret_access_key: form.secret_access_key,
+   region: form.region || 'auto',
+   max_bytes: parseInt(form.max_bytes) || 10188208025,
  }, token);
+
+ // Auto-detect actual bucket size
+ try {
+   const sizeInfo = await api.getBucketSize(provider.id, token);
+   if (sizeInfo.success) {
+     await api.updateProviderBytes(provider.id, sizeInfo.usedBytes, token);
+   }
+ } catch {}
+
  sounds.store();
  onNotify('success', 'Storage bucket added');
  resetForm();
  setShowForm(false);
  onRefresh();
  } catch (e: any) {
- sounds.error();
- onNotify('error', e.message);
+   sounds.error();
+   onNotify('error', e.message);
  } finally {
- setSaving(false);
+   setSaving(false);
  }
  }
 
@@ -111,11 +121,31 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  async function handleToggleActive(id: string) {
  sounds.toggle();
  try {
- await api.toggleProvider(id, token);
- onRefresh();
+   await api.toggleProvider(id, token);
+   onRefresh();
  } catch (e: any) {
- sounds.error();
- onNotify('error', e.message);
+   sounds.error();
+   onNotify('error', e.message);
+ }
+ }
+
+ async function handleRefreshSize(id: string) {
+ sounds.click();
+ setRefreshingId(id);
+ try {
+   const sizeInfo = await api.getBucketSize(id, token);
+   if (sizeInfo.success) {
+     await api.updateProviderBytes(id, sizeInfo.usedBytes, token);
+     onNotify('success', `Size updated: ${formatBytes(sizeInfo.usedBytes)} (${sizeInfo.objectCount} files)`);
+     onRefresh();
+   } else {
+     onNotify('error', 'Failed to detect size');
+   }
+ } catch (e: any) {
+   sounds.error();
+   onNotify('error', e.message);
+ } finally {
+   setRefreshingId(null);
  }
  }
 
@@ -466,6 +496,15 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  title="Test connection"
  >
  {testingId === p.id ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Test'}
+ </button>
+ <button
+   onClick={() => handleRefreshSize(p.id)}
+   disabled={refreshingId === p.id}
+   className="px-3 py-1.5 rounded text-[11px] font-mono border transition-all hover:bg-primary/10 min-h-[32px]"
+   style={{ borderColor: `${colors.success}20`, color: colors.success }}
+   title="Refresh bucket size"
+ >
+   {refreshingId === p.id ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Size'}
  </button>
  </div>
  </div>

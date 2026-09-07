@@ -1,8 +1,8 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
-import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects } from './s3';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles, getDb } from './db';
+import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
 let dbInitialized = false;
@@ -558,6 +558,35 @@ export async function handleApiRequest(
       } catch (e: any) {
         sendJson(res, 200, { success: false, error: e.message, bucket: provider.bucket_name });
       }
+      return true;
+    }
+
+    if (path === '/api/admin/providers/size' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      if (!id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      try {
+        const sizeInfo = await getBucketSize(provider);
+        sendJson(res, 200, { success: true, ...sizeInfo });
+      } catch (e: any) {
+        sendJson(res, 200, { success: false, error: e.message });
+      }
+      return true;
+    }
+
+    if (path === '/api/admin/providers/update-bytes' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      const bytes: number = body.bytes;
+      if (!id || bytes === undefined) { sendError(res, 400, 'Missing provider id or bytes'); return true; }
+      const sql = getDb();
+      await sql`UPDATE storage_providers SET current_bytes = ${bytes} WHERE id = ${id}`;
+      sendJson(res, 200, { success: true });
       return true;
     }
 

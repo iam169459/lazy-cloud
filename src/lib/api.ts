@@ -138,6 +138,20 @@ export const api = {
       body: JSON.stringify({ id }),
     }) as Promise<{ success: boolean }>,
 
+  getBucketSize: (id: string, token: string) =>
+    request('/api/admin/providers/size', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    }) as Promise<{ success: boolean; usedBytes: number; objectCount: number }>,
+
+  updateProviderBytes: (id: string, bytes: number, token: string) =>
+    request('/api/admin/providers/update-bytes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id, bytes }),
+    }) as Promise<{ success: boolean }>,
+
   getSecurityStatus: (token: string) =>
     request('/api/admin/security/status', {
       headers: { Authorization: `Bearer ${token}` },

@@ -203,3 +203,30 @@ export function clearRegionCache(providerId?: string) {
     regionCache.clear();
   }
 }
+
+export async function getBucketSize(provider: StorageProvider): Promise<{ usedBytes: number; objectCount: number }> {
+  const client = await createS3Client(provider);
+  let usedBytes = 0;
+  let objectCount = 0;
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: provider.bucket_name,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (response.Contents) {
+      for (const obj of response.Contents) {
+        usedBytes += obj.Size || 0;
+        objectCount++;
+      }
+    }
+
+    continuationToken = response.NextContinuationToken;
+  } while (continuationToken);
+
+  return { usedBytes, objectCount };
+}
