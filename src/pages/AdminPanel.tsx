@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield, Activity, Sliders,
-} from 'lucide-react';
+import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, Shield, Sliders } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -10,11 +8,10 @@ import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/li
 import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
-import AdminSecurityFeatures from './AdminSecurityFeatures';
 import AdminAdvanced from './AdminAdvanced';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'security-features' | 'advanced';
+type Tab = 'dashboard' | 'storage' | 'security' | 'advanced';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
@@ -26,7 +23,6 @@ export default function AdminPanel() {
   const [providers, setProviders] = useState<StorageProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const showNotification = useCallback((type: 'success' | 'error', msg: string) => {
     setNotification({ type, msg });
@@ -37,11 +33,7 @@ export default function AdminPanel() {
   const refreshAll = useCallback(async () => {
     if (!token) return;
     try {
-      const [s, f, p] = await Promise.all([
-        api.getStats(token),
-        api.listFiles(token),
-        api.listProviders(token),
-      ]);
+      const [s, f, p] = await Promise.all([api.getStats(token), api.listFiles(token), api.listProviders(token)]);
       setStats(s);
       setFiles(f.files);
       setProviders(p.providers);
@@ -53,18 +45,11 @@ export default function AdminPanel() {
   }, [token, showNotification]);
 
   useEffect(() => {
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
+    if (!token) { navigate('/admin/login'); return; }
     refreshAll();
   }, [token, navigate, refreshAll]);
 
-  function handleLogout() {
-    sounds.click();
-    logout();
-    navigate('/');
-  }
+  function handleLogout() { sounds.click(); logout(); navigate('/'); }
 
   if (!token) return null;
 
@@ -73,119 +58,88 @@ export default function AdminPanel() {
   const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'dashboard', label: 'Files', icon: <FileText className="w-4 h-4" /> },
     { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
     { id: 'security', label: 'Credentials', icon: <Shield className="w-4 h-4" /> },
-    { id: 'security-features', label: 'Security+Time', icon: <Lock className="w-4 h-4" /> },
-    { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'advanced', label: 'Settings', icon: <Sliders className="w-4 h-4" /> },
   ];
 
   return (
     <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
-      <header className="sticky top-0 z-20 backdrop-blur-xl border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-left">
-            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center overflow-hidden logo-hover-spin" style={{ background: colors.gradient, boxShadow: `0 0 12px ${colors.primaryGlow}` }}>
-              <img src="/logo.svg" alt="LazyDrop" className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-lg" style={{ imageRendering: 'crisp-edges' }} />
+      <header className="sticky top-0 z-20 border-b" style={{ background: `${colors.bg}dd`, borderColor: colors.border, backdropFilter: 'blur(8px)' }}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+              <Zap className="w-4 h-4" style={{ color: colors.bg }} strokeWidth={2.5} />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold tracking-tight text-gradient-sci text-sm sm:text-base">LazyDrop</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase tracking-widest hidden sm:inline-block" style={{ color: `${colors.primary}90`, background: `${colors.primary}10`, border: `1px solid ${colors.primary}20` }}>Admin</span>
-            </div>
+            <span className="font-bold text-sm text-gradient-sci">LazyDrop</span>
           </div>
-          <div className="hidden sm:flex items-center gap-3 animate-fade-in-up">
-            <Link to="/" className="text-sm flex items-center gap-1.5 transition-colors" style={{ color: colors.textMuted }} onClick={() => sounds.click()}>
-              <Activity className="w-3 h-3" />
-              View site
-            </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>View site</Link>
             <ThemeSwitcher />
-            <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm transition-colors" style={{ color: colors.textMuted }}>
-              <LogOut className="w-4 h-4" />
-              Logout
+            <button onClick={handleLogout} className="text-xs flex items-center gap-1" style={{ color: colors.textDim }}>
+              <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           </div>
-          <button onClick={() => { setMobileMenuOpen(!mobileMenuOpen); sounds.click(); }} className="sm:hidden p-2 rounded-lg" style={{ color: colors.textMuted }}>
-            <Settings className="w-5 h-5" />
-          </button>
         </div>
-        {mobileMenuOpen && (
-          <div className="sm:hidden border-t px-4 py-3 space-y-2 animate-slide-down" style={{ borderColor: colors.border, background: `${colors.bg}ee` }}>
-            <Link to="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm" style={{ color: colors.textMuted }} onClick={() => { sounds.click(); setMobileMenuOpen(false); }}>
-              <Activity className="w-4 h-4" />
-              View site
-            </Link>
-            <ThemeSwitcher />
-            <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full" style={{ color: colors.textMuted }}>
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          </div>
-        )}
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <StatCard icon={<FileText className="w-4 h-4" />} label="Files" value={stats ? stats.files.total_files : '—'} delay="0" colorKey="emerald" />
-          <StatCard icon={<Download className="w-4 h-4" />} label="Downloads" value={stats ? stats.files.total_downloads : '—'} delay="100" colorKey="cyan" />
-          <StatCard icon={<Cloud className="w-4 h-4" />} label="Buckets" value={stats ? stats.providers.total_providers : '—'} delay="200" colorKey="blue" />
-          <StatCard icon={<HardDrive className="w-4 h-4" />} label="Storage" value={totalCap > 0 ? `${formatBytes(totalUsed)} / ${formatBytes(totalCap)}` : '—'} progress={usedPct} delay="300" colorKey="purple" />
+      <div className="max-w-5xl mx-auto px-4 py-4 sm:py-6">
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <MiniStat icon={<FileText className="w-4 h-4" />} label="Files" value={stats ? stats.files.total_files : '—'} />
+          <MiniStat icon={<Download className="w-4 h-4" />} label="Downloads" value={stats ? stats.files.total_downloads : '—'} />
+          <MiniStat icon={<Cloud className="w-4 h-4" />} label="Buckets" value={stats ? stats.providers.total_providers : '—'} />
+          <MiniStat icon={<HardDrive className="w-4 h-4" />} label="Used" value={totalCap > 0 ? `${formatBytes(totalUsed)}/${formatBytes(totalCap)}` : '—'} progress={usedPct} />
         </div>
 
-        <div className="flex gap-1 mb-6 sm:mb-8 p-1 rounded-xl w-full overflow-x-auto animate-fade-in-up delay-400" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+        {/* Tabs */}
+        <div className="flex gap-1 mb-5 p-1 rounded-lg overflow-x-auto" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => { setTab(t.id); sounds.click(); }} className="relative flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-300 whitespace-nowrap flex-shrink-0" style={{ background: tab === t.id ? `${colors.primary}15` : 'transparent', color: tab === t.id ? colors.primary : colors.textDim, border: tab === t.id ? `1px solid ${colors.primary}30` : '1px solid transparent' }}>
-              {t.icon}
-              <span>{t.label}</span>
+            <button key={t.id} onClick={() => { setTab(t.id); sounds.click(); }} className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap" style={{ background: tab === t.id ? `${colors.primary}12` : 'transparent', color: tab === t.id ? colors.primary : colors.textDim }}>
+              {t.icon} {t.label}
             </button>
           ))}
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <div className="relative w-12 h-12">
-              <Loader2 className="w-12 h-12 animate-spin" style={{ color: colors.primary }} />
-            </div>
-            <p className="text-sm font-mono animate-pulse-glow" style={{ color: colors.textMuted }}>INITIALIZING...</p>
+          <div className="flex flex-col items-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
+            <p className="text-xs font-mono" style={{ color: colors.textDim }}>Loading...</p>
           </div>
         ) : tab === 'dashboard' ? (
           <AdminDashboard files={files} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
         ) : tab === 'storage' ? (
           <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
-        )        : tab === 'security' ? (
+        ) : tab === 'security' ? (
           <AdminSecurity token={token!} onNotify={showNotification} onCredentialsChanged={() => { logout(); navigate('/admin/login'); }} />
-        ) : tab === 'security-features' ? (
-          <AdminSecurityFeatures token={token!} onNotify={showNotification} />
         ) : (
           <AdminAdvanced token={token!} onNotify={showNotification} />
         )}
       </div>
 
       {notification && (
-        <div className="fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl border backdrop-blur-xl transition-all animate-slide-in-bottom max-w-[90vw]" style={{ background: notification.type === 'success' ? `${colors.success}15` : `${colors.danger}15`, borderColor: notification.type === 'success' ? `${colors.success}40` : `${colors.danger}40`, color: notification.type === 'success' ? colors.success : colors.danger }}>
-          {notification.type === 'success' ? <Check className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-          <span className="text-sm">{notification.msg}</span>
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm animate-fade-in-up" style={{ background: notification.type === 'success' ? `${colors.success}12` : `${colors.danger}12`, borderColor: notification.type === 'success' ? `${colors.success}30` : `${colors.danger}30`, color: notification.type === 'success' ? colors.success : colors.danger }}>
+          {notification.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {notification.msg}
         </div>
       )}
     </div>
   );
 }
 
-function StatCard({ icon, label, value, progress, delay, colorKey }: {
-  icon: React.ReactNode; label: string; value: string; progress?: number; delay: string; colorKey: string;
-}) {
+function MiniStat({ icon, label, value, progress }: { icon: React.ReactNode; label: string; value: string; progress?: number }) {
   const { colors } = useTheme();
-  const colorMap: Record<string, string> = { emerald: colors.primary, cyan: colors.secondary, blue: colors.accent, purple: '#a855f7' };
-  const c = colorMap[colorKey] || colors.primary;
   return (
-    <div className="group p-3 sm:p-4 rounded-2xl card-sci corner-accent animate-fade-in-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border flex items-center justify-center mb-2 sm:mb-3 group-hover:scale-110 transition-transform duration-300" style={{ background: `${c}15`, borderColor: `${c}25`, color: c }}>
-        {icon}
+    <div className="p-3 rounded-xl card-sci">
+      <div className="flex items-center gap-2 mb-1">
+        <span style={{ color: colors.primary }}>{icon}</span>
+        <span className="text-[10px] font-mono uppercase" style={{ color: colors.textDim }}>{label}</span>
       </div>
-      <div className="text-[10px] mb-1 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>{label}</div>
-      <div className="text-base sm:text-lg font-bold truncate" style={{ color: colors.text }}>{value}</div>
+      <div className="text-sm font-bold truncate" style={{ color: colors.text }}>{value}</div>
       {progress !== undefined && (
-        <div className="mt-2 sm:mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
-          <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(progress, 100)}%`, background: colors.gradient }} />
+        <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
+          <div className="h-full rounded-full" style={{ width: `${Math.min(progress, 100)}%`, background: colors.gradient }} />
         </div>
       )}
     </div>

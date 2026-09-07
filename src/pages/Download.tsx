@@ -4,7 +4,6 @@ import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, 
 import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import { useTilt3D } from '@/lib/useTilt3D';
 
 export default function DownloadPage() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -13,14 +12,10 @@ export default function DownloadPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-  const cardTilt = useTilt3D<HTMLDivElement>({ maxTilt: 8, scale: 1.02 });
 
   useEffect(() => {
     if (!fileId) return;
-    api.getFileInfo(fileId)
-      .then(setFile)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    api.getFileInfo(fileId).then(setFile).catch((e) => setError(e.message)).finally(() => setLoading(false));
   }, [fileId]);
 
   async function handleDownload() {
@@ -40,13 +35,10 @@ export default function DownloadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center grid-bg perspective-scene" style={{ color: colors.text }}>
-        <div className="flex flex-col items-center gap-4 animate-fade-in-up">
-          <div className="relative w-14 h-14">
-            <Loader2 className="w-14 h-14 animate-spin" style={{ color: colors.primary }} />
-            <div className="absolute inset-0 rounded-full border animate-ping" style={{ borderColor: `${colors.primary}20` }} />
-          </div>
-          <p className="text-sm font-mono animate-pulse-glow" style={{ color: colors.textMuted }}>LOCATING_FILE...</p>
+      <div className="min-h-screen flex items-center justify-center grid-bg" style={{ color: colors.text }}>
+        <div className="flex flex-col items-center gap-3 animate-fade-in-up">
+          <Loader2 className="w-10 h-10 animate-spin" style={{ color: colors.primary }} />
+          <p className="text-xs font-mono" style={{ color: colors.textMuted }}>LOCATING_FILE...</p>
         </div>
       </div>
     );
@@ -54,17 +46,14 @@ export default function DownloadPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 grid-bg perspective-scene" style={{ color: colors.text }}>
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-[30%] left-[20%] w-[300px] h-[300px] rounded-full blur-[120px]" style={{ background: `${colors.danger}08` }} />
-        </div>
-        <div className="relative z-10 flex flex-col items-center animate-scale-in">
-          <div className="w-20 h-20 rounded-2xl border flex items-center justify-center mb-6" style={{ background: `${colors.danger}10`, borderColor: `${colors.danger}20` }}>
-            <AlertCircle className="w-10 h-10" style={{ color: colors.danger }} />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 grid-bg" style={{ color: colors.text }}>
+        <div className="flex flex-col items-center animate-scale-in">
+          <div className="w-16 h-16 rounded-xl border flex items-center justify-center mb-4" style={{ background: `${colors.danger}10`, borderColor: `${colors.danger}20` }}>
+            <AlertCircle className="w-8 h-8" style={{ color: colors.danger }} />
           </div>
-          <h1 className="text-2xl font-bold mb-2">File not found</h1>
-          <p className="mb-8 text-center max-w-md font-mono text-sm" style={{ color: colors.textMuted }}>{error}</p>
-          <Link to="/" className="flex items-center gap-2 px-6 py-3 rounded-xl border transition-all text-sm ripple-effect" style={{ borderColor: colors.border, color: colors.text }} onClick={() => sounds.click()}>
+          <h1 className="text-xl font-bold mb-2">File not found</h1>
+          <p className="mb-6 text-center max-w-sm font-mono text-sm" style={{ color: colors.textMuted }}>{error}</p>
+          <Link to="/" className="flex items-center gap-2 px-5 py-2.5 rounded-lg border text-sm" style={{ borderColor: colors.border, color: colors.text }} onClick={() => sounds.click()}>
             <ArrowLeft className="w-4 h-4" />
             Back to home
           </Link>
@@ -76,74 +65,39 @@ export default function DownloadPage() {
   if (!file) return null;
 
   return (
-    <div className="min-h-screen relative overflow-hidden grid-bg perspective-scene" style={{ color: colors.text }}>
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb1 }} />
-        <div className="absolute bottom-[-10%] right-[10%] w-[400px] h-[400px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb2, animationDelay: '2s' }} />
-        <div className="absolute top-[50%] left-[50%] w-[300px] h-[300px] rounded-full blur-[120px] animate-float" style={{ background: colors.orb3, animationDelay: '3s' }} />
-      </div>
-
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] pointer-events-none opacity-[0.02] preserve-3d">
-        <div className="w-full h-full rounded-full border ring-3d ring-3d-1" style={{ borderColor: colors.primary }} />
-      </div>
-
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-12">
-        <div className="w-full max-w-lg">
-          <div
-            ref={cardTilt.ref}
-            onMouseMove={cardTilt.onMouseMove}
-            onMouseLeave={cardTilt.onMouseLeave}
-            className="card-sci corner-accent rounded-3xl p-8 animate-card-flip tilt-card"
-            style={cardTilt.style}
-          >
-            <div className="tilt-shine" />
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent animate-hologram" />
-
-            <div className="flex justify-center mb-6">
-              <div className="relative w-20 h-20 rounded-2xl border flex items-center justify-center float-3d" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}20` }}>
-                <FileText className="w-10 h-10" style={{ color: colors.primary }} />
-                <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse-glow" style={{ background: colors.primary }} />
+    <div className="min-h-screen relative grid-bg" style={{ color: colors.text }}>
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4 py-10">
+        <div className="w-full max-w-md">
+          <div className="card-sci rounded-2xl p-6 sm:p-8 animate-scale-in">
+            <div className="flex justify-center mb-5">
+              <div className="w-16 h-16 rounded-xl border flex items-center justify-center" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}15` }}>
+                <FileText className="w-8 h-8" style={{ color: colors.primary }} />
               </div>
             </div>
 
-            <h1 className="text-xl font-bold text-center mb-1 break-all leading-snug animate-fade-in-up">{file.original_name}</h1>
-            <p className="text-sm text-center mb-8 font-mono animate-fade-in-up delay-100" style={{ color: colors.textDim }}>READY_TO_DOWNLOAD</p>
+            <h1 className="text-lg font-bold text-center mb-1 break-all" style={{ color: colors.text }}>{file.original_name}</h1>
+            <p className="text-xs text-center mb-6 font-mono" style={{ color: colors.textDim }}>READY_TO_DOWNLOAD</p>
 
-            <div className="space-y-3 mb-8">
-              <DetailRow icon={<HardDrive className="w-4 h-4" />} label="Size" value={formatBytes(file.file_size)} delay="200" />
-              <DetailRow icon={<FileType className="w-4 h-4" />} label="Type" value={file.mime_type || 'Unknown'} delay="300" />
-              <DetailRow icon={<Calendar className="w-4 h-4" />} label="Uploaded" value={formatDate(file.created_at)} delay="400" />
+            <div className="space-y-2 mb-6">
+              <DetailRow icon={<HardDrive className="w-3.5 h-3.5" />} label="Size" value={formatBytes(file.file_size)} />
+              <DetailRow icon={<FileType className="w-3.5 h-3.5" />} label="Type" value={file.mime_type || 'Unknown'} />
+              <DetailRow icon={<Calendar className="w-3.5 h-3.5" />} label="Uploaded" value={formatDate(file.created_at)} />
             </div>
 
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl font-bold text-sm btn-sci disabled:opacity-60 animate-fade-in-up delay-500"
-              style={{ background: colors.gradient, color: colors.bg }}
-            >
-              {downloading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Preparing download...
-                </>
-              ) : (
-                <>
-                  <Download className="w-5 h-5" />
-                  Download file
-                </>
-              )}
+            <button onClick={handleDownload} disabled={downloading} className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm btn-sci disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
+              {downloading ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing...</> : <><Download className="w-4 h-4" /> Download file</>}
             </button>
 
-            <div className="flex items-center justify-center gap-2 mt-5 text-xs font-mono" style={{ color: colors.textDim }}>
+            <div className="flex items-center justify-center gap-1.5 mt-4 text-xs font-mono" style={{ color: colors.textDim }}>
               <Package className="w-3 h-3" />
               Downloaded {file.download_count} time{file.download_count !== 1 ? 's' : ''}
             </div>
           </div>
 
-          <div className="text-center mt-8 animate-fade-in-up delay-600">
-            <Link to="/" className="text-sm flex items-center justify-center gap-2 transition-colors" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
+          <div className="text-center mt-6 animate-fade-in-up delay-200">
+            <Link to="/" className="text-xs flex items-center justify-center gap-1.5" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
               <Zap className="w-3 h-3" style={{ color: colors.primary }} />
-              Powered by LazyDrop
+              LazyDrop
             </Link>
           </div>
         </div>
@@ -152,17 +106,15 @@ export default function DownloadPage() {
   );
 }
 
-function DetailRow({ icon, label, value, delay }: { icon: React.ReactNode; label: string; value: string; delay: string }) {
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   const { colors } = useTheme();
   return (
-    <div className="flex items-center justify-between py-3 px-4 rounded-xl border transition-all animate-fade-in-left" style={{ background: `${colors.text}02`, borderColor: `${colors.text}05`, animationDelay: `${delay}ms` }}>
-      <div className="flex items-center gap-2.5 text-sm" style={{ color: colors.textMuted }}>
-        <div className="w-7 h-7 rounded-lg border flex items-center justify-center" style={{ background: `${colors.primary}08`, borderColor: `${colors.primary}12` }}>
-          {icon}
-        </div>
+    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg" style={{ background: `${colors.text}03`, border: `1px solid ${colors.text}05` }}>
+      <div className="flex items-center gap-2 text-xs" style={{ color: colors.textMuted }}>
+        {icon}
         {label}
       </div>
-      <span className="text-sm font-medium max-w-[60%] text-right truncate font-mono" style={{ color: colors.text }}>{value}</span>
+      <span className="text-xs font-medium font-mono truncate max-w-[60%] text-right" style={{ color: colors.text }}>{value}</span>
     </div>
   );
 }
