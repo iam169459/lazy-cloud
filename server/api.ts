@@ -519,6 +519,7 @@ export async function handleApiRequest(
         bucket_name: bucket,
         access_key_id: accessKey,
         secret_access_key: secretKey,
+        region: sanitize(body.region) || 'auto',
         max_bytes: body.max_bytes || defaultMaxBytes,
       });
       sendJson(res, 200, { provider: { ...provider, secret_access_key: '--------' } });

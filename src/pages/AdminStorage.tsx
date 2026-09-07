@@ -279,11 +279,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <input type="text" value={form.provider_name} onChange={(e) => updateField('provider_name', e.target.value)} placeholder="My Storage" required className="input" />
  </FormField>
 
- {selectedProvider?.endpoint.includes('{region}') && (
- <FormField label="Region" required>
- <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider?.regionPlaceholder || 'us-east-1'} required className="input" />
- </FormField>
- )}
+
 
  <FormField label="Endpoint URL" required>
  <input type="url" value={form.endpoint_url} onChange={(e) => updateField('endpoint_url', e.target.value)} placeholder="https://s3.amazonaws.com" required className="input" />
@@ -298,7 +294,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  </FormField>
 
  <FormField label="Region">
- <input type="text" value={form.region} onChange={(e) => updateField('region', e.target.value)} placeholder="auto" className="input" />
+ <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider?.regionPlaceholder || 'auto'} className="input" />
  </FormField>
 
  <FormField label="Access key ID" required>
