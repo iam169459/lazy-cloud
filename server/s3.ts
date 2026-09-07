@@ -3,12 +3,15 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   ListObjectsV2Command,
+  GetBucketLocationCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { StorageProvider } from './db';
 
-function extractRegion(endpointUrl: string): string {
+const regionCache = new Map<string, string>();
+
+function guessRegionFromEndpoint(endpointUrl: string): string {
   const url = endpointUrl.toLowerCase();
 
   const backblazeMatch = url.match(/s3\.([^.]+)\.backblazeb2\.com/);
@@ -20,19 +23,50 @@ function extractRegion(endpointUrl: string): string {
   const doMatch = url.match(/([^.]+)\.digitaloceanspaces\.com/);
   if (doMatch) return doMatch[1];
 
-  const gcpMatch = url.match(/storage\.googleapis\.com/);
-  if (gcpMatch) return 'auto';
-
   const wasabiMatch = url.match(/s3\.([^.]+)\.wasabisys\.com/);
   if (wasabiMatch) return wasabiMatch[1];
 
-  return 'auto';
+  return '';
 }
 
-export function createS3Client(provider: StorageProvider): S3Client {
-  const region = provider.region && provider.region !== 'auto'
-    ? provider.region
-    : extractRegion(provider.endpoint_url);
+async function detectRegion(provider: StorageProvider): Promise<string> {
+  const cacheKey = `${provider.id}-${provider.endpoint_url}`;
+  if (regionCache.has(cacheKey)) return regionCache.get(cacheKey)!;
+
+  if (provider.region && provider.region !== 'auto') {
+    regionCache.set(cacheKey, provider.region);
+    return provider.region;
+  }
+
+  const guessed = guessRegionFromEndpoint(provider.endpoint_url);
+  if (guessed) {
+    regionCache.set(cacheKey, guessed);
+    return guessed;
+  }
+
+  const probeClient = new S3Client({
+    region: 'us-east-1',
+    endpoint: provider.endpoint_url,
+    credentials: {
+      accessKeyId: provider.access_key_id,
+      secretAccessKey: provider.secret_access_key,
+    },
+    forcePathStyle: true,
+  });
+
+  try {
+    const res = await probeClient.send(new GetBucketLocationCommand({ Bucket: provider.bucket_name }));
+    const loc = res.LocationConstraint || 'us-east-1';
+    regionCache.set(cacheKey, loc);
+    return loc;
+  } catch {
+    regionCache.set(cacheKey, 'us-east-1');
+    return 'us-east-1';
+  }
+}
+
+export async function createS3Client(provider: StorageProvider): Promise<S3Client> {
+  const region = await detectRegion(provider);
   return new S3Client({
     region,
     endpoint: provider.endpoint_url,
@@ -50,7 +84,7 @@ export async function uploadToProvider(
   body: Buffer,
   contentType: string
 ): Promise<void> {
-  const client = createS3Client(provider);
+  const client = await createS3Client(provider);
 
   const upload = new Upload({
     client,
@@ -72,7 +106,7 @@ export async function deleteFromProvider(
   provider: StorageProvider,
   key: string
 ): Promise<void> {
-  const client = createS3Client(provider);
+  const client = await createS3Client(provider);
   await client.send(
     new DeleteObjectCommand({
       Bucket: provider.bucket_name,
@@ -85,7 +119,7 @@ export async function downloadFromProvider(
   provider: StorageProvider,
   key: string
 ): Promise<Buffer | null> {
-  const client = createS3Client(provider);
+  const client = await createS3Client(provider);
   try {
     const response = await client.send(
       new GetObjectCommand({
@@ -111,7 +145,7 @@ export async function getPresignedDownloadUrl(
   filename: string,
   contentType: string
 ): Promise<string> {
-  const client = createS3Client(provider);
+  const client = await createS3Client(provider);
   const command = new GetObjectCommand({
     Bucket: provider.bucket_name,
     Key: key,
@@ -130,7 +164,7 @@ export interface S3Object {
 export async function listObjects(
   provider: StorageProvider
 ): Promise<S3Object[]> {
-  const client = createS3Client(provider);
+  const client = await createS3Client(provider);
   const objects: S3Object[] = [];
   let continuationToken: string | undefined;
 
@@ -158,4 +192,14 @@ export async function listObjects(
   } while (continuationToken);
 
   return objects;
+}
+
+export function clearRegionCache(providerId?: string) {
+  if (providerId) {
+    for (const key of regionCache.keys()) {
+      if (key.startsWith(providerId)) regionCache.delete(key);
+    }
+  } else {
+    regionCache.clear();
+  }
 }
