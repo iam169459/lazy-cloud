@@ -97,13 +97,6 @@ export function getProviderById(id: string): CloudProvider | undefined {
   return cloudProviders.find(p => p.id === id);
 }
 
-export function detectProviderFromEndpoint(endpoint: string): CloudProvider | undefined {
-  const url = endpoint.toLowerCase();
-  if (url.includes('backblazeb2.com')) return cloudProviders.find(p => p.id === 'backblaze-b2');
-  if (url.includes('r2.cloudflarestorage.com')) return cloudProviders.find(p => p.id === 'cloudflare-r2');
-  if (url.includes('amazonaws.com')) return cloudProviders.find(p => p.id === 'aws-s3');
-  if (url.includes('storage.googleapis.com')) return cloudProviders.find(p => p.id === 'google-cloud');
-  if (url.includes('idrive.com')) return cloudProviders.find(p => p.id === 'idrive-e2');
-  if (url.includes(':9000') && !url.includes('amazonaws.com')) return cloudProviders.find(p => p.id === 'minio');
-  return undefined;
+export function getProviderColors(id: string): string {
+  return getProviderById(id)?.color || '#6b7280';
 }

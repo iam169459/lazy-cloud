@@ -2,88 +2,76 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, ArrowLeft, Loader2, Zap, User } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useTheme } from '@/lib/theme';
+import { sounds } from '@/lib/sounds';
+
+const MAX = 5, LOCK = 30_000;
 
 export default function AdminLogin() {
   const { login } = useAuth();
-  const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const nav = useNavigate();
+  const { colors } = useTheme();
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [attempts, setAttempts] = useState(() => {
+    const s = localStorage.getItem('ld_att');
+    const t = localStorage.getItem('ld_lock');
+    if (t && Date.now() - +t < LOCK) { setTimeout(() => setLocked(false), LOCK - (Date.now() - +t)); return +(s || '0'); }
+    return s ? +s : 0;
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-    const ok = await login(username, password);
-    if (ok) {
-      navigate('/admin');
-    } else {
-      setError('Invalid username or password');
+    if (locked) return;
+    setLoading(true); setErr(''); sounds.click();
+    const ok = await login(user, pass);
+    if (ok) { localStorage.removeItem('ld_att'); localStorage.removeItem('ld_lock'); sounds.success(); nav('/admin'); }
+    else {
+      const n = attempts + 1; setAttempts(n); localStorage.setItem('ld_att', String(n));
+      if (n >= MAX) { localStorage.setItem('ld_lock', String(Date.now())); setLocked(true); setErr(`Locked for ${LOCK / 1000}s.`); setTimeout(() => { setLocked(false); setAttempts(0); localStorage.removeItem('ld_att'); localStorage.removeItem('ld_lock'); }, LOCK); }
+      else { sounds.error(); setErr(`Invalid. ${MAX - n} left.`); }
     }
     setLoading(false);
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col items-center justify-center px-6 relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[20%] left-[30%] w-[400px] h-[400px] rounded-full bg-emerald-500/10 blur-[120px]" />
-      </div>
-
-      <div className="relative z-10 w-full max-w-sm">
-        <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-[#0a0a0f]" strokeWidth={2.5} />
+    <div className="min-h-screen flex flex-col items-center justify-center px-5 grid-bg" style={{ color: colors.text }}>
+      <div className="w-full max-w-sm">
+        <Link to="/" className="flex items-center justify-center gap-2 mb-8 animate-fade-up" onClick={() => sounds.click()}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+            <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
           </div>
-          <span className="text-xl font-bold tracking-tight">LazyDrop</span>
+          <span className="text-lg font-semibold text-gradient">LazyDrop</span>
         </Link>
-
-        <div className="bg-white/[0.03] border border-white/10 rounded-3xl p-8">
-          <div className="flex justify-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-400/10 flex items-center justify-center">
-              <Lock className="w-7 h-7 text-emerald-400" />
+        <div className="card p-6 animate-scale-up">
+          <h1 className="text-lg font-bold text-center mb-1">Admin Access</h1>
+          <p className="text-xs text-center mb-5" style={{ color: colors.textDim }}>Enter your credentials</p>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Username</label>
+              <div className="input-group">
+                <span className="input-icon"><User className="w-4 h-4" /></span>
+                <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input" disabled={locked} />
+              </div>
             </div>
-          </div>
-
-          <h1 className="text-xl font-bold text-center mb-1">Admin Access</h1>
-          <p className="text-sm text-gray-400 text-center mb-6">Enter your credentials to manage files</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                autoFocus
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/30 transition-all"
-              />
+            <div>
+              <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Password</label>
+              <div className="input-group">
+                <span className="input-icon"><Lock className="w-4 h-4" /></span>
+                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Password" className="input" disabled={locked} />
+              </div>
             </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400/50 focus:ring-1 focus:ring-emerald-400/30 transition-all"
-              />
-            </div>
-            {error && <p className="text-sm text-red-400 text-center">{error}</p>}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-[#0a0a0f] font-semibold text-sm hover:shadow-[0_0_30px_rgba(52,211,153,0.3)] transition-all disabled:opacity-60"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign in'}
+            {err && <p className="text-sm text-center animate-shake" style={{ color: '#ef4444' }}>{err}</p>}
+            <button type="submit" disabled={loading || locked} className="btn btn-primary w-full">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : locked ? 'Locked' : 'Sign in'}
             </button>
           </form>
         </div>
-
-        <Link to="/" className="flex items-center justify-center gap-1.5 mt-6 text-sm text-gray-500 hover:text-gray-300 transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to home
+        <Link to="/" className="flex items-center justify-center gap-1.5 mt-5 text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
+          <ArrowLeft className="w-3 h-3" /> Back to home
         </Link>
       </div>
     </div>

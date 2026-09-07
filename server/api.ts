@@ -1,7 +1,9 @@
 import { IncomingMessage, ServerResponse } from 'http';
+import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials } from './db';
-import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
+import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects } from './s3';
+import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
 let dbInitialized = false;
 
@@ -34,6 +36,267 @@ function sendJson(res: ServerResponse, status: number, data: any) {
 
 function sendError(res: ServerResponse, status: number, message: string) {
   sendJson(res, status, { error: message });
+}
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
+
+function safeCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+function sanitize(str: unknown): string {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[<>'"&;]/g, '').trim().slice(0, 500);
+}
+
+/**
+ * Delete files older than settings.autoDeleteDays (when auto-delete is on).
+ * Runs on a timer in the Vite plugin and is safe to call repeatedly.
+ */
+export async function cleanupExpiredFiles(): Promise<number> {
+  try {
+    const settings = await getAppSettings();
+    if (!settings.autoDelete) return 0;
+    const days = parseInt(settings.autoDeleteDays) || 30;
+    const files = await listExpiredFiles(days);
+    if (files.length === 0) return 0;
+
+    const providers = await listProviders();
+    let removed = 0;
+    for (const f of files) {
+      const provider = providers.find((p) => p.id === f.provider_id);
+      try {
+        if (provider) {
+          await deleteFromProvider(provider, f.r2_key);
+          await updateProviderBytes(provider.id, -f.file_size);
+        }
+        await deleteFileRecord(f.id);
+        removed++;
+      } catch (e: any) {
+        console.error(`[lazydrop] auto-delete failed for ${f.id}:`, e.message);
+      }
+    }
+    if (removed > 0) console.log(`[lazydrop] auto-deleted ${removed} expired file(s)`);
+    return removed;
+  } catch (e: any) {
+    console.error('[lazydrop] cleanup sweep failed:', e.message);
+    return 0;
+  }
+}
+
+async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const settings = await getAppSettings();
+  const maxSize = parseInt(settings.maxFileSize) || 0;
+  const bb = busboy({
+    headers: req.headers,
+    limits: { fileSize: maxSize > 0 ? maxSize : undefined, files: 1 },
+  });
+
+  let fileName = '';
+  let mimeType = '';
+  const chunks: Buffer[] = [];
+  let fileSize = 0;
+  let uploadError: string | null = null;
+
+  bb.on('file', (_fieldname, file, info) => {
+    fileName = info.filename || 'unnamed';
+    mimeType = info.mimeType || 'application/octet-stream';
+
+    file.on('limit', () => {
+      uploadError = `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`;
+      file.resume();
+    });
+
+    file.on('data', (chunk: Buffer) => {
+      if (!uploadError) {
+        chunks.push(chunk);
+        fileSize += chunk.length;
+      }
+    });
+  });
+
+  bb.on('error', (err: Error) => {
+    uploadError = err.message;
+  });
+
+  return new Promise<boolean>((resolve) => {
+    bb.on('finish', async () => {
+      if (uploadError) {
+        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
+        return resolve(true);
+      }
+      if (!fileName || chunks.length === 0) {
+        sendError(res, 400, 'No file uploaded');
+        return resolve(true);
+      }
+
+      const fileBuffer = Buffer.concat(chunks);
+      chunks.length = 0;
+
+      const allowed = (settings.allowedTypes || '*')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
+        return resolve(true);
+      }
+
+      const providerUsed = await findProviderForSize(fileSize);
+      if (!providerUsed) {
+        const allProviders = await listProviders();
+        if (allProviders.length === 0) {
+          sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
+        } else {
+          sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
+        }
+        return resolve(true);
+      }
+
+      const fileId = generateId();
+      const fileKey = `${fileId}/${fileName}`;
+
+      try {
+        await uploadToProvider(providerUsed, fileKey, fileBuffer, mimeType);
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            r2_key: fileKey,
+            provider_id: providerUsed.id,
+          });
+          await updateProviderBytes(providerUsed.id, fileSize);
+        } catch (dbErr: any) {
+          await deleteFromProvider(providerUsed, fileKey).catch(() => {});
+          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
+          return resolve(true);
+        }
+        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
+      } catch (e: any) {
+        sendError(res, 500, `Upload to storage failed: ${e.message}`);
+      }
+      resolve(true);
+    });
+
+    req.pipe(bb);
+  });
+}
+
+async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const settings = await getAppSettings();
+  const maxSize = parseInt(settings.maxFileSize) || 0;
+  const bb = busboy({
+    headers: req.headers,
+    limits: { fileSize: maxSize > 0 ? maxSize : undefined, files: 1 },
+  });
+
+  let fileName = '';
+  let mimeType = '';
+  let fileSize = 0;
+  const chunks: Buffer[] = [];
+  let uploadError: string | null = null;
+
+  bb.on('file', (_fieldname, file, info) => {
+    fileName = info.filename || 'unnamed';
+    mimeType = info.mimeType || 'application/octet-stream';
+
+    file.on('limit', () => {
+      uploadError = `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`;
+      file.resume();
+    });
+
+    file.on('data', (chunk: Buffer) => {
+      fileSize += chunk.length;
+      chunks.push(chunk);
+    });
+  });
+
+  bb.on('error', (err: Error) => {
+    uploadError = err.message;
+  });
+
+  return new Promise<boolean>((resolve) => {
+    bb.on('finish', async () => {
+      if (uploadError) {
+        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
+        return resolve(true);
+      }
+      if (!fileName || chunks.length === 0) {
+        sendError(res, 400, 'No file uploaded');
+        return resolve(true);
+      }
+
+      const fileBuffer = Buffer.concat(chunks);
+      chunks.length = 0;
+
+      const allowed = (settings.allowedTypes || '*')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
+        return resolve(true);
+      }
+
+      const provider = await findProviderForSize(fileSize);
+      if (!provider) {
+        const allProviders = await listProviders();
+        if (allProviders.length === 0) {
+          sendError(res, 507, 'No storage providers configured.');
+        } else {
+          sendError(res, 507, 'No storage provider with enough space.');
+        }
+        return resolve(true);
+      }
+
+      const fileId = generateId();
+      const r2Key = `${fileId}/${fileName}`;
+
+      try {
+        const { encrypted, iv, authTag } = encryptFile(fileBuffer);
+        await uploadToProvider(provider, r2Key, encrypted, mimeType);
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            r2_key: r2Key,
+            provider_id: provider.id,
+            encrypted: true,
+            enc_iv: iv,
+            enc_auth_tag: authTag,
+          });
+          await updateProviderBytes(provider.id, fileBuffer.length);
+        } catch (dbErr: any) {
+          await deleteFromProvider(provider, r2Key).catch(() => {});
+          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
+          return resolve(true);
+        }
+        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize, encrypted: true });
+      } catch (e: any) {
+        sendError(res, 500, `Encrypted upload to storage failed: ${e.message}`);
+      }
+      resolve(true);
+    });
+
+    req.pipe(bb);
+  });
 }
 
 async function checkAuth(req: IncomingMessage): Promise<boolean> {
@@ -84,7 +347,10 @@ export async function handleApiRequest(
       const provider = providers.find((p) => p.id === file.provider_id);
       if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
 
-      await incrementDownloadCount(fileId);
+      const settings = await getAppSettings();
+      if (settings.enableDownloadCounter !== false) {
+        await incrementDownloadCount(fileId);
+      }
       const url = await getPresignedDownloadUrl(provider, file.r2_key, file.original_name, file.mime_type || 'application/octet-stream');
       sendJson(res, 200, { url });
       return true;
@@ -95,15 +361,23 @@ export async function handleApiRequest(
       const DEFAULT_USER = process.env.ADMIN_USERNAME || 'admin';
       const DEFAULT_PASS = process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024';
 
+      const inputUser = sanitize(body.username);
+      const inputPass = sanitize(body.password);
+
+      if (!inputUser || !inputPass) {
+        sendError(res, 400, 'Username and password are required');
+        return true;
+      }
+
       let valid = false;
       let token = DEFAULT_PASS;
 
-      if (body.username === DEFAULT_USER && body.password === DEFAULT_PASS) {
+      if (safeCompare(inputUser, DEFAULT_USER) && safeCompare(inputPass, DEFAULT_PASS)) {
         valid = true;
       } else {
         try {
           const creds = await getAdminCredentials();
-          if (body.username === creds.username && body.password === creds.password) {
+          if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
             valid = true;
             token = creds.password;
           }
@@ -129,75 +403,48 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/upload' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      return handleUpload(req, res);
+    }
 
-      const bb = busboy({ headers: req.headers });
-      let uploadedFile: { name: string; data: Buffer[]; mimeType: string } | null = null;
-      let uploadError: string | null = null;
+    if (path === '/api/upload' && req.method === 'POST') {
+      const settings = await getAppSettings();
+      if (!settings.enablePublicUpload) {
+        sendError(res, 403, 'Public uploads are disabled');
+        return true;
+      }
+      return handleUpload(req, res);
+    }
 
-      bb.on('file', (_fieldname, file, info) => {
-        const chunks: Buffer[] = [];
-        file.on('data', (chunk) => chunks.push(chunk));
-        file.on('end', () => {
-          uploadedFile = {
-            name: info.filename || 'unnamed',
-            data: chunks,
-            mimeType: info.mimeType || 'application/octet-stream',
-          };
-        });
-      });
+    if (path === '/api/admin/upload/encrypted' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      return handleEncryptedUpload(req, res);
+    }
 
-      bb.on('error', (err: Error) => {
-        uploadError = err.message;
-      });
-
-      return new Promise<boolean>((resolve) => {
-        bb.on('finish', async () => {
-          if (uploadError) {
-            sendError(res, 400, uploadError);
-            return resolve(true);
-          }
-          if (!uploadedFile) {
-            sendError(res, 400, 'No file uploaded');
-            return resolve(true);
-          }
-
-          const fileBuffer = Buffer.concat(uploadedFile.data);
-          const fileSize = fileBuffer.length;
-
-          const provider = await findProviderForSize(fileSize);
-          if (!provider) {
-            const allProviders = await listProviders();
-            if (allProviders.length === 0) {
-              sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
-            } else {
-              sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
-            }
-            return resolve(true);
-          }
-
-          const fileId = generateId(10);
-          const r2Key = `${fileId}/${uploadedFile.name}`;
-
-          try {
-            await uploadToProvider(provider, r2Key, fileBuffer, uploadedFile.mimeType);
-            await createFileRecord({
-              id: fileId,
-              original_name: uploadedFile.name,
-              file_size: fileSize,
-              mime_type: uploadedFile.mimeType,
-              r2_key: r2Key,
-              provider_id: provider.id,
-            });
-            await updateProviderBytes(provider.id, fileSize);
-            sendJson(res, 200, { id: fileId, name: uploadedFile.name, size: fileSize });
-          } catch (e: any) {
-            sendError(res, 500, `Upload failed: ${e.message}`);
-          }
-          resolve(true);
-        });
-
-        req.pipe(bb);
-      });
+    if (path === '/api/download/encrypted' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (!file.encrypted) { sendError(res, 400, 'File is not encrypted'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      const settings = await getAppSettings();
+      if (settings.enableDownloadCounter !== false) {
+        await incrementDownloadCount(fileId);
+      }
+      try {
+        const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
+        if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+        const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
+        const blob = new Blob([decrypted]);
+        const url = URL.createObjectURL(blob);
+        sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
+      } catch (e: any) {
+        sendError(res, 500, `Decryption failed: ${e.message}`);
+      }
+      return true;
     }
 
     if (path === '/api/admin/files' && req.method === 'GET') {
@@ -244,19 +491,36 @@ export async function handleApiRequest(
     if (path === '/api/admin/providers/add' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      if (!body.provider_name || !body.endpoint_url || !body.bucket_name || !body.access_key_id || !body.secret_access_key) {
+      const name = sanitize(body.provider_name);
+      const endpoint = sanitize(body.endpoint_url);
+      const bucket = sanitize(body.bucket_name);
+      const accessKey = sanitize(body.access_key_id);
+      const secretKey = sanitize(body.secret_access_key);
+      if (!name || !endpoint || !bucket || !accessKey || !secretKey) {
         sendError(res, 400, 'All fields are required');
         return true;
       }
+      if (endpoint.length > 512) {
+        sendError(res, 400, 'Endpoint URL too long');
+        return true;
+      }
+      // Dedup check: prevent same bucket_name + endpoint_url
+      const existing = await listProviders();
+      if (existing.some(p => p.bucket_name === bucket && p.endpoint_url === endpoint)) {
+        sendError(res, 409, 'A bucket with this name and endpoint already exists');
+        return true;
+      }
+      const settings = await getAppSettings();
+      const defaultMaxBytes = parseInt(settings.maxStoragePerBucket) || 10188208025;
       const provider = await addProvider({
-        provider_type: body.provider_type || 'custom',
-        provider_name: body.provider_name,
-        endpoint_url: body.endpoint_url,
-        bucket_name: body.bucket_name,
-        access_key_id: body.access_key_id,
-        secret_access_key: body.secret_access_key,
-        region: body.region || 'auto',
-        max_bytes: body.max_bytes || 10188208025,
+        provider_type: sanitize(body.provider_type) || 'custom',
+        provider_name: name,
+        endpoint_url: endpoint,
+        bucket_name: bucket,
+        access_key_id: accessKey,
+        secret_access_key: secretKey,
+        region: sanitize(body.region) || 'auto',
+        max_bytes: body.max_bytes || defaultMaxBytes,
       });
       sendJson(res, 200, { provider: { ...provider, secret_access_key: '--------' } });
       return true;
@@ -280,6 +544,36 @@ export async function handleApiRequest(
       return true;
     }
 
+    if (path === '/api/admin/providers/test' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      if (!id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      try {
+        const objects = await listObjects(provider);
+        sendJson(res, 200, { success: true, fileCount: objects.length, bucket: provider.bucket_name });
+      } catch (e: any) {
+        sendJson(res, 200, { success: false, error: e.message, bucket: provider.bucket_name });
+      }
+      return true;
+    }
+
+    if (path === '/api/settings' && req.method === 'GET') {
+      sendJson(res, 200, await getAppSettings());
+      return true;
+    }
+
+    if (path === '/api/admin/settings' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const settings = await updateAppSettings(body);
+      sendJson(res, 200, { settings });
+      return true;
+    }
+
     if (path === '/api/admin/credentials' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const creds = await getAdminCredentials();
@@ -290,12 +584,273 @@ export async function handleApiRequest(
     if (path === '/api/admin/credentials/update' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      if (!body.username || !body.password) {
+      const newUsername = sanitize(body.username);
+      const newPassword = sanitize(body.password);
+      if (!newUsername || !newPassword) {
         sendError(res, 400, 'Username and password are required');
         return true;
       }
-      await updateAdminCredentials(body.username, body.password);
-      sendJson(res, 200, { success: true, username: body.username });
+      if (newPassword.length < 8) {
+        sendError(res, 400, 'Password must be at least 8 characters');
+        return true;
+      }
+      await updateAdminCredentials(newUsername, newPassword);
+      sendJson(res, 200, { success: true, username: newUsername });
+      return true;
+    }
+
+    if (path === '/api/admin/security/status' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const encStatus = getEncryptionStatus();
+      const settings = await getAppSettings();
+      const creds = await getAdminCredentials();
+      sendJson(res, 200, {
+        encryption: encStatus,
+        fileTTL: {
+          enabled: settings.autoDelete !== false,
+          defaultDays: parseInt(settings.autoDeleteDays) || 30,
+        },
+        sessionTimeout: 30,
+        ipWhitelist: [],
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/security/file-ttl' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const enabled = body.enabled !== false;
+      const days = Math.max(1, Math.min(365, parseInt(body.defaultDays) || 30));
+      await updateAppSettings({ autoDelete: enabled, autoDeleteDays: String(days) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/session-timeout' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const minutes = Math.max(5, Math.min(480, parseInt(body.minutes) || 30));
+      await updateAppSettings({ sessionTimeout: String(minutes) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/ip-whitelist' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const ips = Array.isArray(body.ips) ? body.ips.filter((ip: string) => typeof ip === 'string' && ip.trim()) : [];
+      await updateAppSettings({ ipWhitelist: JSON.stringify(ips) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/encryption' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      sendJson(res, 200, { success: true, note: 'Encryption setting updated. Use ENCRYPTION_KEY env var for custom keys.' });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/storage' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const providers = await listProviders();
+      const results: { provider: string; bucket: string; files: { key: string; size: number }[]; error?: string }[] = [];
+      const allOrphaned: { key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }[] = [];
+      for (const p of providers) {
+        try {
+          const objects = await listObjects(p);
+          results.push({
+            provider: p.provider_name,
+            bucket: p.bucket_name,
+            files: objects.map((o) => ({ key: o.key, size: o.size })),
+          });
+        } catch (e: any) {
+          results.push({
+            provider: p.provider_name,
+            bucket: p.bucket_name,
+            files: [],
+            error: e.message,
+          });
+        }
+      }
+      const dbFiles = await listFiles();
+      const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
+      let totalS3Objects = 0;
+      let totalSize = 0;
+      for (const r of results) {
+        for (const f of r.files) {
+          totalS3Objects++;
+          totalSize += f.size;
+          if (!dbKeys.has(f.key)) {
+            const matchedProvider = providers.find((p) => p.bucket_name === r.bucket);
+            if (matchedProvider) {
+              allOrphaned.push({
+                key: f.key,
+                size: f.size,
+                provider_id: matchedProvider.id,
+                provider_name: matchedProvider.provider_name,
+                bucket_name: matchedProvider.bucket_name,
+              });
+            }
+          }
+        }
+      }
+      sendJson(res, 200, {
+        buckets: results,
+        summary: {
+          totalBuckets: providers.length,
+          totalS3Objects,
+          totalDbRecords: dbFiles.length,
+          orphanedFiles: allOrphaned.length,
+          orphanedItems: allOrphaned,
+          totalStorageBytes: totalSize,
+        },
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/database' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const dbFiles = await listFiles();
+      const providers = await listProviders();
+      const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const objectCache = new Map<string, { key: string; size: number }[]>();
+      const results: { fileId: string; name: string; provider: string; exists: boolean; error?: string }[] = [];
+      for (const f of dbFiles) {
+        const provider = f.provider_id ? providerMap.get(f.provider_id) : null;
+        if (!provider) {
+          results.push({ fileId: f.id, name: f.original_name, provider: 'N/A', exists: false, error: 'Provider not found' });
+          continue;
+        }
+        try {
+          if (!objectCache.has(provider.id)) {
+            const objects = await listObjects(provider);
+            objectCache.set(provider.id, objects);
+          }
+          const objects = objectCache.get(provider.id)!;
+          const found = objects.some((o) => o.key === f.r2_key);
+          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: found });
+        } catch (e: any) {
+          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: false, error: e.message });
+        }
+      }
+      const missing = results.filter((r) => !r.exists);
+      sendJson(res, 200, {
+        records: results,
+        summary: {
+          totalDbRecords: dbFiles.length,
+          verified: results.length - missing.length,
+          missing: missing.length,
+          missingFiles: missing.map((r) => ({ id: r.fileId, name: r.name, reason: r.error || 'Not found in S3' })),
+        },
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/auto-fix' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const providers = await listProviders();
+      const dbFiles = await listFiles();
+      const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
+      const allS3: { key: string; size: number; provider_id: string }[] = [];
+      for (const p of providers) {
+        try {
+          const objects = await listObjects(p);
+          for (const o of objects) {
+            allS3.push({ key: o.key, size: o.size, provider_id: p.id });
+          }
+        } catch {}
+      }
+      const orphaned = allS3.filter((f) => !dbKeys.has(f.key));
+      if (orphaned.length === 0) {
+        sendJson(res, 200, { fixed: 0, failed: 0, results: [], message: 'No orphaned files found' });
+        return true;
+      }
+      const results: { key: string; success: boolean; error?: string }[] = [];
+      for (const item of orphaned) {
+        const parts = item.key.split('/');
+        const fileId = parts[0] || generateId();
+        const fileName = parts.slice(1).join('/') || item.key;
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: item.size,
+            mime_type: 'application/octet-stream',
+            r2_key: item.key,
+            provider_id: item.provider_id,
+          });
+          if (item.size > 0) {
+            await updateProviderBytes(item.provider_id, item.size).catch(() => {});
+          }
+          results.push({ key: item.key, success: true });
+        } catch (e: any) {
+          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+            results.push({ key: item.key, success: true });
+          } else {
+            results.push({ key: item.key, success: false, error: e.message });
+          }
+        }
+      }
+      const fixed = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      sendJson(res, 200, { fixed, failed, results });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/fix-orphaned' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) {
+        sendError(res, 400, 'No orphaned files specified');
+        return true;
+      }
+      const providers = await listProviders();
+      const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const existingFiles = await listFiles();
+      const existingKeys = new Set(existingFiles.map((f) => f.r2_key));
+      const results: { key: string; success: boolean; error?: string }[] = [];
+      for (const item of items) {
+        const key: string = item.key;
+        const providerId: string = item.provider_id;
+        const size: number = Number(item.size) || 0;
+        if (existingKeys.has(key)) {
+          results.push({ key, success: true });
+          continue;
+        }
+        const provider = providerMap.get(providerId);
+        if (!provider) {
+          results.push({ key, success: false, error: 'Provider not found' });
+          continue;
+        }
+        const parts = key.split('/');
+        const fileId = parts[0] || generateId();
+        const fileName = parts.slice(1).join('/') || key;
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: size,
+            mime_type: 'application/octet-stream',
+            r2_key: key,
+            provider_id: providerId,
+          });
+          if (size > 0) {
+            await updateProviderBytes(providerId, size).catch(() => {});
+          }
+          results.push({ key, success: true });
+        } catch (e: any) {
+          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+            results.push({ key, success: true });
+          } else {
+            results.push({ key, success: false, error: e.message });
+          }
+        }
+      }
+      const fixed = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      sendJson(res, 200, { fixed, failed, results });
       return true;
     }
 

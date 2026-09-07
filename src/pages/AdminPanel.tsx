@@ -1,178 +1,129 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import {
-  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Settings, BarChart3, Shield,
-} from 'lucide-react';
+import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders, Scan } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useTheme } from '@/lib/theme';
+import { sounds } from '@/lib/sounds';
 import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/lib/api';
 import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
+import AdminAdvanced from './AdminAdvanced';
+import AdminScan from './AdminScan';
+import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security';
+type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
-  const navigate = useNavigate();
+  const nav = useNavigate();
+  const { colors } = useTheme();
   const [tab, setTab] = useState<Tab>('dashboard');
   const [stats, setStats] = useState<Stats | null>(null);
   const [files, setFiles] = useState<FileWithProvider[]>([]);
   const [providers, setProviders] = useState<StorageProvider[]>([]);
   const [loading, setLoading] = useState(true);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  const showNotification = useCallback((type: 'success' | 'error', msg: string) => {
-    setNotification({ type, msg });
-    setTimeout(() => setNotification(null), 4000);
+  const notify = useCallback((type: 'success' | 'error', msg: string) => {
+    setNotif({ type, msg }); sounds[type === 'success' ? 'notification' : 'error']();
+    setTimeout(() => setNotif(null), 4000);
   }, []);
 
-  const refreshAll = useCallback(async () => {
+  const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const [s, f, p] = await Promise.all([
-        api.getStats(token),
-        api.listFiles(token),
-        api.listProviders(token),
-      ]);
-      setStats(s);
-      setFiles(f.files);
-      setProviders(p.providers);
-    } catch (e: any) {
-      showNotification('error', e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, showNotification]);
+      const [s, f, p] = await Promise.all([api.getStats(token), api.listFiles(token), api.listProviders(token)]);
+      setStats(s); setFiles(f.files); setProviders(p.providers);
+    } catch (e: any) { notify('error', e.message); } finally { setLoading(false); }
+  }, [token, notify]);
 
-  useEffect(() => {
-    if (!token) {
-      navigate('/admin/login');
-      return;
-    }
-    refreshAll();
-  }, [token, navigate, refreshAll]);
+  useEffect(() => { if (!token) { nav('/admin/login'); return; } refresh(); }, [token, nav, refresh]);
 
-  function handleLogout() {
-    logout();
-    navigate('/');
-  }
-
+  function doLogout() { sounds.click(); logout(); nav('/'); }
   if (!token) return null;
 
-  const totalUsed = stats ? parseInt(stats.providers.used_bytes) : 0;
-  const totalCap = stats ? parseInt(stats.providers.capacity_bytes) : 0;
-  const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
+  const used = stats ? parseInt(stats.providers.used_bytes || '0') : 0;
+  const cap = stats ? parseInt(stats.providers.capacity_bytes || '0') : 0;
+  const pct = cap > 0 ? (used / cap) * 100 : 0;
+
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Files', icon: <FileText className="w-4 h-4" /> },
+    { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
+    { id: 'security', label: 'Credentials', icon: <Shield className="w-4 h-4" /> },
+    { id: 'advanced', label: 'Settings', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'scan', label: 'Scan', icon: <Scan className="w-4 h-4" /> },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <header className="sticky top-0 z-20 bg-[#0a0a0f]/80 backdrop-blur-lg border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
+      <header className="sticky top-0 z-20 border-b backdrop-blur-md" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
-              <Zap className="w-4 h-4 text-[#0a0a0f]" strokeWidth={2.5} />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+              <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-bold tracking-tight">LazyDrop</span>
-            <span className="text-xs text-gray-500 ml-2 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">Admin</span>
+            <span className="font-semibold text-sm text-gradient">LazyDrop</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link to="/" className="text-sm text-gray-400 hover:text-white transition-colors">View site</Link>
-            <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-red-400 transition-colors">
-              <LogOut className="w-4 h-4" />
-              Logout
+            <Link to="/" className="text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>View site</Link>
+            <ThemeSwitcher />
+            <button onClick={doLogout} className="text-xs flex items-center gap-1" style={{ color: colors.textDim }}>
+              <LogOut className="w-3.5 h-3.5" /> Logout
             </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard icon={<FileText className="w-4 h-4" />} label="Files" value={stats ? stats.files.total_files : '—'} />
-          <StatCard icon={<Download className="w-4 h-4" />} label="Downloads" value={stats ? stats.files.total_downloads : '—'} />
-          <StatCard icon={<Cloud className="w-4 h-4" />} label="Buckets" value={stats ? stats.providers.total_providers : '—'} />
-          <StatCard
-            icon={<HardDrive className="w-4 h-4" />}
-            label="Storage used"
-            value={totalCap > 0 ? `${formatBytes(totalUsed)} / ${formatBytes(totalCap)}` : '—'}
-            progress={usedPct}
-          />
+      <div className="max-w-5xl mx-auto px-4 py-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <Mini icon={<FileText className="w-4 h-4" />} label="Files" val={stats ? stats.files.total_files : '—'} />
+          <Mini icon={<Download className="w-4 h-4" />} label="Downloads" val={stats ? stats.files.total_downloads : '—'} />
+          <Mini icon={<Cloud className="w-4 h-4" />} label="Buckets" val={stats ? stats.providers.total_providers : '—'} />
+          <Mini icon={<HardDrive className="w-4 h-4" />} label="Used" val={cap > 0 ? `${formatBytes(used)}/${formatBytes(cap)}` : '—'} pct={pct} />
         </div>
-
-        <div className="flex gap-1 mb-6 p-1 rounded-xl bg-white/5 border border-white/10 w-fit">
-          <TabButton active={tab === 'dashboard'} onClick={() => setTab('dashboard')} icon={<BarChart3 className="w-4 h-4" />}>
-            Dashboard
-          </TabButton>
-          <TabButton active={tab === 'storage'} onClick={() => setTab('storage')} icon={<Settings className="w-4 h-4" />}>
-            Storage
-          </TabButton>
-          <TabButton active={tab === 'security'} onClick={() => setTab('security')} icon={<Shield className="w-4 h-4" />}>
-            Security
-          </TabButton>
+        <div className="flex gap-1 mb-5 p-1 rounded-lg overflow-x-auto" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          {tabs.map((t) => (
+            <button key={t.id} onClick={() => { setTab(t.id); sounds.click(); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-md text-xs font-medium transition-all whitespace-nowrap min-h-[40px]" style={{ background: tab === t.id ? 'rgba(99,102,241,0.12)' : 'transparent', color: tab === t.id ? '#818cf8' : colors.textDim }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
         </div>
-
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+          <div className="flex flex-col items-center py-16 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#818cf8' }} />
+            <p className="text-xs" style={{ color: colors.textDim }}>Loading...</p>
           </div>
-        ) : tab === 'dashboard' ? (
-          <AdminDashboard files={files} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
-        ) : tab === 'storage' ? (
-          <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
-        ) : (
-          <AdminSecurity
-            token={token!}
-            onNotify={showNotification}
-            onCredentialsChanged={() => {
-              logout();
-              navigate('/admin/login');
-            }}
-          />
-        )}
+        ) : tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
+        : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
+        : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
+        : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
+        : <AdminAdvanced token={token!} onNotify={notify} />}
       </div>
 
-      {notification && (
-        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border backdrop-blur-lg transition-all ${
-          notification.type === 'success'
-            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            : 'bg-red-500/10 border-red-500/30 text-red-300'
-        }`}>
-          {notification.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-          {notification.msg}
+      {notif && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm animate-fade-up" style={{ background: notif.type === 'success' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', borderColor: notif.type === 'success' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)', color: notif.type === 'success' ? '#22c55e' : '#ef4444' }}>
+          {notif.type === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {notif.msg}
         </div>
       )}
     </div>
   );
 }
 
-function StatCard({ icon, label, value, progress }: { icon: React.ReactNode; label: string; value: string; progress?: number }) {
+function Mini({ icon, label, val, pct }: { icon: React.ReactNode; label: string; val: string; pct?: number }) {
   return (
-    <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
-      <div className="flex items-center gap-2 text-gray-400 text-xs mb-2">
-        {icon}
-        {label}
+    <div className="card p-3">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span style={{ color: '#818cf8' }}>{icon}</span>
+        <span className="text-[10px] font-mono uppercase" style={{ color: '#64748b' }}>{label}</span>
       </div>
-      <div className="text-lg font-bold truncate">{value}</div>
-      {progress !== undefined && (
-        <div className="mt-2 h-1.5 rounded-full bg-white/5 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all"
-            style={{ width: `${Math.min(progress, 100)}%` }}
-          />
+      <div className="text-sm font-bold truncate">{val}</div>
+      {pct !== undefined && (
+        <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+          <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
         </div>
       )}
     </div>
-  );
-}
-
-function TabButton({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-        active ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-      }`}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
