@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders, Scan } from 'lucide-react';
+import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders, Scan, Menu, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -14,12 +14,12 @@ import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan';
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard', label: 'Files', icon: <FileText className="w-4 h-4" /> },
-  { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
-  { id: 'security', label: 'Credentials', icon: <Shield className="w-4 h-4" /> },
-  { id: 'advanced', label: 'Settings', icon: <Sliders className="w-4 h-4" /> },
-  { id: 'scan', label: 'Scan', icon: <Scan className="w-4 h-4" /> },
+const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'dashboard', label: 'Files', icon: <FileText className="w-[18px] h-[18px]" /> },
+  { id: 'storage', label: 'Storage', icon: <Cloud className="w-[18px] h-[18px]" /> },
+  { id: 'security', label: 'Credentials', icon: <Shield className="w-[18px] h-[18px]" /> },
+  { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
+  { id: 'scan', label: 'Scan', icon: <Scan className="w-[18px] h-[18px]" /> },
 ];
 
 export default function AdminPanel() {
@@ -27,6 +27,7 @@ export default function AdminPanel() {
   const nav = useNavigate();
   const { colors } = useTheme();
   const [tab, setTab] = useState<Tab>('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [files, setFiles] = useState<FileWithProvider[]>([]);
   const [providers, setProviders] = useState<StorageProvider[]>([]);
@@ -55,98 +56,169 @@ export default function AdminPanel() {
   const cap = stats ? parseInt(stats.providers.capacity_bytes || '0') : 0;
   const pct = cap > 0 ? (used / cap) * 100 : 0;
 
+  const pageTitles: Record<Tab, string> = {
+    dashboard: 'Files',
+    storage: 'Storage',
+    security: 'Credentials',
+    advanced: 'Settings',
+    scan: 'Scan',
+  };
+
   return (
-    <div className="min-h-screen" style={{ color: colors.text }}>
-      {/* Top Bar */}
-      <header className="sticky top-0 z-20" style={{ background: colors.bg, borderBottom: `1px solid ${colors.border}` }}>
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen flex" style={{ color: colors.text }}>
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-[240px] flex flex-col transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ background: colors.bg, borderRight: `1px solid ${colors.border}` }}
+      >
+        {/* Logo */}
+        <div className="h-14 px-4 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid ${colors.border}` }}>
+          <Link to="/" className="flex items-center gap-2.5" onClick={() => { sounds.click(); setSidebarOpen(false); }}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-semibold text-sm tracking-tight">LazyDrop</span>
+          </Link>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1.5 rounded-lg" style={{ color: colors.textMuted }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Primary Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
+          <div className="text-[10px] font-mono uppercase tracking-wider px-2 mb-2" style={{ color: colors.textDim }}>
+            Navigation
           </div>
-          <div className="flex items-center gap-1">
-            <Link to="/" className="btn btn-ghost text-xs" onClick={() => sounds.click()}>
+          <div className="flex flex-col gap-0.5">
+            {navItems.map((item) => {
+              const isActive = tab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { setTab(item.id); sounds.click(); setSidebarOpen(false); }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left"
+                  style={{
+                    background: isActive ? `${colors.primary}12` : 'transparent',
+                    color: isActive ? colors.primary : colors.textMuted,
+                  }}
+                >
+                  <span style={{ color: isActive ? colors.primary : colors.textDim }}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Secondary Nav */}
+        <div className="px-3 py-3 shrink-0" style={{ borderTop: `1px solid ${colors.border}` }}>
+          <div className="flex flex-col gap-0.5">
+            <Link
+              to="/"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
+              style={{ color: colors.textMuted }}
+              onClick={() => { sounds.click(); setSidebarOpen(false); }}
+            >
+              <span style={{ color: colors.textDim }}><FileText className="w-[18px] h-[18px]" /></span>
               View site
             </Link>
-            <ThemeSwitcher />
-            <button onClick={doLogout} className="btn btn-ghost text-xs">
-              <LogOut className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-3 px-3 py-2">
+              <ThemeSwitcher compact />
+            </div>
+            <button
+              onClick={() => { doLogout(); setSidebarOpen(false); }}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left"
+              style={{ color: colors.textMuted }}
+            >
+              <span style={{ color: colors.textDim }}><LogOut className="w-[18px] h-[18px]" /></span>
               Logout
             </button>
           </div>
         </div>
-      </header>
+      </aside>
 
-      {/* Page Content */}
-      <div className="max-w-6xl mx-auto px-5">
-        {/* Page Intro */}
-        <div className="pt-6 pb-4">
-          <h1 className="text-lg font-semibold tracking-tight mb-1">Dashboard</h1>
-          <p className="text-sm" style={{ color: colors.textMuted }}>Manage files, storage buckets, and system settings.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <SummaryCard
-            icon={<FileText className="w-4 h-4" />}
-            label="Total files"
-            value={stats ? stats.files.total_files : '—'}
-          />
-          <SummaryCard
-            icon={<Download className="w-4 h-4" />}
-            label="Downloads"
-            value={stats ? stats.files.total_downloads : '—'}
-          />
-          <SummaryCard
-            icon={<Cloud className="w-4 h-4" />}
-            label="Buckets"
-            value={stats ? stats.providers.total_providers : '—'}
-          />
-          <SummaryCard
-            icon={<HardDrive className="w-4 h-4" />}
-            label="Storage"
-            value={cap > 0 ? `${formatBytes(used)} / ${formatBytes(cap)}` : '—'}
-            accent={pct > 80 ? colors.warning : undefined}
-            progress={pct > 0 ? pct : undefined}
-          />
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-1 p-1 rounded-xl mb-6" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
-          {tabs.map((t) => {
-            const isActive = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => { setTab(t.id); sounds.click(); }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
-                style={{
-                  background: isActive ? colors.cardBg : 'transparent',
-                  color: isActive ? colors.primary : colors.textMuted,
-                  boxShadow: isActive ? `0 1px 3px rgba(0,0,0,0.1), 0 0 0 1px ${colors.border}` : 'none',
-                }}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main Content */}
-        <div className="pb-12">
-          {loading ? (
-            <div className="flex flex-col items-center py-24 gap-4">
-              <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
-              <p className="text-sm" style={{ color: colors.textMuted }}>Loading dashboard...</p>
+      {/* Main Content Area */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top Bar */}
+        <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bg }}>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }}>
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+              <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
-          ) : tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
-          : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
-          : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
-          : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
-          : <AdminAdvanced token={token!} onNotify={notify} />}
+            <span className="font-semibold text-sm">LazyDrop</span>
+          </div>
+          <div className="w-9" />
+        </header>
+
+        {/* Page Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl px-5 py-6">
+            {/* Page Intro */}
+            <div className="mb-6">
+              <h1 className="text-xl font-semibold tracking-tight mb-1">{pageTitles[tab]}</h1>
+              <p className="text-sm" style={{ color: colors.textMuted }}>
+                {tab === 'dashboard' && 'Upload, manage, and share your files.'}
+                {tab === 'storage' && 'Connect and manage S3-compatible storage buckets.'}
+                {tab === 'security' && 'Update admin credentials and security settings.'}
+                {tab === 'advanced' && 'Configure themes, file TTL, and system preferences.'}
+                {tab === 'scan' && 'Scan storage buckets for orphaned or mismatched files.'}
+              </p>
+            </div>
+
+            {/* Summary Cards - only on dashboard */}
+            {tab === 'dashboard' && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <SummaryCard
+                  icon={<FileText className="w-4 h-4" />}
+                  label="Total files"
+                  value={stats ? stats.files.total_files : '—'}
+                />
+                <SummaryCard
+                  icon={<Download className="w-4 h-4" />}
+                  label="Downloads"
+                  value={stats ? stats.files.total_downloads : '—'}
+                />
+                <SummaryCard
+                  icon={<Cloud className="w-4 h-4" />}
+                  label="Buckets"
+                  value={stats ? stats.providers.total_providers : '—'}
+                />
+                <SummaryCard
+                  icon={<HardDrive className="w-4 h-4" />}
+                  label="Storage"
+                  value={cap > 0 ? `${formatBytes(used)} / ${formatBytes(cap)}` : '—'}
+                  accent={pct > 80 ? colors.warning : undefined}
+                  progress={pct > 0 ? pct : undefined}
+                />
+              </div>
+            )}
+
+            {/* Main Content */}
+            {loading ? (
+              <div className="flex flex-col items-center py-24 gap-4">
+                <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
+                <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
+              </div>
+            ) : tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
+            : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
+            : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
+            : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
+            : <AdminAdvanced token={token!} onNotify={notify} />}
+          </div>
         </div>
       </div>
 
