@@ -119,6 +119,14 @@ export async function initDatabase() {
   // Add provider_type to storage_providers if missing (migration for existing DBs)
   await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS provider_type TEXT DEFAULT 's3'`;
 
+  // Fix max_bytes for existing providers based on provider_type
+  await sql`UPDATE storage_providers SET max_bytes = 10737418240 WHERE provider_type = 'backblaze-b2' AND max_bytes = 10188208025`;
+  await sql`UPDATE storage_providers SET max_bytes = 10737418240 WHERE provider_type = 'cloudflare-r2' AND max_bytes = 10188208025`;
+  await sql`UPDATE storage_providers SET max_bytes = 5368709120 WHERE provider_type = 'aws-s3' AND max_bytes = 10188208025`;
+  await sql`UPDATE storage_providers SET max_bytes = 5368709120 WHERE provider_type = 'google-cloud' AND max_bytes = 10188208025`;
+  await sql`UPDATE storage_providers SET max_bytes = 10737418240 WHERE provider_type = 'idrive-e2' AND max_bytes = 10188208025`;
+  await sql`UPDATE storage_providers SET max_bytes = 1099511627776 WHERE provider_type = 'minio' AND max_bytes = 10188208025`;
+
   // Indexes for the hot query paths
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_files_provider_id ON files (provider_id)`;
