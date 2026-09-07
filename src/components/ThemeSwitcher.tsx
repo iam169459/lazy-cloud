@@ -14,9 +14,10 @@ const themeOptions: { id: ThemeId; label: string; colors: string[] }[] = [
 
 interface ThemeSwitcherProps {
   compact?: boolean;
+  iconOnly?: boolean;
 }
 
-export default function ThemeSwitcher({ compact }: ThemeSwitcherProps) {
+export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps) {
   const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
 
@@ -31,11 +32,18 @@ export default function ThemeSwitcher({ compact }: ThemeSwitcherProps) {
       <div className="relative">
         <button
           onClick={() => { setOpen(!open); sounds.click(); }}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left w-full"
-          style={{ color: 'var(--text-muted)' }}
+          className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all text-left"
+          style={{
+            padding: iconOnly ? '0.625rem' : '0.625rem 0.75rem',
+            justifyContent: iconOnly ? 'center' : 'flex-start',
+            width: iconOnly ? 'auto' : '100%',
+            color: 'var(--text-muted)',
+          }}
+          aria-label="Select theme"
+          title={iconOnly ? 'Theme' : undefined}
         >
           <span style={{ color: 'var(--text-dim)' }}><Palette className="w-[18px] h-[18px]" /></span>
-          Theme
+          {!iconOnly && <span>Theme</span>}
         </button>
 
         {open && (
@@ -44,8 +52,8 @@ export default function ThemeSwitcher({ compact }: ThemeSwitcherProps) {
             <div
               className="absolute left-full bottom-0 ml-2 w-56 rounded-xl p-2 z-50 animate-scale-in"
               style={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
+                background: 'rgba(15, 23, 42, 0.85)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
                 backdropFilter: 'blur(20px)',
               }}
             >

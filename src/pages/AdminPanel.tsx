@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders, Scan, Menu, X } from 'lucide-react';
+import {
+  Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
+  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -22,12 +25,21 @@ const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'scan', label: 'Scan', icon: <Scan className="w-[18px] h-[18px]" /> },
 ];
 
+const pageDescriptions: Record<Tab, string> = {
+  dashboard: 'Upload, manage, and share your files.',
+  storage: 'Connect and manage S3-compatible storage buckets.',
+  security: 'Update admin credentials and security settings.',
+  advanced: 'Configure themes, file TTL, and system preferences.',
+  scan: 'Scan storage buckets for orphaned or mismatched files.',
+};
+
 export default function AdminPanel() {
   const { token, logout } = useAuth();
   const nav = useNavigate();
   const { colors } = useTheme();
   const [tab, setTab] = useState<Tab>('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [files, setFiles] = useState<FileWithProvider[]>([]);
   const [providers, setProviders] = useState<StorageProvider[]>([]);
@@ -56,93 +68,144 @@ export default function AdminPanel() {
   const cap = stats ? parseInt(stats.providers.capacity_bytes || '0') : 0;
   const pct = cap > 0 ? (used / cap) * 100 : 0;
 
-  const pageTitles: Record<Tab, string> = {
-    dashboard: 'Files',
-    storage: 'Storage',
-    security: 'Credentials',
-    advanced: 'Settings',
-    scan: 'Scan',
-  };
+  const sidebarWidth = collapsed ? 68 : 240;
 
   return (
     <div className="min-h-screen flex" style={{ color: colors.text }}>
       {/* Mobile Overlay */}
-      {sidebarOpen && (
+      {mobileOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"
           style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[240px] flex flex-col transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{ background: colors.bg, borderRight: `1px solid ${colors.border}` }}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-200 lg:static lg:z-auto ${
+          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+        style={{
+          width: sidebarWidth,
+          minWidth: sidebarWidth,
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderRight: `1px solid rgba(255, 255, 255, 0.06)`,
+        }}
+        role="navigation"
+        aria-label="Admin navigation"
       >
         {/* Logo */}
-        <div className="h-14 px-4 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid ${colors.border}` }}>
-          <Link to="/" className="flex items-center gap-2.5" onClick={() => { sounds.click(); setSidebarOpen(false); }}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+        <div className="h-14 px-4 flex items-center shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 overflow-hidden"
+            onClick={() => { sounds.click(); setMobileOpen(false); }}
+            aria-label="LazyDrop — home"
+          >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="font-semibold text-sm tracking-tight">LazyDrop</span>
+            {!collapsed && (
+              <span className="text-sm font-semibold tracking-tight whitespace-nowrap">LazyDrop</span>
+            )}
           </Link>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1.5 rounded-lg" style={{ color: colors.textMuted }}>
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Primary Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3">
-          <div className="text-[10px] font-mono uppercase tracking-wider px-2 mb-2" style={{ color: colors.textDim }}>
-            Navigation
-          </div>
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          {!collapsed && (
+            <div className="text-[10px] font-mono uppercase tracking-wider px-2 mb-2" style={{ color: colors.textDim }}>
+              Navigation
+            </div>
+          )}
           <div className="flex flex-col gap-0.5">
             {navItems.map((item) => {
               const isActive = tab === item.id;
               return (
                 <button
                   key={item.id}
-                  onClick={() => { setTab(item.id); sounds.click(); setSidebarOpen(false); }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left"
+                  onClick={() => { setTab(item.id); sounds.click(); setMobileOpen(false); }}
+                  className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 text-left"
                   style={{
-                    background: isActive ? `${colors.primary}12` : 'transparent',
-                    color: isActive ? colors.primary : colors.textMuted,
+                    padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    background: isActive ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
+                    color: isActive ? '#22c55e' : colors.textMuted,
                   }}
+                  aria-current={isActive ? 'page' : undefined}
+                  title={collapsed ? item.label : undefined}
                 >
-                  <span style={{ color: isActive ? colors.primary : colors.textDim }}>
+                  <span style={{ color: isActive ? '#22c55e' : colors.textDim, flexShrink: 0 }}>
                     {item.icon}
                   </span>
-                  {item.label}
+                  {!collapsed && <span className="truncate">{item.label}</span>}
                 </button>
               );
             })}
           </div>
         </nav>
 
-        {/* Secondary Nav */}
-        <div className="px-3 py-3 shrink-0" style={{ borderTop: `1px solid ${colors.border}` }}>
+        {/* Sidebar Footer */}
+        <div className="px-2 py-3 shrink-0" style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}>
           <div className="flex flex-col gap-0.5">
+            {/* Collapse Toggle — desktop only */}
+            <button
+              onClick={() => { sounds.click(); setCollapsed(!collapsed); }}
+              className="hidden lg:flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 w-full"
+              style={{
+                padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                color: colors.textDim,
+              }}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? <ChevronsRight className="w-[18px] h-[18px]" /> : <ChevronsLeft className="w-[18px] h-[18px]" />}
+              {!collapsed && <span>Collapse</span>}
+            </button>
+
             <Link
               to="/"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{ color: colors.textMuted }}
-              onClick={() => { sounds.click(); setSidebarOpen(false); }}
+              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150"
+              style={{
+                padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                color: colors.textMuted,
+              }}
+              onClick={() => { sounds.click(); setMobileOpen(false); }}
+              title={collapsed ? 'View site' : undefined}
             >
-              <span style={{ color: colors.textDim }}><FileText className="w-[18px] h-[18px]" /></span>
-              View site
+              <span style={{ color: colors.textDim, flexShrink: 0 }}><FileText className="w-[18px] h-[18px]" /></span>
+              {!collapsed && <span>View site</span>}
             </Link>
-            <div className="flex items-center gap-3 px-3 py-2">
-              <ThemeSwitcher compact />
-            </div>
+
+            {!collapsed && (
+              <div className="px-2 py-1.5">
+                <ThemeSwitcher compact />
+              </div>
+            )}
+            {collapsed && (
+              <div className="flex justify-center py-1">
+                <ThemeSwitcher compact iconOnly />
+              </div>
+            )}
+
             <button
-              onClick={() => { doLogout(); setSidebarOpen(false); }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left"
-              style={{ color: colors.textMuted }}
+              onClick={() => { doLogout(); setMobileOpen(false); }}
+              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 text-left w-full"
+              style={{
+                padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                color: colors.textMuted,
+              }}
+              title={collapsed ? 'Logout' : undefined}
             >
-              <span style={{ color: colors.textDim }}><LogOut className="w-[18px] h-[18px]" /></span>
-              Logout
+              <span style={{ color: colors.textDim, flexShrink: 0 }}><LogOut className="w-[18px] h-[18px]" /></span>
+              {!collapsed && <span>Logout</span>}
             </button>
           </div>
         </div>
@@ -150,9 +213,9 @@ export default function AdminPanel() {
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top Bar */}
+        {/* Mobile Top Bar */}
         <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bg }}>
-          <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }}>
+          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }} aria-label="Open navigation">
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
@@ -169,14 +232,10 @@ export default function AdminPanel() {
           <div className="max-w-5xl px-5 py-6">
             {/* Page Intro */}
             <div className="mb-6">
-              <h1 className="text-xl font-semibold tracking-tight mb-1">{pageTitles[tab]}</h1>
-              <p className="text-sm" style={{ color: colors.textMuted }}>
-                {tab === 'dashboard' && 'Upload, manage, and share your files.'}
-                {tab === 'storage' && 'Connect and manage S3-compatible storage buckets.'}
-                {tab === 'security' && 'Update admin credentials and security settings.'}
-                {tab === 'advanced' && 'Configure themes, file TTL, and system preferences.'}
-                {tab === 'scan' && 'Scan storage buckets for orphaned or mismatched files.'}
-              </p>
+              <h1 className="text-xl font-semibold tracking-tight mb-1" style={{ fontFamily: "'Fira Code', monospace" }}>
+                {pageTitles[tab]}
+              </h1>
+              <p className="text-sm" style={{ color: colors.textMuted }}>{pageDescriptions[tab]}</p>
             </div>
 
             {/* Summary Cards - only on dashboard */}
@@ -201,7 +260,7 @@ export default function AdminPanel() {
                   icon={<HardDrive className="w-4 h-4" />}
                   label="Storage"
                   value={cap > 0 ? `${formatBytes(used)} / ${formatBytes(cap)}` : '—'}
-                  accent={pct > 80 ? colors.warning : undefined}
+                  accent={pct > 80 ? '#f59e0b' : undefined}
                   progress={pct > 0 ? pct : undefined}
                 />
               </div>
@@ -226,10 +285,12 @@ export default function AdminPanel() {
       {notif && (
         <div
           className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium animate-fade-up"
+          role="alert"
+          aria-live="assertive"
           style={{
-            background: notif.type === 'success' ? `${colors.success}12` : `${colors.danger}12`,
-            border: `1px solid ${notif.type === 'success' ? `${colors.success}25` : `${colors.danger}25`}`,
-            color: notif.type === 'success' ? colors.success : colors.danger,
+            background: notif.type === 'success' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
+            border: `1px solid ${notif.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+            color: notif.type === 'success' ? '#22c55e' : '#ef4444',
             backdropFilter: 'blur(12px)',
           }}
         >
@@ -241,6 +302,14 @@ export default function AdminPanel() {
   );
 }
 
+const pageTitles: Record<Tab, string> = {
+  dashboard: 'Files',
+  storage: 'Storage',
+  security: 'Credentials',
+  advanced: 'Settings',
+  scan: 'Scan',
+};
+
 function SummaryCard({ icon, label, value, accent, progress }: {
   icon: React.ReactNode;
   label: string;
@@ -250,7 +319,7 @@ function SummaryCard({ icon, label, value, accent, progress }: {
 }) {
   const { colors } = useTheme();
   return (
-    <div className="card p-4">
+    <div className="glass-card p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }}>
           {icon}
@@ -265,8 +334,8 @@ function SummaryCard({ icon, label, value, accent, progress }: {
             style={{
               width: `${Math.min(progress, 100)}%`,
               background: progress > 90
-                ? `linear-gradient(90deg, ${colors.warning}, ${colors.danger})`
-                : colors.gradient,
+                ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
+                : 'linear-gradient(90deg, #22c55e, #3b82f6)',
             }}
           />
         </div>
