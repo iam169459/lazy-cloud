@@ -57,58 +57,58 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
  );
  }
 
- return (
- <div className="space-y-5 sm:space-y-6">
- <div className="animate-fade-up">
- <h2 className="font-semibold flex items-center gap-2">
- <Shield className="w-4 h-4" style={{ color: colors.primary }} />
- <span className="text-gradient">Security / Credentials</span>
- </h2>
- <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Update your admin username and password</p>
- </div>
+  return (
+    <div className="space-y-5 sm:space-y-6">
+      <div className="animate-fade-up">
+        <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
+          <Shield className="w-4 h-4" style={{ color: '#22c55e' }} />
+          Security / Credentials
+        </h2>
+        <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Update your admin username and password</p>
+      </div>
 
- <form onSubmit={handleSave} className="max-w-lg card rounded-2xl p-5 sm:p-6 space-y-4 sm:space-y-5 animate-fade-up delay-100">
- <div>
- <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Current username</label>
- <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: `${colors.text}02`, borderColor: `${colors.text}05`, color: colors.textDim }}>
- <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: `${colors.primary}80` }} />
- <span className="truncate">{currentUsername || 'admin'}</span>
- </div>
- </div>
+      <form onSubmit={handleSave} className="max-w-lg glass-card p-5 sm:p-6 space-y-4 sm:space-y-5 animate-fade-up delay-100">
+        <div>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Current username</label>
+          <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)', color: colors.textDim }}>
+            <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: 'rgba(34,197,94,0.5)' }} />
+            <span className="truncate">{currentUsername || 'admin'}</span>
+          </div>
+        </div>
 
- <div>
- <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
- New username <span style={{ color: colors.primary }}>*</span>
- </label>
- <div className="input-icon-wrap">
- <span className="input-icon"><User className="w-4 h-4" style={{ color: colors.textDim }} /></span>
- <input type="text" value={formUsername} onChange={(e) => { setFormUsername(e.target.value); sounds.type(); }} placeholder="admin" required className="input" />
- </div>
- </div>
+        <div>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
+            New username <span style={{ color: '#22c55e' }}>*</span>
+          </label>
+          <div className="input-group">
+            <span className="input-icon"><User className="w-4 h-4" style={{ color: colors.textDim }} /></span>
+            <input type="text" value={formUsername} onChange={(e) => { setFormUsername(e.target.value); sounds.type(); }} placeholder="admin" required className="input" />
+          </div>
+        </div>
 
- <div>
- <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
- New password <span style={{ color: colors.primary }}>*</span>
- </label>
- <div className="input-icon-wrap">
- <span className="input-icon"><KeyRound className="w-4 h-4" style={{ color: colors.textDim }} /></span>
- <input type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); sounds.type(); }} placeholder="Enter new password" required className="input" />
- </div>
- <p className="text-[11px] mt-1.5 font-mono" style={{ color: colors.textDim }}>You will be logged out after saving</p>
- </div>
+        <div>
+          <label className="block text-[11px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
+            New password <span style={{ color: '#22c55e' }}>*</span>
+          </label>
+          <div className="input-group">
+            <span className="input-icon"><KeyRound className="w-4 h-4" style={{ color: colors.textDim }} /></span>
+            <input type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); sounds.type(); }} placeholder="Enter new password" required className="input" />
+          </div>
+          <p className="text-[11px] mt-1.5 font-mono" style={{ color: colors.textDim }}>You will be logged out after saving</p>
+        </div>
 
- <button type="submit" disabled={saving} className="flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 rounded-xl font-bold text-sm btn btn-primary disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
- {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
- Save credentials
- </button>
- </form>
+        <button type="submit" disabled={saving} className="btn btn-primary text-xs w-full sm:w-auto">
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          Save credentials
+        </button>
+      </form>
 
- <div className="max-w-lg rounded-2xl p-3 sm:p-4 flex items-start gap-3 animate-fade-up delay-200" style={{ background: `${colors.warning}08`, border: `1px solid ${colors.warning}15` }}>
- <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: `${colors.warning}90` }} />
- <p className="text-[11px] sm:text-xs leading-relaxed font-mono" style={{ color: `${colors.warning}80` }}>
- If no custom credentials have been set, the system falls back to default credentials (username: <span style={{ color: colors.warning }}>admin</span>).
- </p>
- </div>
- </div>
- );
+      <div className="max-w-lg glass-card p-3 sm:p-4 flex items-start gap-3 animate-fade-up delay-200" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
+        <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
+        <p className="text-[11px] sm:text-xs leading-relaxed font-mono" style={{ color: 'rgba(245,158,11,0.7)' }}>
+          If no custom credentials have been set, the system falls back to default credentials (username: <span style={{ color: '#f59e0b' }}>admin</span>).
+        </p>
+      </div>
+    </div>
+  );
 }

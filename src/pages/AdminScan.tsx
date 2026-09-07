@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw, Wrench, Zap } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, formatBytes } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import { formatBytes } from '@/lib/api';
+import DataTable, { Column, Action } from '@/components/DataTable';
 
 interface Props {
   token: string;
@@ -85,11 +85,8 @@ export default function AdminScan({ token, onNotify }: Props) {
     try {
       const result = await api.fixOrphaned(items, token);
       const newFixed = new Set(fixedKeys);
-      for (const r of result.results) {
-        if (r.success) newFixed.add(r.key);
-      }
+      for (const r of result.results) { if (r.success) newFixed.add(r.key); }
       setFixedKeys(newFixed);
-
       if (storageResult) {
         setStorageResult({
           ...storageResult,
@@ -100,13 +97,8 @@ export default function AdminScan({ token, onNotify }: Props) {
           },
         });
       }
-
-      if (result.fixed > 0) {
-        onNotify('success', `Fixed ${result.fixed} orphaned file(s) — added to database`);
-      }
-      if (result.failed > 0) {
-        onNotify('error', `Failed to fix ${result.failed} file(s)`);
-      }
+      if (result.fixed > 0) onNotify('success', `Fixed ${result.fixed} orphaned file(s) — added to database`);
+      if (result.failed > 0) onNotify('error', `Failed to fix ${result.failed} file(s)`);
     } catch (e: any) {
       onNotify('error', `Fix failed: ${e.message}`);
     } finally {
@@ -121,9 +113,7 @@ export default function AdminScan({ token, onNotify }: Props) {
       const result = await api.autoFix(token);
       if (result.fixed > 0) {
         const newFixed = new Set(fixedKeys);
-        for (const r of result.results) {
-          if (r.success) newFixed.add(r.key);
-        }
+        for (const r of result.results) { if (r.success) newFixed.add(r.key); }
         setFixedKeys(newFixed);
         onNotify('success', `Auto-fixed ${result.fixed} orphaned file(s) — all imported to database`);
       } else {
@@ -137,267 +127,298 @@ export default function AdminScan({ token, onNotify }: Props) {
     }
   };
 
+  // Orphaned items table columns
+  const orphanedColumns: Column<{ key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }>[] = [
+    {
+      key: 'key',
+      label: 'File',
+      sortable: true,
+      render: (row) => {
+        const fileName = row.key.split('/').slice(1).join('/') || row.key;
+        const isFixed = fixedKeys.has(row.key);
+        return (
+          <div className="flex items-center gap-2">
+            <span className={`status-badge ${isFixed ? 'status-success' : 'status-danger'}`}>
+              {isFixed ? 'Fixed' : 'Orphaned'}
+            </span>
+            <span className="text-xs font-mono truncate max-w-[240px]" style={{ color: isFixed ? '#22c55e' : colors.text }}>{fileName}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'provider_name',
+      label: 'Provider',
+      render: (row) => (
+        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.04)', color: colors.textMuted }}>
+          {row.provider_name}
+        </span>
+      ),
+    },
+    {
+      key: 'bucket_name',
+      label: 'Bucket',
+      render: (row) => (
+        <span className="text-[11px] font-mono" style={{ color: colors.textDim }}>{row.bucket_name}</span>
+      ),
+    },
+    {
+      key: 'size',
+      label: 'Size',
+      sortable: true,
+      render: (row) => (
+        <span className="text-[11px] font-mono" style={{ color: colors.textMuted }}>{formatBytes(row.size)}</span>
+      ),
+    },
+  ];
+
+  const orphanedActions: Action<{ key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }>[] = [
+    {
+      label: 'Fix',
+      icon: fixing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />,
+      onClick: (row) => handleFixOrphaned([{ key: row.key, provider_id: row.provider_id, size: row.size }]),
+      disabled: (row) => fixing || fixedKeys.has(row.key),
+      hidden: (row) => fixedKeys.has(row.key),
+    },
+  ];
+
+  // Missing files table columns
+  const missingColumns: Column<{ id: string; name: string; reason: string }>[] = [
+    {
+      key: 'name',
+      label: 'File',
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <span className="status-badge status-danger">Missing</span>
+          <span className="text-xs font-mono truncate max-w-[240px]">{row.name}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'reason',
+      label: 'Reason',
+      render: (row) => (
+        <span className="text-[11px] font-mono" style={{ color: '#ef4444' }}>{row.reason}</span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="animate-fade-up">
-        <h2 className="font-semibold flex items-center gap-2">
-          <Scan className="w-4 h-4" style={{ color: colors.primary }} />
-          <span className="text-gradient">System Scan</span>
-        </h2>
-        <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Verify storage buckets and database integrity</p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card rounded-2xl p-6 animate-fade-up">
+      {/* Scan Actions */}
+      <div className="grid md:grid-cols-3 gap-4">
+        {/* Storage Scan */}
+        <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-xl border flex items-center justify-center" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}25`, color: colors.primary }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
               <Cloud className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm">Storage Scan</h3>
-              <p className="text-xs" style={{ color: colors.textDim }}>Scan all S3 buckets for files</p>
+              <h3 className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>Storage Scan</h3>
+              <p className="text-[11px]" style={{ color: colors.textDim }}>Scan all S3 buckets</p>
             </div>
           </div>
           <p className="text-xs mb-4" style={{ color: colors.textDim }}>
-            Lists every object in all configured buckets and compares against database records. Identifies orphaned files (in S3 but not in DB).
+            Lists every object in all configured buckets and compares against database records.
           </p>
-          <button
-            onClick={handleStorageScan}
-            disabled={scanningStorage}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm btn btn-primary"
-            style={{ background: colors.gradient, color: colors.bg }}
-          >
-            {scanningStorage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
-            {scanningStorage ? 'Scanning storage...' : 'Scan Storage Buckets'}
+          <button onClick={handleStorageScan} disabled={scanningStorage} className="btn btn-primary text-xs w-full">
+            {scanningStorage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scan className="w-3.5 h-3.5" />}
+            {scanningStorage ? 'Scanning...' : 'Scan Storage'}
           </button>
         </div>
 
-        <div className="card rounded-2xl p-6 animate-fade-up" style={{ animationDelay: '80ms' }}>
+        {/* Database Scan */}
+        <div className="glass-card p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-xl border flex items-center justify-center" style={{ background: `${colors.secondary}10`, borderColor: `${colors.secondary}25`, color: colors.secondary }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm">Database Scan</h3>
-              <p className="text-xs" style={{ color: colors.textDim }}>Verify all DB records</p>
+              <h3 className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>Database Scan</h3>
+              <p className="text-[11px]" style={{ color: colors.textDim }}>Verify all DB records</p>
             </div>
           </div>
           <p className="text-xs mb-4" style={{ color: colors.textDim }}>
-            Checks every database record to ensure its corresponding S3 object still exists. Identifies missing files (in DB but not in S3).
+            Checks every database record to ensure its corresponding S3 object still exists.
           </p>
-          <button
-            onClick={handleDbScan}
-            disabled={scanningDb}
-            className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-sm btn btn-secondary"
-            style={{ background: `${colors.text}08`, color: colors.text, border: `1px solid ${colors.text}15` }}
-          >
-            {scanningDb ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-            {scanningDb ? 'Scanning database...' : 'Scan Database Records'}
+          <button onClick={handleDbScan} disabled={scanningDb} className="btn btn-secondary text-xs w-full">
+            {scanningDb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+            {scanningDb ? 'Scanning...' : 'Scan Database'}
           </button>
         </div>
-      </div>
 
-      <div className="card rounded-2xl p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-11 h-11 rounded-xl border flex items-center justify-center" style={{ background: `${colors.success}10`, borderColor: `${colors.success}25`, color: colors.success }}>
+        {/* Auto Fix */}
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm">Auto Fix</h3>
-              <p className="text-xs" style={{ color: colors.textDim }}>Scan all buckets and automatically import any orphaned files into the database</p>
+              <h3 className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>Auto Fix</h3>
+              <p className="text-[11px]" style={{ color: colors.textDim }}>Scan & import orphans</p>
             </div>
           </div>
-          <button
-            onClick={handleAutoFix}
-            disabled={autoFixing}
-            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm btn min-w-[180px]"
-            style={{ background: colors.gradient, color: '#fff' }}
-          >
-            {autoFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            {autoFixing ? 'Scanning & fixing...' : 'Auto Fix All'}
+          <p className="text-xs mb-4" style={{ color: colors.textDim }}>
+            Automatically scan all buckets and import any orphaned files into the database.
+          </p>
+          <button onClick={handleAutoFix} disabled={autoFixing} className="btn btn-primary text-xs w-full" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}>
+            {autoFixing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+            {autoFixing ? 'Fixing...' : 'Auto Fix All'}
           </button>
         </div>
       </div>
 
+      {/* Storage Scan Results */}
       {storageResult && (
-        <div className="card rounded-2xl p-5 animate-fade-up">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Cloud className="w-4 h-4" style={{ color: colors.primary }} />
-              Storage Scan Results
-            </h3>
-            <button onClick={handleStorageScan} className="p-2 rounded-lg" style={{ color: colors.textDim }}>
-              <RefreshCw className="w-4 h-4" />
-            </button>
+        <div className="space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Cloud className="w-4 h-4" style={{ color: '#22c55e' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Buckets</span>
+              </div>
+              <p className="text-xl font-bold">{storageResult.summary.totalBuckets}</p>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <HardDrive className="w-4 h-4" style={{ color: '#3b82f6' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>S3 Files</span>
+              </div>
+              <p className="text-xl font-bold">{storageResult.summary.totalS3Objects}</p>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4" style={{ color: '#22c55e' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>DB Records</span>
+              </div>
+              <p className="text-xl font-bold">{storageResult.summary.totalDbRecords}</p>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FileX className="w-4 h-4" style={{ color: storageResult.summary.orphanedFiles > 0 ? '#ef4444' : '#22c55e' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Orphaned</span>
+              </div>
+              <p className="text-xl font-bold" style={{ color: storageResult.summary.orphanedFiles > 0 ? '#ef4444' : '#22c55e' }}>
+                {storageResult.summary.orphanedFiles}
+              </p>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <StatBox label="Buckets" value={String(storageResult.summary.totalBuckets)} icon={<Cloud className="w-3.5 h-3.5" />} color={colors.primary} colors={colors} />
-            <StatBox label="S3 Files" value={String(storageResult.summary.totalS3Objects)} icon={<HardDrive className="w-3.5 h-3.5" />} color={colors.secondary} colors={colors} />
-            <StatBox label="DB Records" value={String(storageResult.summary.totalDbRecords)} icon={<Database className="w-3.5 h-3.5" />} color={colors.primary} colors={colors} />
-            <StatBox
-              label="Orphaned"
-              value={String(storageResult.summary.orphanedFiles)}
-              icon={<FileX className="w-3.5 h-3.5" />}
-              color={storageResult.summary.orphanedFiles > 0 ? colors.danger : colors.success}
-              colors={colors}
-            />
-          </div>
-
-          {storageResult.summary.totalStorageBytes > 0 && (
-            <p className="text-xs font-mono mb-3" style={{ color: colors.textDim }}>
-              Total storage: {formatBytes(storageResult.summary.totalStorageBytes)}
-            </p>
+          {/* Success banner */}
+          {storageResult.summary.orphanedFiles === 0 && storageResult.buckets.some((b) => !b.error) && (
+            <div className="glass-card p-4 flex items-center gap-3" style={{ border: '1px solid rgba(34,197,94,0.2)' }}>
+              <Check className="w-5 h-5" style={{ color: '#22c55e' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#22c55e' }}>All storage files accounted for</p>
+                <p className="text-xs" style={{ color: colors.textDim }}>{storageResult.summary.totalS3Objects} files in {storageResult.summary.totalBuckets} buckets — all have matching DB records.</p>
+              </div>
+            </div>
           )}
 
-          {storageResult.buckets.map((b, i) => (
-            <div key={i} className="mb-3 p-3 rounded-xl" style={{ background: `${colors.text}03`, border: `1px solid ${colors.text}08` }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold">{b.provider} <span className="font-mono" style={{ color: colors.textDim }}>({b.bucket})</span></span>
-                {b.error ? (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${colors.danger}15`, color: colors.danger }}>{b.error}</span>
-                ) : (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${colors.primary}10`, color: colors.primary }}>{b.files.length} files</span>
-                )}
-              </div>
-              {!b.error && b.files.length > 0 && (
-                <div className="space-y-1">
-                  {b.files.slice(0, 5).map((f, j) => (
-                    <div key={j} className="flex items-center justify-between text-[10px] font-mono" style={{ color: colors.textDim }}>
-                      <span className="truncate max-w-[200px]">{f.key}</span>
-                      <span>{formatBytes(f.size)}</span>
-                    </div>
-                  ))}
-                  {b.files.length > 5 && (
-                    <p className="text-[10px] font-mono" style={{ color: `${colors.text}40` }}>...and {b.files.length - 5} more</p>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-
+          {/* Orphaned Files Table */}
           {storageResult.summary.orphanedItems.length > 0 && (
-            <div className="p-3 rounded-xl" style={{ background: `${colors.danger}08`, border: `1px solid ${colors.danger}20` }}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: colors.danger }}>
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Orphaned Files ({storageResult.summary.orphanedItems.length})
-                </p>
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
+                  <AlertTriangle className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                  Orphaned Files
+                </h3>
                 <button
                   onClick={() => handleFixOrphaned(storageResult.summary.orphanedItems.map((item) => ({ key: item.key, provider_id: item.provider_id, size: item.size })))}
                   disabled={fixing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-                  style={{ background: `${colors.success}15`, color: colors.success, border: `1px solid ${colors.success}25` }}
+                  className="btn btn-primary text-xs"
                 >
-                  {fixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                  Fix All
+                  {fixing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
+                  Fix All ({storageResult.summary.orphanedItems.length})
                 </button>
               </div>
-              <div className="space-y-2 mt-2">
-                {storageResult.summary.orphanedItems.map((item, i) => {
-                  const isFixed = fixedKeys.has(item.key);
-                  const fileName = item.key.split('/').slice(1).join('/') || item.key;
-                  return (
-                    <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg" style={{ background: isFixed ? `${colors.success}08` : `${colors.text}04` }}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-mono truncate" style={{ color: isFixed ? colors.success : colors.text }}>{fileName}</p>
-                        <p className="text-[9px] font-mono" style={{ color: colors.textDim }}>
-                          {item.provider_name} ({item.bucket_name}) · {formatBytes(item.size)}
-                        </p>
-                      </div>
-                      {isFixed ? (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${colors.success}15`, color: colors.success }}>
-                          <Check className="w-3 h-3 inline" /> Fixed
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleFixOrphaned([{ key: item.key, provider_id: item.provider_id, size: item.size }])}
-                          disabled={fixing}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all flex-shrink-0"
-                          style={{ background: `${colors.success}15`, color: colors.success, border: `1px solid ${colors.success}25` }}
-                        >
-                          <Wrench className="w-3 h-3" />
-                          Fix
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {storageResult.summary.orphanedFiles === 0 && storageResult.buckets.some((b) => !b.error) && (
-            <div className="p-3 rounded-xl text-center" style={{ background: `${colors.success}08`, border: `1px solid ${colors.success}20` }}>
-              <Check className="w-5 h-5 mx-auto mb-1" style={{ color: colors.success }} />
-              <p className="text-xs font-semibold" style={{ color: colors.success }}>All storage files are accounted for in the database</p>
+              <DataTable
+                columns={orphanedColumns}
+                data={storageResult.summary.orphanedItems}
+                actions={orphanedActions}
+                keyExtractor={(row) => row.key}
+                searchPlaceholder="Search files..."
+                searchKeys={['key', 'provider_name', 'bucket_name']}
+                pageSize={8}
+                emptyTitle="No orphaned files"
+              />
             </div>
           )}
         </div>
       )}
 
+      {/* Database Scan Results */}
       {dbResult && (
-        <div className="card rounded-2xl p-5 animate-fade-up">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Database className="w-4 h-4" style={{ color: colors.secondary }} />
-              Database Scan Results
-            </h3>
-            <button onClick={handleDbScan} className="p-2 rounded-lg" style={{ color: colors.textDim }}>
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <StatBox label="Total Records" value={String(dbResult.summary.totalDbRecords)} icon={<Database className="w-3.5 h-3.5" />} color={colors.secondary} colors={colors} />
-            <StatBox label="Verified" value={String(dbResult.summary.verified)} icon={<Check className="w-3.5 h-3.5" />} color={colors.success} colors={colors} />
-            <StatBox
-              label="Missing"
-              value={String(dbResult.summary.missing)}
-              icon={<FileX className="w-3.5 h-3.5" />}
-              color={dbResult.summary.missing > 0 ? colors.danger : colors.success}
-              colors={colors}
-            />
-          </div>
-
-          {dbResult.summary.missing > 0 && (
-            <div className="p-3 rounded-xl" style={{ background: `${colors.danger}08`, border: `1px solid ${colors.danger}20` }}>
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: colors.danger }}>
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Missing Files (in DB, not in S3)
+        <div className="space-y-4">
+          {/* Summary Stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="w-4 h-4" style={{ color: '#3b82f6' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Total Records</span>
+              </div>
+              <p className="text-xl font-bold">{dbResult.summary.totalDbRecords}</p>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Check className="w-4 h-4" style={{ color: '#22c55e' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Verified</span>
+              </div>
+              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{dbResult.summary.verified}</p>
+            </div>
+            <div className="glass-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FileX className="w-4 h-4" style={{ color: dbResult.summary.missing > 0 ? '#ef4444' : '#22c55e' }} />
+                <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Missing</span>
+              </div>
+              <p className="text-xl font-bold" style={{ color: dbResult.summary.missing > 0 ? '#ef4444' : '#22c55e' }}>
+                {dbResult.summary.missing}
               </p>
-              <div className="space-y-1">
-                {dbResult.summary.missingFiles.map((f, i) => (
-                  <div key={i} className="flex items-center justify-between text-[10px] font-mono" style={{ color: colors.textDim }}>
-                    <span className="truncate max-w-[200px]">{f.name}</span>
-                    <span style={{ color: colors.danger }}>{f.reason}</span>
-                  </div>
-                ))}
+            </div>
+          </div>
+
+          {/* Success banner */}
+          {dbResult.summary.missing === 0 && (
+            <div className="glass-card p-4 flex items-center gap-3" style={{ border: '1px solid rgba(34,197,94,0.2)' }}>
+              <Check className="w-5 h-5" style={{ color: '#22c55e' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#22c55e' }}>All database records verified</p>
+                <p className="text-xs" style={{ color: colors.textDim }}>{dbResult.summary.totalDbRecords} records — all have matching S3 objects.</p>
               </div>
             </div>
           )}
 
-          {dbResult.summary.missing === 0 && (
-            <div className="p-3 rounded-xl text-center" style={{ background: `${colors.success}08`, border: `1px solid ${colors.success}20` }}>
-              <Check className="w-5 h-5 mx-auto mb-1" style={{ color: colors.success }} />
-              <p className="text-xs font-semibold" style={{ color: colors.success }}>All database records verified - files exist in S3</p>
+          {/* Missing Files Table */}
+          {dbResult.summary.missingFiles.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2 mb-3" style={{ fontFamily: "'Fira Code', monospace" }}>
+                <AlertTriangle className="w-4 h-4" style={{ color: '#ef4444' }} />
+                Missing Files (in DB, not in S3)
+              </h3>
+              <DataTable
+                columns={missingColumns}
+                data={dbResult.summary.missingFiles}
+                keyExtractor={(row) => row.id}
+                searchPlaceholder="Search files..."
+                searchKeys={['name', 'reason']}
+                pageSize={8}
+                emptyTitle="No missing files"
+              />
             </div>
           )}
         </div>
       )}
-    </div>
-  );
-}
 
-function StatBox({ label, value, icon, color, colors }: { label: string; value: string; icon: React.ReactNode; color: string; colors: any }) {
-  return (
-    <div className="p-3 rounded-xl" style={{ background: `${color}08`, border: `1px solid ${color}15` }}>
-      <div className="flex items-center gap-1.5 mb-1" style={{ color }}>
-        {icon}
-        <span className="text-[10px] font-mono uppercase">{label}</span>
-      </div>
-      <p className="text-lg font-bold" style={{ color }}>{value}</p>
+      {/* Empty state — no scans run yet */}
+      {!storageResult && !dbResult && !scanningStorage && !scanningDb && (
+        <div className="glass-card p-12 text-center">
+          <Scan className="w-10 h-10 mx-auto mb-3" style={{ color: colors.textDim }} />
+          <p className="text-sm font-medium" style={{ color: colors.textMuted }}>No scans run yet</p>
+          <p className="text-xs mt-1" style={{ color: colors.textDim }}>Select a scan type above to verify storage and database integrity.</p>
+        </div>
+      )}
     </div>
   );
 }
