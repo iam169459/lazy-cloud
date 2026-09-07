@@ -177,6 +177,13 @@ export const api = {
       body: JSON.stringify({ id }),
     }) as Promise<{ provider: StorageProvider }>,
 
+  testProvider: (id: string, token: string) =>
+    request('/api/admin/providers/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    }) as Promise<{ success: boolean; fileCount?: number; bucket: string; error?: string }>,
+
   getCredentials: (token: string) =>
     request('/api/admin/credentials', {
       headers: { Authorization: `Bearer ${token}` },

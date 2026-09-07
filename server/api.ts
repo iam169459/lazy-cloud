@@ -543,6 +543,23 @@ export async function handleApiRequest(
       return true;
     }
 
+    if (path === '/api/admin/providers/test' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      if (!id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      try {
+        const objects = await listObjects(provider);
+        sendJson(res, 200, { success: true, fileCount: objects.length, bucket: provider.bucket_name });
+      } catch (e: any) {
+        sendJson(res, 200, { success: false, error: e.message, bucket: provider.bucket_name });
+      }
+      return true;
+    }
+
     if (path === '/api/settings' && req.method === 'GET') {
       sendJson(res, 200, await getAppSettings());
       return true;

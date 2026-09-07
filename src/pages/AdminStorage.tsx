@@ -17,6 +17,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  const [showForm, setShowForm] = useState(false);
  const [saving, setSaving] = useState(false);
  const [deletingId, setDeletingId] = useState<string | null>(null);
+ const [testingId, setTestingId] = useState<string | null>(null);
  const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
  const [stats, setStats] = useState<{ totalFiles: number; encryptedFiles: number; totalSize: number } | null>(null);
  const [form, setForm] = useState({
@@ -428,12 +429,27 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <span className="text-[10px] font-mono hidden sm:inline" style={{ color: `${colors.text}40` }}>|</span>
  <span className="text-[10px] font-mono hidden sm:inline" style={{ color: colors.textDim }} title={p.created_at}>Added {new Date(p.created_at).toLocaleDateString()}</span>
  <button
- onClick={() => onNotify('success', `Test connection to ${p.provider_name}: OK`)}
+ onClick={async () => {
+   setTestingId(p.id);
+   try {
+     const res = await api.testProvider(p.id, token);
+     if (res.success) {
+       onNotify('success', `Connection OK — ${res.fileCount} file(s) in ${res.bucket}`);
+     } else {
+       onNotify('error', `Connection failed: ${res.error}`);
+     }
+   } catch (e: any) {
+     onNotify('error', `Test failed: ${e.message}`);
+   } finally {
+     setTestingId(null);
+   }
+ }}
+ disabled={testingId === p.id}
  className="px-3 py-1.5 rounded text-[11px] font-mono border transition-all hover:bg-primary/10 min-h-[32px]"
  style={{ borderColor: `${colors.primary}20`, color: colors.primary }}
  title="Test connection"
  >
- Test
+ {testingId === p.id ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Test'}
  </button>
  </div>
  </div>
