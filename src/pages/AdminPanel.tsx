@@ -82,7 +82,7 @@ export default function AdminPanel() {
         </div>
         <div className="flex gap-1 mb-5 p-1 rounded-lg overflow-x-auto" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => { setTab(t.id); sounds.click(); }} className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all whitespace-nowrap" style={{ background: tab === t.id ? 'rgba(99,102,241,0.12)' : 'transparent', color: tab === t.id ? '#818cf8' : colors.textDim }}>
+            <button key={t.id} onClick={() => { setTab(t.id); sounds.click(); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-md text-xs font-medium transition-all whitespace-nowrap min-h-[40px]" style={{ background: tab === t.id ? 'rgba(99,102,241,0.12)' : 'transparent', color: tab === t.id ? '#818cf8' : colors.textDim }}>
               {t.icon} {t.label}
             </button>
           ))}

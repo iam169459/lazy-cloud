@@ -148,7 +148,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
  type="text"
  value={settings.siteName}
  onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
- className="input text-xs w-36"
+ className="input w-36"
  />
  </SettingsRow>
  </SettingsCard>
@@ -170,7 +170,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
  type="number"
  value={settings.maxFileSize}
  onChange={(e) => setSettings({ ...settings, maxFileSize: e.target.value })}
- className="input text-xs w-32"
+ className="input w-32"
  />
  </SettingsRow>
  <SettingsRow label="Allowed file types" desc="Comma-separated MIME types or * for all">
@@ -178,7 +178,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
  type="text"
  value={settings.allowedTypes}
  onChange={(e) => setSettings({ ...settings, allowedTypes: e.target.value })}
- className="input text-xs w-full"
+ className="input w-full"
  placeholder="*"
  />
  </SettingsRow>
@@ -204,7 +204,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
  type="number"
  value={settings.autoDeleteDays}
  onChange={(e) => setSettings({ ...settings, autoDeleteDays: e.target.value })}
- className="input text-xs w-20"
+ className="input w-20"
  />
  </SettingsRow>
  )}
@@ -217,7 +217,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
  type="number"
  value={settings.maxStoragePerBucket}
  onChange={(e) => setSettings({ ...settings, maxStoragePerBucket: e.target.value })}
- className="input text-xs w-32"
+ className="input w-32"
  />
  </SettingsRow>
  </SettingsCard>
@@ -285,12 +285,12 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
  return (
  <button
  onClick={() => { onChange(!checked); sounds.toggle(); }}
- className="relative w-10 h-5 rounded-full transition-all duration-300"
+ className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
  style={{ background: checked ? colors.gradient : `${colors.text}15` }}
  >
  <span
- className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-300"
- style={{ background: colors.bg, transform: checked ? 'translateX(20px)' : 'translateX(0)' }}
+ className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-300"
+ style={{ background: colors.bg, transform: checked ? 'translateX(24px)' : 'translateX(0)' }}
  />
  </button>
  );

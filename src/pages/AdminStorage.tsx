@@ -379,7 +379,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <p className="text-xs font-mono" style={{ color: colors.textDim }}>{p.bucket_name}</p>
  </div>
  </div>
- <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2 rounded-lg transition-all disabled:opacity-50" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }} title="Remove bucket">
+ <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2.5 rounded-lg transition-all disabled:opacity-50 min-w-[36px] min-h-[36px] flex items-center justify-center" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }} title="Remove bucket">
  {deletingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
  </button>
  </div>
@@ -414,22 +414,22 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <div className="flex items-center gap-3">
  <button
  onClick={() => handleToggleActive(p.id)}
- className="relative w-10 h-5 rounded-full transition-all duration-300"
+ className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
  style={{ background: p.is_active ? (pInfo?.color || colors.gradient) : `${colors.text}15` }}
  >
- <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-300 flex items-center justify-center" style={{ background: colors.bg, transform: p.is_active ? 'translateX(20px)' : 'translateX(0)' }}>
- {p.is_active && <Power className="w-2 h-2" style={{ color: pInfo?.color || colors.primary }} />}
+ <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-300 flex items-center justify-center" style={{ background: colors.bg, transform: p.is_active ? 'translateX(24px)' : 'translateX(0)' }}>
+ {p.is_active && <Power className="w-2.5 h-2.5" style={{ color: pInfo?.color || colors.primary }} />}
  </span>
  </button>
  <span className="text-xs font-mono" style={{ color: colors.textDim }}>{p.is_active ? 'ONLINE' : 'OFFLINE'}</span>
  </div>
- <div className="flex items-center gap-2">
- <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
- <span className="text-[10px] font-mono" style={{ color: `${colors.text}40` }}>|</span>
- <span className="text-[10px] font-mono" style={{ color: colors.textDim }} title={p.created_at}>Added {new Date(p.created_at).toLocaleDateString()}</span>
+ <div className="flex flex-wrap items-center gap-2">
+ <span className="text-[10px] font-mono truncate max-w-[120px] sm:max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+ <span className="text-[10px] font-mono hidden sm:inline" style={{ color: `${colors.text}40` }}>|</span>
+ <span className="text-[10px] font-mono hidden sm:inline" style={{ color: colors.textDim }} title={p.created_at}>Added {new Date(p.created_at).toLocaleDateString()}</span>
  <button
  onClick={() => onNotify('success', `Test connection to ${p.provider_name}: OK`)}
- className="px-2 py-1 rounded text-[10px] font-mono border transition-all hover:bg-primary/10"
+ className="px-3 py-1.5 rounded text-[11px] font-mono border transition-all hover:bg-primary/10 min-h-[32px]"
  style={{ borderColor: `${colors.primary}20`, color: colors.primary }}
  title="Test connection"
  >

@@ -54,7 +54,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
         )}
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
           <h2 className="text-sm font-semibold">Files ({files.length})</h2>
         </div>
@@ -80,9 +80,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
                     <td className="px-4 py-2.5 text-xs hidden lg:table-cell whitespace-nowrap" style={{ color: '#94a3b8' }}>{formatDate(f.created_at)}</td>
                     <td className="px-4 py-2.5 text-xs hidden sm:table-cell font-mono" style={{ color: '#94a3b8' }}>{f.download_count}</td>
                     <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-end gap-0.5">
-                        <button onClick={() => copyLink(f.id)} className="p-1.5 rounded-md" style={{ color: copiedId === f.id ? '#22c55e' : '#64748b' }}>{copiedId === f.id ? <Check className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}</button>
-                        <button onClick={() => del(f.id, f.original_name)} disabled={deletingId === f.id} className="p-1.5 rounded-md disabled:opacity-50" style={{ color: '#64748b' }}>{deletingId === f.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}</button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => copyLink(f.id)} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center" style={{ color: copiedId === f.id ? '#22c55e' : '#64748b' }}>{copiedId === f.id ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}</button>
+                        <button onClick={() => del(f.id, f.original_name)} disabled={deletingId === f.id} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center disabled:opacity-50" style={{ color: '#64748b' }}>{deletingId === f.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
                       </div>
                     </td>
                   </tr>

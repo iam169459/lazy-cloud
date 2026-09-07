@@ -187,7 +187,7 @@ function QuickUpload() {
           <p className="text-sm font-medium">File uploaded</p>
           <div className="flex items-center gap-2 w-full max-w-sm">
             <input readOnly value={link} className="input text-xs font-mono" onFocus={(e) => e.target.select()} />
-            <button onClick={(e) => { e.stopPropagation(); copyLink(); }} className="btn btn-primary text-xs px-4 flex-shrink-0" style={{ minHeight: 40 }}>
+            <button onClick={(e) => { e.stopPropagation(); copyLink(); }} className="btn btn-primary text-xs px-4 flex-shrink-0" style={{ minHeight: 44 }}>
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>

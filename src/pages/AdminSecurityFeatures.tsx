@@ -215,9 +215,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  onChange={(e) => setFileTTLEnabled(e.target.checked)}
  className="sr-only"
  />
- <div className="w-9 h-5 rounded-full transition-all duration-300" style={{ background: fileTTLEnabled ? colors.primary : `${colors.text}20` }}>
- <span className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-300" style={{ background: colors.bg, transform: fileTTLEnabled ? 'translateX(16px)' : 'translateX(0)' }}>
- {fileTTLEnabled && <Check className="w-2.5 h-2.5" style={{ color: colors.primary }} />}
+ <div className="w-12 h-6 rounded-full transition-all duration-300" style={{ background: fileTTLEnabled ? colors.primary : `${colors.text}20` }}>
+ <span className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-300" style={{ background: colors.bg, transform: fileTTLEnabled ? 'translateX(24px)' : 'translateX(0)' }}>
+ {fileTTLEnabled && <Check className="w-3 h-3" style={{ color: colors.primary }} />}
  </span>
  </div>
  <span className="ml-3 text-xs font-medium" style={{ color: colors.text }}>Enable automatic file expiration</span>
@@ -368,7 +368,7 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>#{i + 1}</span>
  <button
  onClick={() => handleRemoveIp(ip)}
- className="p-1.5 rounded-lg transition-all hover:bg-red-500/10"
+ className="p-2.5 rounded-lg transition-all hover:bg-red-500/10 min-w-[36px] min-h-[36px] flex items-center justify-center"
  style={{ color: colors.danger }}
  >
  <EyeOff className="w-4 h-4" />
