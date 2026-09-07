@@ -373,6 +373,34 @@ select.form-input {
 /* ═══ Landing Page Rocket — removed, JS-driven ═══ */
 .landing-moon { animation: landing-moon-glow 3s ease-in-out infinite; }
 .landing-cloud-icon { animation: hud-float 3s ease-in-out infinite; }
-.landing-hud-status { animation: landing-hud-status 7s linear infinite; }
-.landing-hud-pct { animation: landing-hud-pct 7s linear infinite; }
-.landing-hud-bar { animation: landing-hud-fill 7s linear infinite; }
+
+/* ─── Orbiting file icons ─── */
+.rjf { position: absolute; top: 0; left: 0; animation: file-orbit-spin 3s linear infinite; }
+.rjf-1 { animation-delay: 0s; }
+.rjf-2 { animation-delay: -0.75s; }
+.rjf-3 { animation-delay: -1.5s; }
+.rjf-4 { animation-delay: -2.25s; }
+@keyframes file-orbit-spin {
+  from { transform: rotate(0deg) translateX(20px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(20px) rotate(-360deg); }
+}
+
+/* ─── HUD scanline ─── */
+@keyframes hud-scanline {
+  0% { transform: translateY(-1px); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+/* ─── Progress bar shimmer ─── */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ─── Speed indicator flicker ─── */
+@keyframes speed-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
