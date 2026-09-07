@@ -56,6 +56,10 @@
   }
   .btn:active { transform: scale(0.97); }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn:focus-visible {
+    outline: 2px solid var(--primary, #34d399);
+    outline-offset: 2px;
+  }
 
   .btn-primary {
     background: var(--gradient, linear-gradient(135deg, #34d399, #22d3ee, #3b82f6));
@@ -123,6 +127,20 @@
     border-color: var(--primary, #34d399);
     box-shadow: 0 0 0 2px var(--input-focus, rgba(52,211,153,0.2));
     background: var(--input-bg, rgba(255,255,255,0.04));
+  }
+  .input:focus-visible {
+    outline: 2px solid var(--primary, #34d399);
+    outline-offset: 2px;
+  }
+  .input[data-invalid="true"],
+  .input[aria-invalid="true"] {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+  }
+  .input[data-invalid="true"]:focus,
+  .input[aria-invalid="true"]:focus {
+    border-color: #ef4444;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
   }
 
   .text-gradient {

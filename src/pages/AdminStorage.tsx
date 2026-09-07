@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
   Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info,
-  Lock, Shield, HardDrive, RefreshCw, Zap, X
+  HardDrive, RefreshCw, Zap, X
 } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { cloudProviders, CloudProvider, getProviderById, detectProviderFromEndpoint } from '@/lib/providers';
 import DataTable, { Column, Action } from '@/components/DataTable';
+import { FormSection, FormField, FormActions, SaveButton, CancelButton } from '@/components/Form';
 
 interface Props {
   providers: StorageProvider[];
@@ -35,6 +36,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     max_bytes: '10188208025',
     region: '',
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [formTouched, setFormTouched] = useState<Set<string>>(new Set());
 
   function handleSelectProvider(p: CloudProvider) {
     sounds.click();
@@ -62,10 +65,36 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
 
   function updateField(field: string, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
+    setFormTouched(prev => new Set(prev).add(field));
+  }
+
+  function blurField(field: string) {
+    setFormTouched(prev => new Set(prev).add(field));
+    validateForm();
+  }
+
+  function validateForm(): boolean {
+    const e: Record<string, string> = {};
+    if (!form.provider_name.trim()) e.provider_name = 'Provider name is required';
+    if (!form.endpoint_url.trim()) e.endpoint_url = 'Endpoint URL is required';
+    else if (!/^https?:\/\//.test(form.endpoint_url)) e.endpoint_url = 'Must be a valid URL';
+    if (!form.bucket_name.trim()) e.bucket_name = 'Bucket name is required';
+    if (!form.access_key_id.trim()) e.access_key_id = 'Access key ID is required';
+    if (!form.secret_access_key.trim()) e.secret_access_key = 'Secret access key is required';
+    const maxBytes = Number(form.max_bytes);
+    if (isNaN(maxBytes) || maxBytes < 0) e.max_bytes = 'Must be a non-negative number';
+    setFormErrors(e);
+    return Object.keys(e).length === 0;
   }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    setFormTouched(new Set(Object.keys(form)));
+    if (!validateForm()) {
+      sounds.error();
+      onNotify('error', 'Fix the errors below before saving');
+      return;
+    }
     sounds.click();
     setSaving(true);
     try {
@@ -101,6 +130,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   function resetForm() {
     setForm({ provider_name: '', endpoint_url: '', bucket_name: '', access_key_id: '', secret_access_key: '', max_bytes: '10188208025', region: '' });
     setSelectedProvider(null);
+    setFormErrors({});
+    setFormTouched(new Set());
   }
 
   async function handleDelete(id: string, name: string) {
@@ -428,41 +459,45 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             </div>
           )}
 
-          <form onSubmit={handleAdd} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <FormField label="Provider name" required>
-                <input type="text" value={form.provider_name} onChange={(e) => updateField('provider_name', e.target.value)} placeholder="My Storage" required className="input" />
-              </FormField>
-              <FormField label="Endpoint URL" required>
-                <input
-                  type="url"
-                  value={form.endpoint_url}
-                  onChange={(e) => {
-                    updateField('endpoint_url', e.target.value);
-                    const detected = detectProviderFromEndpoint(e.target.value);
-                    if (detected && !selectedProvider) {
-                      setSelectedProvider(detected);
-                      setForm(prev => ({ ...prev, provider_name: detected.name, max_bytes: String(detected.maxBytes) }));
-                    }
-                  }}
-                  placeholder="https://s3.amazonaws.com"
-                  required
-                  className="input"
-                />
-              </FormField>
-              <FormField label="Bucket name" required>
-                <input type="text" value={form.bucket_name} onChange={(e) => updateField('bucket_name', e.target.value)} placeholder="my-bucket" required className="input" />
-              </FormField>
-              <FormField label="Region">
-                <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider?.regionPlaceholder || 'auto'} className="input" />
-              </FormField>
-              <FormField label="Access key ID" required>
-                <input type="text" value={form.access_key_id} onChange={(e) => updateField('access_key_id', e.target.value)} required className="input" />
-              </FormField>
-              <FormField label="Secret access key" required>
-                <input type="password" value={form.secret_access_key} onChange={(e) => updateField('secret_access_key', e.target.value)} required className="input" />
-              </FormField>
-            </div>
+          <form onSubmit={handleAdd} noValidate className="space-y-4">
+            <FormSection title="Connection Details" icon={<Server className="w-4 h-4" />}>
+              <div className="grid md:grid-cols-2 gap-4">
+                <FormField label="Provider name" required error={formTouched.has('provider_name') ? formErrors.provider_name : undefined}>
+                  <input type="text" value={form.provider_name} onChange={(e) => updateField('provider_name', e.target.value)} onBlur={() => blurField('provider_name')} placeholder="My Storage" className="input" aria-invalid={!!formErrors.provider_name} />
+                </FormField>
+                <FormField label="Endpoint URL" required error={formTouched.has('endpoint_url') ? formErrors.endpoint_url : undefined}>
+                  <input
+                    type="url"
+                    value={form.endpoint_url}
+                    onChange={(e) => {
+                      updateField('endpoint_url', e.target.value);
+                      const detected = detectProviderFromEndpoint(e.target.value);
+                      if (detected && !selectedProvider) {
+                        setSelectedProvider(detected);
+                        setForm(prev => ({ ...prev, provider_name: detected.name, max_bytes: String(detected.maxBytes) }));
+                      }
+                    }}
+                    onBlur={() => blurField('endpoint_url')}
+                    placeholder="https://s3.amazonaws.com"
+                    className="input"
+                    aria-invalid={!!formErrors.endpoint_url}
+                  />
+                </FormField>
+                <FormField label="Bucket name" required error={formTouched.has('bucket_name') ? formErrors.bucket_name : undefined}>
+                  <input type="text" value={form.bucket_name} onChange={(e) => updateField('bucket_name', e.target.value)} onBlur={() => blurField('bucket_name')} placeholder="my-bucket" className="input" aria-invalid={!!formErrors.bucket_name} />
+                </FormField>
+                <FormField label="Region" hint={selectedProvider ? `Default: ${selectedProvider.regionPlaceholder}` : 'auto'}>
+                  <input type="text" value={form.region} onChange={(e) => handleRegionChange(e.target.value)} placeholder={selectedProvider?.regionPlaceholder || 'auto'} className="input" />
+                </FormField>
+                <FormField label="Access key ID" required error={formTouched.has('access_key_id') ? formErrors.access_key_id : undefined}>
+                  <input type="text" value={form.access_key_id} onChange={(e) => updateField('access_key_id', e.target.value)} onBlur={() => blurField('access_key_id')} className="input" aria-invalid={!!formErrors.access_key_id} />
+                </FormField>
+                <FormField label="Secret access key" required error={formTouched.has('secret_access_key') ? formErrors.secret_access_key : undefined}>
+                  <input type="password" value={form.secret_access_key} onChange={(e) => updateField('secret_access_key', e.target.value)} onBlur={() => blurField('secret_access_key')} className="input" aria-invalid={!!formErrors.secret_access_key} />
+                </FormField>
+              </div>
+            </FormSection>
+
             {selectedProvider && (
               <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)' }}>
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#22c55e' }} />
@@ -471,14 +506,21 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                 </div>
               </div>
             )}
-            <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={saving} className="btn btn-primary text-xs">
-                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                Save bucket
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); resetForm(); sounds.click(); }} className="btn btn-secondary text-xs">
-                Cancel
-              </button>
+
+            <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+                {Object.keys(formErrors).length > 0 ? `${Object.keys(formErrors).length} error(s) to fix` : 'Ready to save'}
+              </p>
+              <FormActions>
+                <SaveButton loading={saving}>
+                  <Plus className="w-3.5 h-3.5" />
+                  Save Bucket
+                </SaveButton>
+                <CancelButton onClick={() => { setShowForm(false); resetForm(); sounds.click(); }}>
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </CancelButton>
+              </FormActions>
             </div>
           </form>
         </div>
@@ -497,18 +539,6 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         emptyTitle="No storage buckets configured"
         emptyDescription="Click 'Add bucket' to connect your first S3-compatible storage provider."
       />
-    </div>
-  );
-}
-
-function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <div>
-      <label className="block text-[10px] mb-1.5 font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>
-        {label} {required && <span style={{ color: '#22c55e' }}>*</span>}
-      </label>
-      {children}
     </div>
   );
 }

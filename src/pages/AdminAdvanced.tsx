@@ -3,115 +3,145 @@ import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, U
 import { useTheme, ThemeId, themes } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
+import { FormSection, FormField, FormRow, Toggle, FormActions, SaveButton, CancelButton, DangerButton } from '@/components/Form';
 
 interface Props {
- token: string;
- onNotify: (type: 'success' | 'error', msg: string) => void;
+  token: string;
+  onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
 function errMsg(e: unknown): string {
- return e instanceof Error ? e.message : 'Something went wrong';
+  return e instanceof Error ? e.message : 'Something went wrong';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
- siteName: 'LazyDrop',
- maxFileSize: '10737418240',
- allowedTypes: '*',
- autoDelete: false,
- autoDeleteDays: '30',
- enableDownloadCounter: true,
- enablePublicUpload: false,
- maxStoragePerBucket: '10188208025',
+  siteName: 'LazyDrop',
+  maxFileSize: '10737418240',
+  allowedTypes: '*',
+  autoDelete: false,
+  autoDeleteDays: '30',
+  enableDownloadCounter: true,
+  enablePublicUpload: false,
+  maxStoragePerBucket: '10188208025',
 };
 
+type Errors = Partial<Record<keyof AppSettings, string>>;
+
+function validate(settings: AppSettings): Errors {
+  const e: Errors = {};
+  if (!settings.siteName.trim()) e.siteName = 'Site name is required';
+  const maxFile = Number(settings.maxFileSize);
+  if (isNaN(maxFile) || maxFile < 0) e.maxFileSize = 'Must be a non-negative number';
+  if (!settings.allowedTypes.trim()) e.allowedTypes = 'At least one type is required';
+  if (settings.autoDelete) {
+    const days = Number(settings.autoDeleteDays);
+    if (isNaN(days) || days < 1) e.autoDeleteDays = 'Must be at least 1 day';
+  }
+  const maxStorage = Number(settings.maxStoragePerBucket);
+  if (isNaN(maxStorage) || maxStorage < 0) e.maxStoragePerBucket = 'Must be a non-negative number';
+  return e;
+}
+
 export default function AdminAdvanced({ token, onNotify }: Props) {
- const { theme, setTheme, colors } = useTheme();
- const [saving, setSaving] = useState(false);
- const [loading, setLoading] = useState(true);
- const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
- const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const { theme, setTheme, colors } = useTheme();
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [errors, setErrors] = useState<Errors>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
- useEffect(() => {
- (async () => {
- try {
- let loaded = await api.getSettings();
+  useEffect(() => {
+    (async () => {
+      try {
+        let loaded = await api.getSettings();
+        const legacy = localStorage.getItem('lazydrop-settings');
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            loaded = { ...loaded, ...parsed };
+            await api.updateSettings(loaded, token);
+            localStorage.removeItem('lazydrop-settings');
+          } catch {}
+        }
+        setSettings(loaded);
+      } catch (e: unknown) {
+        onNotify('error', errMsg(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, onNotify]);
 
- // One-time migration from the old localStorage-only settings
- const legacy = localStorage.getItem('lazydrop-settings');
- if (legacy) {
- try {
- const parsed = JSON.parse(legacy);
- loaded = { ...loaded, ...parsed };
- await api.updateSettings(loaded, token);
- localStorage.removeItem('lazydrop-settings');
- } catch {
- // ignore broken legacy data
- }
- }
+  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setTouched((prev) => new Set(prev).add(key));
+  }
 
- setSettings(loaded);
- } catch (e: unknown) {
- onNotify('error', errMsg(e));
- } finally {
- setLoading(false);
- }
- })();
- }, [token, onNotify]);
+  function blur(key: keyof AppSettings) {
+    setTouched((prev) => new Set(prev).add(key));
+    const e = validate(settings);
+    setErrors(e);
+  }
 
- function handleSave() {
- sounds.click();
- setSaving(true);
- sounds.setEnabled(soundEnabled);
- api.updateSettings(settings, token)
- .then(() => {
- sounds.success();
- onNotify('success', 'Settings saved — new limits are enforced on uploads');
- })
- .catch((e: unknown) => {
- sounds.error();
- onNotify('error', errMsg(e));
- })
- .finally(() => setSaving(false));
- }
+  function handleSave() {
+    const e = validate(settings);
+    setErrors(e);
+    setTouched(new Set(Object.keys(settings) as (keyof AppSettings)[]));
+    if (Object.keys(e).length > 0) {
+      sounds.error();
+      onNotify('error', 'Fix the errors below before saving');
+      return;
+    }
+    sounds.click();
+    setSaving(true);
+    sounds.setEnabled(soundEnabled);
+    api.updateSettings(settings, token)
+      .then(() => { sounds.success(); onNotify('success', 'Settings saved — new limits are enforced on uploads'); })
+      .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
+      .finally(() => setSaving(false));
+  }
 
- function handleReset() {
- if (!confirm('Reset all settings to defaults?')) return;
- sounds.click();
- setSaving(true);
- api.updateSettings(DEFAULT_SETTINGS, token)
- .then(() => {
- setSettings(DEFAULT_SETTINGS);
- sounds.success();
- onNotify('success', 'Settings reset to defaults');
- })
- .catch((e: unknown) => {
- sounds.error();
- onNotify('error', errMsg(e));
- })
- .finally(() => setSaving(false));
- }
+  function handleReset() {
+    if (!confirm('Reset all settings to defaults?')) return;
+    sounds.click();
+    setSaving(true);
+    api.updateSettings(DEFAULT_SETTINGS, token)
+      .then(() => {
+        setSettings(DEFAULT_SETTINGS);
+        setErrors({});
+        setTouched(new Set());
+        sounds.success();
+        onNotify('success', 'Settings reset to defaults');
+      })
+      .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
+      .finally(() => setSaving(false));
+  }
 
- function handleClearLocal() {
- if (!confirm('Clear local sound preference and theme? Server settings are kept.')) return;
- sounds.delete();
- localStorage.removeItem('lazydrop-sound-enabled');
- localStorage.removeItem('lazydrop-theme');
- setSoundEnabled(true);
- sounds.setEnabled(true);
- onNotify('success', 'Local preferences cleared');
- }
+  function handleClearLocal() {
+    if (!confirm('Clear local sound preference and theme? Server settings are kept.')) return;
+    sounds.delete();
+    localStorage.removeItem('lazydrop-sound-enabled');
+    localStorage.removeItem('lazydrop-theme');
+    setSoundEnabled(true);
+    sounds.setEnabled(true);
+    onNotify('success', 'Local preferences cleared');
+  }
 
- if (loading) {
- return (
- <div className="flex flex-col items-center justify-center py-20 gap-4">
- <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
- <p className="text-sm font-mono animate-pulse" style={{ color: colors.textMuted }}>LOADING_SETTINGS...</p>
- </div>
- );
- }
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#22c55e' }} />
+        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING_SETTINGS...</p>
+      </div>
+    );
+  }
+
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(DEFAULT_SETTINGS);
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="animate-fade-up">
         <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
           <Settings className="w-4 h-4" style={{ color: '#22c55e' }} />
@@ -122,16 +152,18 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
         </p>
       </div>
 
+      {/* Settings Grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Appearance */}
-        <SettingsCard title="Appearance" icon={<Palette className="w-4 h-4" />}>
-          <SettingsRow label="Theme" desc="Choose your visual style">
+        <FormSection title="Appearance" icon={<Palette className="w-4 h-4" />}>
+          <FormRow label="Theme" desc="Choose your visual style">
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(themes) as ThemeId[]).map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => { setTheme(t); sounds.click(); }}
-                  className="px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200"
+                  className="px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer"
                   style={{
                     background: theme === t ? 'rgba(34,197,94,0.12)' : 'transparent',
                     borderColor: theme === t ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.08)',
@@ -142,156 +174,156 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                 </button>
               ))}
             </div>
-          </SettingsRow>
-          <SettingsRow label="Site name" desc="Shown on the landing page and browser title">
+          </FormRow>
+          <FormField
+            label="Site name"
+            required
+            error={touched.has('siteName') ? errors.siteName : undefined}
+            hint="Shown on the landing page and browser title"
+          >
             <input
               type="text"
               value={settings.siteName}
-              onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
-              className="input w-36"
+              onChange={(e) => update('siteName', e.target.value)}
+              onBlur={() => blur('siteName')}
+              className="input w-full"
+              aria-invalid={!!errors.siteName}
+              placeholder="LazyDrop"
             />
-          </SettingsRow>
-        </SettingsCard>
+          </FormField>
+        </FormSection>
 
         {/* Sound */}
-        <SettingsCard title="Sound Effects" icon={soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}>
-          <SettingsRow label="Enable sounds" desc="Play sounds on interactions">
-            <Toggle
-              checked={soundEnabled}
-              onChange={(v) => setSoundEnabled(v)}
-            />
-          </SettingsRow>
-        </SettingsCard>
+        <FormSection title="Sound Effects" icon={soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}>
+          <FormRow label="Enable sounds" desc="Play sounds on interactions">
+            <Toggle checked={soundEnabled} onChange={setSoundEnabled} label="Enable sounds" />
+          </FormRow>
+        </FormSection>
 
         {/* File Settings */}
-        <SettingsCard title="File Management" icon={<Download className="w-4 h-4" />}>
-          <SettingsRow label="Max file size" desc="Maximum upload size in bytes (0 = unlimited)">
+        <FormSection title="File Management" icon={<Download className="w-4 h-4" />}>
+          <FormField
+            label="Max file size"
+            required
+            error={touched.has('maxFileSize') ? errors.maxFileSize : undefined}
+            hint="Maximum upload size in bytes (0 = unlimited)"
+          >
             <input
               type="number"
               value={settings.maxFileSize}
-              onChange={(e) => setSettings({ ...settings, maxFileSize: e.target.value })}
+              onChange={(e) => update('maxFileSize', e.target.value)}
+              onBlur={() => blur('maxFileSize')}
               className="input w-32"
+              aria-invalid={!!errors.maxFileSize}
+              min="0"
             />
-          </SettingsRow>
-          <SettingsRow label="Allowed file types" desc="Comma-separated MIME types or * for all">
+          </FormField>
+          <FormField
+            label="Allowed file types"
+            required
+            error={touched.has('allowedTypes') ? errors.allowedTypes : undefined}
+            hint="Comma-separated MIME types or * for all"
+          >
             <input
               type="text"
               value={settings.allowedTypes}
-              onChange={(e) => setSettings({ ...settings, allowedTypes: e.target.value })}
+              onChange={(e) => update('allowedTypes', e.target.value)}
+              onBlur={() => blur('allowedTypes')}
               className="input w-full"
+              aria-invalid={!!errors.allowedTypes}
               placeholder="*"
             />
-          </SettingsRow>
-          <SettingsRow label="Download counter" desc="Track download counts">
+          </FormField>
+          <FormRow label="Download counter" desc="Track download counts">
             <Toggle
               checked={settings.enableDownloadCounter}
-              onChange={(v) => setSettings({ ...settings, enableDownloadCounter: v })}
+              onChange={(v) => update('enableDownloadCounter', v)}
+              label="Download counter"
             />
-          </SettingsRow>
-        </SettingsCard>
+          </FormRow>
+        </FormSection>
 
         {/* Auto Cleanup */}
-        <SettingsCard title="Auto Cleanup" icon={<Trash2 className="w-4 h-4" />}>
-          <SettingsRow label="Auto-delete old files" desc="Remove files after X days">
+        <FormSection title="Auto Cleanup" icon={<Trash2 className="w-4 h-4" />}>
+          <FormRow label="Auto-delete old files" desc="Remove files after X days">
             <Toggle
               checked={settings.autoDelete}
-              onChange={(v) => setSettings({ ...settings, autoDelete: v })}
+              onChange={(v) => { update('autoDelete', v); setErrors({}); }}
+              label="Auto-delete old files"
             />
-          </SettingsRow>
+          </FormRow>
           {settings.autoDelete && (
-            <SettingsRow label="Days before deletion" desc="Files older than this are deleted (checked hourly)">
+            <FormField
+              label="Days before deletion"
+              required
+              error={touched.has('autoDeleteDays') ? errors.autoDeleteDays : undefined}
+              hint="Files older than this are deleted (checked hourly)"
+            >
               <input
                 type="number"
                 value={settings.autoDeleteDays}
-                onChange={(e) => setSettings({ ...settings, autoDeleteDays: e.target.value })}
+                onChange={(e) => update('autoDeleteDays', e.target.value)}
+                onBlur={() => blur('autoDeleteDays')}
                 className="input w-20"
+                aria-invalid={!!errors.autoDeleteDays}
+                min="1"
               />
-            </SettingsRow>
+            </FormField>
           )}
-        </SettingsCard>
+        </FormSection>
 
         {/* Storage Limits */}
-        <SettingsCard title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
-          <SettingsRow label="Max bytes per bucket" desc="Default limit used for new buckets">
+        <FormSection title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
+          <FormField
+            label="Max bytes per bucket"
+            required
+            error={touched.has('maxStoragePerBucket') ? errors.maxStoragePerBucket : undefined}
+            hint="Default limit used for new buckets"
+          >
             <input
               type="number"
               value={settings.maxStoragePerBucket}
-              onChange={(e) => setSettings({ ...settings, maxStoragePerBucket: e.target.value })}
+              onChange={(e) => update('maxStoragePerBucket', e.target.value)}
+              onBlur={() => blur('maxStoragePerBucket')}
               className="input w-32"
+              aria-invalid={!!errors.maxStoragePerBucket}
+              min="0"
             />
-          </SettingsRow>
-        </SettingsCard>
+          </FormField>
+        </FormSection>
 
         {/* Security */}
-        <SettingsCard title="Security" icon={<Shield className="w-4 h-4" />}>
-          <SettingsRow label="Public upload" desc="Allow anyone to upload from the landing page">
+        <FormSection title="Security" icon={<Shield className="w-4 h-4" />}>
+          <FormRow label="Public upload" desc="Allow anyone to upload from the landing page">
             <Toggle
               checked={settings.enablePublicUpload}
-              onChange={(v) => setSettings({ ...settings, enablePublicUpload: v })}
+              onChange={(v) => update('enablePublicUpload', v)}
+              label="Public upload"
             />
-          </SettingsRow>
-        </SettingsCard>
+          </FormRow>
+        </FormSection>
       </div>
 
-      {/* Actions */}
-      <div className="flex flex-wrap gap-3 animate-fade-up delay-300">
-        <button onClick={handleSave} disabled={saving} className="btn btn-primary text-xs">
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          Save Settings
-        </button>
-        <button onClick={handleReset} disabled={saving} className="btn btn-secondary text-xs">
-          <RotateCcw className="w-3.5 h-3.5" />
-          Reset to Defaults
-        </button>
-        <button onClick={handleClearLocal} className="btn btn-secondary text-xs" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>
-          <Trash2 className="w-3.5 h-3.5" />
-          Clear Local Data
-        </button>
+      {/* CTA Bar */}
+      <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-up delay-300">
+        <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+          {hasChanges ? 'Unsaved changes detected' : 'All changes saved'}
+        </p>
+        <FormActions>
+          <SaveButton loading={saving}>
+            <Save className="w-3.5 h-3.5" />
+            Save Settings
+          </SaveButton>
+          <CancelButton onClick={() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); }}>
+            <RotateCcw className="w-3.5 h-3.5" />
+            Discard
+          </CancelButton>
+          <DangerButton onClick={handleClearLocal}>
+            <Trash2 className="w-3.5 h-3.5" />
+            Clear Local Data
+          </DangerButton>
+        </FormActions>
       </div>
     </div>
-  );
-}
-
-function SettingsCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
-  const { colors } = useTheme();
-  return (
-    <div className="glass-card p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
-          {icon}
-        </div>
-        <h3 className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>{title}</h3>
-      </div>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
-
-function SettingsRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm">{label}</p>
-        <p className="text-[11px] font-mono" style={{ color: 'var(--text-dim)' }}>{desc}</p>
-      </div>
-      <div className="flex-shrink-0">{children}</div>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      onClick={() => { onChange(!checked); sounds.toggle(); }}
-      className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
-      style={{ background: checked ? 'linear-gradient(135deg, #22c55e, #3b82f6)' : 'rgba(255,255,255,0.1)' }}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-300"
-        style={{ background: '#0f172a', transform: checked ? 'translateX(24px)' : 'translateX(0)' }}
-      />
-    </button>
   );
 }
