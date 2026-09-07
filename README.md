@@ -75,3 +75,7 @@ LazyDrop works with any S3-compatible endpoint. Free tiers included:
 - **Backend** — a Vite dev-server plugin (`server/plugin.ts`) exposing a REST API under `/api/`.
 - **Database** — Neon serverless Postgres (`server/db.ts`) for file records, storage providers, and admin settings.
 - **Storage** — `@aws-sdk/client-s3` for uploads, deletes, and presigned download URLs.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, coding conventions, and how to submit a PR.
