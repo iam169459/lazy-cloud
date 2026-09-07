@@ -200,10 +200,17 @@ export const api = {
         totalS3Objects: number;
         totalDbRecords: number;
         orphanedFiles: number;
-        orphanedKeys: string[];
+        orphanedItems: { key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }[];
         totalStorageBytes: number;
       };
     }>,
+
+  fixOrphaned: (items: { key: string; provider_id: string; size: number }[], token: string) =>
+    request('/api/admin/scan/fix-orphaned', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ items }),
+    }) as Promise<{ fixed: number; failed: number; results: { key: string; success: boolean; error?: string }[] }>,
 
   scanDatabase: (token: string) =>
     request('/api/admin/scan/database', {

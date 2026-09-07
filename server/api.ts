@@ -659,7 +659,7 @@ export async function handleApiRequest(
           });
         }
       }
-      const allFiles = results.flatMap((r) => r.files);
+      const allFiles = results.flatMap((r, i) => r.files.map((f) => ({ ...f, provider: providers[i] })));
       const dbFiles = await listFiles();
       const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
       const orphaned = allFiles.filter((f) => !dbKeys.has(f.key));
@@ -671,7 +671,13 @@ export async function handleApiRequest(
           totalS3Objects: allFiles.length,
           totalDbRecords: dbFiles.length,
           orphanedFiles: orphaned.length,
-          orphanedKeys: orphaned.map((f) => f.key),
+          orphanedItems: orphaned.map((f) => ({
+            key: f.key,
+            size: f.size,
+            provider_id: f.provider.id,
+            provider_name: f.provider.provider_name,
+            bucket_name: f.provider.bucket_name,
+          })),
           totalStorageBytes: totalSize,
         },
       });
@@ -708,6 +714,52 @@ export async function handleApiRequest(
           missingFiles: missing.map((r) => ({ id: r.fileId, name: r.name, reason: r.error || 'Not found in S3' })),
         },
       });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/fix-orphaned' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) {
+        sendError(res, 400, 'No orphaned files specified');
+        return true;
+      }
+      const providers = await listProviders();
+      const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const results: { key: string; success: boolean; error?: string }[] = [];
+      for (const item of items) {
+        const key: string = item.key;
+        const providerId: string = item.provider_id;
+        const size: number = item.size || 0;
+        const provider = providerMap.get(providerId);
+        if (!provider) {
+          results.push({ key, success: false, error: 'Provider not found' });
+          continue;
+        }
+        const parts = key.split('/');
+        const fileId = parts[0] || generateId();
+        const fileName = parts.slice(1).join('/') || key;
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: size,
+            mime_type: 'application/octet-stream',
+            r2_key: key,
+            provider_id: providerId,
+          });
+          if (size > 0) {
+            await updateProviderBytes(providerId, size).catch(() => {});
+          }
+          results.push({ key, success: true });
+        } catch (e: any) {
+          results.push({ key, success: false, error: e.message });
+        }
+      }
+      const fixed = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      sendJson(res, 200, { fixed, failed, results });
       return true;
     }
 

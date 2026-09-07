@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw } from 'lucide-react';
+import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw, Wrench } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -17,7 +17,7 @@ interface StorageScanResult {
     totalS3Objects: number;
     totalDbRecords: number;
     orphanedFiles: number;
-    orphanedKeys: string[];
+    orphanedItems: { key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }[];
     totalStorageBytes: number;
   };
 }
@@ -38,9 +38,12 @@ export default function AdminScan({ token, onNotify }: Props) {
   const [scanningDb, setScanningDb] = useState(false);
   const [storageResult, setStorageResult] = useState<StorageScanResult | null>(null);
   const [dbResult, setDbResult] = useState<DbScanResult | null>(null);
+  const [fixing, setFixing] = useState(false);
+  const [fixedKeys, setFixedKeys] = useState<Set<string>>(new Set());
 
   const handleStorageScan = async () => {
     setScanningStorage(true);
+    setFixedKeys(new Set());
     sounds.upload();
     try {
       const result = await api.scanStorage(token);
@@ -72,6 +75,41 @@ export default function AdminScan({ token, onNotify }: Props) {
       onNotify('error', `Database scan failed: ${e.message}`);
     } finally {
       setScanningDb(false);
+    }
+  };
+
+  const handleFixOrphaned = async (items: { key: string; provider_id: string; size: number }[]) => {
+    setFixing(true);
+    sounds.upload();
+    try {
+      const result = await api.fixOrphaned(items, token);
+      const newFixed = new Set(fixedKeys);
+      for (const r of result.results) {
+        if (r.success) newFixed.add(r.key);
+      }
+      setFixedKeys(newFixed);
+
+      if (storageResult) {
+        setStorageResult({
+          ...storageResult,
+          summary: {
+            ...storageResult.summary,
+            orphanedFiles: storageResult.summary.orphanedFiles - result.fixed,
+            orphanedItems: storageResult.summary.orphanedItems.filter((item) => !newFixed.has(item.key)),
+          },
+        });
+      }
+
+      if (result.fixed > 0) {
+        onNotify('success', `Fixed ${result.fixed} orphaned file(s) — added to database`);
+      }
+      if (result.failed > 0) {
+        onNotify('error', `Failed to fix ${result.failed} file(s)`);
+      }
+    } catch (e: any) {
+      onNotify('error', `Fix failed: ${e.message}`);
+    } finally {
+      setFixing(false);
     }
   };
 
@@ -192,20 +230,61 @@ export default function AdminScan({ token, onNotify }: Props) {
             </div>
           ))}
 
-          {storageResult.summary.orphanedFiles > 0 && (
+          {storageResult.summary.orphanedItems.length > 0 && (
             <div className="p-3 rounded-xl" style={{ background: `${colors.danger}08`, border: `1px solid ${colors.danger}20` }}>
-              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: colors.danger }}>
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Orphaned Files (in S3, no DB record)
-              </p>
-              <div className="space-y-1">
-                {storageResult.summary.orphanedKeys.slice(0, 10).map((key, i) => (
-                  <p key={i} className="text-[10px] font-mono truncate" style={{ color: colors.textDim }}>{key}</p>
-                ))}
-                {storageResult.summary.orphanedKeys.length > 10 && (
-                  <p className="text-[10px] font-mono" style={{ color: `${colors.text}40` }}>...and {storageResult.summary.orphanedKeys.length - 10} more</p>
-                )}
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: colors.danger }}>
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Orphaned Files ({storageResult.summary.orphanedItems.length})
+                </p>
+                <button
+                  onClick={() => handleFixOrphaned(storageResult.summary.orphanedItems.map((item) => ({ key: item.key, provider_id: item.provider_id, size: item.size })))}
+                  disabled={fixing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                  style={{ background: `${colors.success}15`, color: colors.success, border: `1px solid ${colors.success}25` }}
+                >
+                  {fixing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                  Fix All
+                </button>
               </div>
+              <div className="space-y-2 mt-2">
+                {storageResult.summary.orphanedItems.map((item, i) => {
+                  const isFixed = fixedKeys.has(item.key);
+                  const fileName = item.key.split('/').slice(1).join('/') || item.key;
+                  return (
+                    <div key={i} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-lg" style={{ background: isFixed ? `${colors.success}08` : `${colors.text}04` }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-mono truncate" style={{ color: isFixed ? colors.success : colors.text }}>{fileName}</p>
+                        <p className="text-[9px] font-mono" style={{ color: colors.textDim }}>
+                          {item.provider_name} ({item.bucket_name}) · {formatBytes(item.size)}
+                        </p>
+                      </div>
+                      {isFixed ? (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: `${colors.success}15`, color: colors.success }}>
+                          <Check className="w-3 h-3 inline" /> Fixed
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleFixOrphaned([{ key: item.key, provider_id: item.provider_id, size: item.size }])}
+                          disabled={fixing}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-all flex-shrink-0"
+                          style={{ background: `${colors.success}15`, color: colors.success, border: `1px solid ${colors.success}25` }}
+                        >
+                          <Wrench className="w-3 h-3" />
+                          Fix
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {storageResult.summary.orphanedFiles === 0 && storageResult.buckets.some((b) => !b.error) && (
+            <div className="p-3 rounded-xl text-center" style={{ background: `${colors.success}08`, border: `1px solid ${colors.success}20` }}>
+              <Check className="w-5 h-5 mx-auto mb-1" style={{ color: colors.success }} />
+              <p className="text-xs font-semibold" style={{ color: colors.success }}>All storage files are accounted for in the database</p>
             </div>
           )}
         </div>
