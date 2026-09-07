@@ -24,6 +24,7 @@ export interface StorageProvider {
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface Stats {

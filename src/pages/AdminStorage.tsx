@@ -425,6 +425,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  </div>
  <div className="flex items-center gap-2">
  <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+ <span className="text-[10px] font-mono" style={{ color: `${colors.text}40` }}>|</span>
+ <span className="text-[10px] font-mono" style={{ color: colors.textDim }} title={p.created_at}>Added {new Date(p.created_at).toLocaleDateString()}</span>
  <button
  onClick={() => onNotify('success', `Test connection to ${p.provider_name}: OK`)}
  className="px-2 py-1 rounded text-[10px] font-mono border transition-all hover:bg-primary/10"

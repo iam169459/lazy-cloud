@@ -26,6 +26,7 @@ export interface StorageProvider {
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface FileRecord {
@@ -56,7 +57,8 @@ export async function initDatabase() {
       secret_access_key TEXT,
       max_bytes BIGINT DEFAULT 10188208025,
       current_bytes BIGINT DEFAULT 0,
-      is_active BOOLEAN DEFAULT true
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
 
@@ -100,6 +102,9 @@ export async function initDatabase() {
 
   // Settings JSON on admin_settings (idempotent — safe on every startup)
   await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'`;
+
+  // Add created_at to storage_providers if missing (migration for existing DBs)
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 
   // Indexes for the hot query paths
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
