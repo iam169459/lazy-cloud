@@ -642,6 +642,7 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const providers = await listProviders();
       const results: { provider: string; bucket: string; files: { key: string; size: number }[]; error?: string }[] = [];
+      const allOrphaned: { key: string; size: number; provider_id: string; provider_name: string; bucket_name: string }[] = [];
       for (const p of providers) {
         try {
           const objects = await listObjects(p);
@@ -659,25 +660,36 @@ export async function handleApiRequest(
           });
         }
       }
-      const allFiles = results.flatMap((r, i) => r.files.map((f) => ({ ...f, provider: providers[i] })));
       const dbFiles = await listFiles();
       const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
-      const orphaned = allFiles.filter((f) => !dbKeys.has(f.key));
-      const totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+      let totalS3Objects = 0;
+      let totalSize = 0;
+      for (const r of results) {
+        for (const f of r.files) {
+          totalS3Objects++;
+          totalSize += f.size;
+          if (!dbKeys.has(f.key)) {
+            const matchedProvider = providers.find((p) => p.bucket_name === r.bucket);
+            if (matchedProvider) {
+              allOrphaned.push({
+                key: f.key,
+                size: f.size,
+                provider_id: matchedProvider.id,
+                provider_name: matchedProvider.provider_name,
+                bucket_name: matchedProvider.bucket_name,
+              });
+            }
+          }
+        }
+      }
       sendJson(res, 200, {
         buckets: results,
         summary: {
           totalBuckets: providers.length,
-          totalS3Objects: allFiles.length,
+          totalS3Objects,
           totalDbRecords: dbFiles.length,
-          orphanedFiles: orphaned.length,
-          orphanedItems: orphaned.map((f) => ({
-            key: f.key,
-            size: f.size,
-            provider_id: f.provider.id,
-            provider_name: f.provider.provider_name,
-            bucket_name: f.provider.bucket_name,
-          })),
+          orphanedFiles: allOrphaned.length,
+          orphanedItems: allOrphaned,
           totalStorageBytes: totalSize,
         },
       });
@@ -727,11 +739,17 @@ export async function handleApiRequest(
       }
       const providers = await listProviders();
       const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const existingFiles = await listFiles();
+      const existingKeys = new Set(existingFiles.map((f) => f.r2_key));
       const results: { key: string; success: boolean; error?: string }[] = [];
       for (const item of items) {
         const key: string = item.key;
         const providerId: string = item.provider_id;
-        const size: number = item.size || 0;
+        const size: number = Number(item.size) || 0;
+        if (existingKeys.has(key)) {
+          results.push({ key, success: true });
+          continue;
+        }
         const provider = providerMap.get(providerId);
         if (!provider) {
           results.push({ key, success: false, error: 'Provider not found' });
@@ -754,7 +772,11 @@ export async function handleApiRequest(
           }
           results.push({ key, success: true });
         } catch (e: any) {
-          results.push({ key, success: false, error: e.message });
+          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+            results.push({ key, success: true });
+          } else {
+            results.push({ key, success: false, error: e.message });
+          }
         }
       }
       const fixed = results.filter((r) => r.success).length;
