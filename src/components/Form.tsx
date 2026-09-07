@@ -9,7 +9,7 @@ export function FormSection({ title, icon, description, children }: {
 }) {
   const { colors } = useTheme();
   return (
-    <fieldset className="glass-card p-5 sm:p-6" style={{ border: 'none' }}>
+    <div className="glass-card p-5 sm:p-6">
       {(title || icon) && (
         <div className="flex items-center gap-2 mb-4">
           {icon && (
@@ -18,13 +18,13 @@ export function FormSection({ title, icon, description, children }: {
             </div>
           )}
           <div>
-            <legend className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>{title}</legend>
+            <h3 className="text-sm font-semibold" style={{ fontFamily: "'Fira Code', monospace" }}>{title}</h3>
             {description && <p className="text-[11px] font-mono mt-0.5" style={{ color: colors.textDim }}>{description}</p>}
           </div>
         </div>
       )}
       <div className="space-y-4">{children}</div>
-    </fieldset>
+    </div>
   );
 }
 
