@@ -4,7 +4,6 @@ import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { cloudProviders, CloudProvider, getProviderById } from '@/lib/providers';
-import ThemeSwitcher from '@/components/ThemeSwitcher';
 
 interface Props {
  providers: StorageProvider[];
@@ -127,8 +126,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  });
 
  // Compute storage stats
- const totalUsed = providers.reduce((sum, p) => sum + (p.current_bytes || 0), 0);
- const totalCap = providers.reduce((sum, p) => sum + (p.max_bytes || 0), 0);
+ const totalUsed = providers.reduce((sum, p) => sum + Number(p.current_bytes || 0), 0);
+ const totalCap = providers.reduce((sum, p) => sum + Number(p.max_bytes || 0), 0);
  const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
  const isStorageCritical = usedPct >= 90;
 
@@ -152,7 +151,6 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  <span style={{ color: colors.textDim }}>/ {formatBytes(totalCap)}</span>
  <span style={{ color: isStorageCritical ? colors.danger : colors.textDim }}>({usedPct.toFixed(1)}%)</span>
  </div>
- <ThemeSwitcher />
  <button
  onClick={() => { setShowForm(!showForm); resetForm(); sounds.click(); }}
  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm btn btn-primary"
@@ -359,8 +357,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
 
  <div className="grid md:grid-cols-2 gap-4">
  {typeProviders.map((p, i) => {
- const currentBytes = p.current_bytes || 0;
- const maxBytes = p.max_bytes || 10188208025;
+ const currentBytes = Number(p.current_bytes || 0);
+ const maxBytes = Number(p.max_bytes || 10188208025);
  const pct = maxBytes > 0 ? (currentBytes / maxBytes) * 100 : 0;
  const isFull = pct >= 95;
  const pInfo = getProviderById(p.provider_type);

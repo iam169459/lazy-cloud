@@ -482,6 +482,12 @@ export async function handleApiRequest(
         sendError(res, 400, 'Endpoint URL too long');
         return true;
       }
+      // Dedup check: prevent same bucket_name + endpoint_url
+      const existing = await listProviders();
+      if (existing.some(p => p.bucket_name === bucket && p.endpoint_url === endpoint)) {
+        sendError(res, 409, 'A bucket with this name and endpoint already exists');
+        return true;
+      }
       const settings = await getAppSettings();
       const defaultMaxBytes = parseInt(settings.maxStoragePerBucket) || 10188208025;
       const provider = await addProvider({
