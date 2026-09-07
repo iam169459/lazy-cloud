@@ -4,6 +4,7 @@ import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, 
 import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { useTilt3D } from '@/lib/useTilt3D';
 
 export default function DownloadPage() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -12,6 +13,7 @@ export default function DownloadPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const cardTilt = useTilt3D<HTMLDivElement>({ maxTilt: 8, scale: 1.02 });
 
   useEffect(() => {
     if (!fileId) return;
@@ -38,8 +40,7 @@ export default function DownloadPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center grid-bg" style={{ color: colors.text }}>
-        <div className="scanline-overlay" />
+      <div className="min-h-screen flex items-center justify-center grid-bg perspective-scene" style={{ color: colors.text }}>
         <div className="flex flex-col items-center gap-4 animate-fade-in-up">
           <div className="relative w-14 h-14">
             <Loader2 className="w-14 h-14 animate-spin" style={{ color: colors.primary }} />
@@ -53,8 +54,7 @@ export default function DownloadPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 grid-bg" style={{ color: colors.text }}>
-        <div className="scanline-overlay" />
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 grid-bg perspective-scene" style={{ color: colors.text }}>
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-[30%] left-[20%] w-[300px] h-[300px] rounded-full blur-[120px]" style={{ background: `${colors.danger}08` }} />
         </div>
@@ -76,26 +76,31 @@ export default function DownloadPage() {
   if (!file) return null;
 
   return (
-    <div className="min-h-screen relative overflow-hidden grid-bg" style={{ color: colors.text }}>
-      <div className="scanline-overlay" />
-
+    <div className="min-h-screen relative overflow-hidden grid-bg perspective-scene" style={{ color: colors.text }}>
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb1 }} />
         <div className="absolute bottom-[-10%] right-[10%] w-[400px] h-[400px] rounded-full blur-[150px] animate-float-slow" style={{ background: colors.orb2, animationDelay: '2s' }} />
         <div className="absolute top-[50%] left-[50%] w-[300px] h-[300px] rounded-full blur-[120px] animate-float" style={{ background: colors.orb3, animationDelay: '3s' }} />
       </div>
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] pointer-events-none opacity-[0.02]">
-        <div className="w-full h-full rounded-full border animate-rotate-slow" style={{ borderColor: colors.primary }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] pointer-events-none opacity-[0.02] preserve-3d">
+        <div className="w-full h-full rounded-full border ring-3d ring-3d-1" style={{ borderColor: colors.primary }} />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 py-12">
         <div className="w-full max-w-lg">
-          <div className="card-sci corner-accent rounded-3xl p-8 animate-scale-in">
+          <div
+            ref={cardTilt.ref}
+            onMouseMove={cardTilt.onMouseMove}
+            onMouseLeave={cardTilt.onMouseLeave}
+            className="card-sci corner-accent rounded-3xl p-8 animate-card-flip tilt-card"
+            style={cardTilt.style}
+          >
+            <div className="tilt-shine" />
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent animate-hologram" />
 
             <div className="flex justify-center mb-6">
-              <div className="relative w-20 h-20 rounded-2xl border flex items-center justify-center animate-float" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}20` }}>
+              <div className="relative w-20 h-20 rounded-2xl border flex items-center justify-center float-3d" style={{ background: `${colors.primary}10`, borderColor: `${colors.primary}20` }}>
                 <FileText className="w-10 h-10" style={{ color: colors.primary }} />
                 <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse-glow" style={{ background: colors.primary }} />
               </div>

@@ -97,6 +97,86 @@ body::after {
 }
 
 /* ═══════════════════════════════════════════
+   3D FOUNDATION
+   ═══════════════════════════════════════════ */
+.perspective-scene { perspective: 1200px; perspective-origin: 50% 50%; }
+.preserve-3d { transform-style: preserve-3d; }
+
+/* 3D card tilt — applied via JS inline style, these are the transitions */
+.tilt-card {
+  transition: transform 0.15s ease-out, box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.tilt-card .tilt-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  background: radial-gradient(circle at var(--shine-x, 50%) var(--shine-y, 50%), rgba(255,255,255,0.12), transparent 60%);
+}
+.tilt-card:hover .tilt-shine { opacity: 1; }
+
+/* 3D perspective grid floor */
+.perspective-grid {
+  position: absolute;
+  bottom: 0;
+  left: -50%;
+  width: 200%;
+  height: 55%;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 60px 60px;
+  transform: rotateX(65deg);
+  transform-origin: bottom center;
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 80%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 80%);
+  animation: grid-scroll 8s linear infinite;
+  pointer-events: none;
+}
+
+/* 3D floating element */
+.float-3d {
+  animation: float-3d 6s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+@keyframes float-3d {
+  0%, 100% { transform: translateY(0) rotateX(0deg) rotateY(0deg); }
+  25% { transform: translateY(-12px) rotateX(3deg) rotateY(2deg); }
+  50% { transform: translateY(-6px) rotateX(-2deg) rotateY(-3deg); }
+  75% { transform: translateY(-14px) rotateX(2deg) rotateY(1deg); }
+}
+
+/* 3D ring orbits */
+.ring-3d {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid;
+  transform-style: preserve-3d;
+}
+.ring-3d-1 { animation: ring-orbit-1 20s linear infinite; }
+.ring-3d-2 { animation: ring-orbit-2 25s linear infinite reverse; }
+.ring-3d-3 { animation: ring-orbit-3 18s linear infinite; }
+@keyframes ring-orbit-1 { from { transform: rotateX(65deg) rotateZ(0deg); } to { transform: rotateX(65deg) rotateZ(360deg); } }
+@keyframes ring-orbit-2 { from { transform: rotateX(55deg) rotateY(15deg) rotateZ(0deg); } to { transform: rotateX(55deg) rotateY(15deg) rotateZ(360deg); } }
+@keyframes ring-orbit-3 { from { transform: rotateX(70deg) rotateY(-10deg) rotateZ(0deg); } to { transform: rotateX(70deg) rotateY(-10deg) rotateZ(360deg); } }
+
+/* 3D card entrance */
+@keyframes card-flip-in {
+  0% { opacity: 0; transform: perspective(800px) rotateY(-25deg) translateX(-30px); }
+  100% { opacity: 1; transform: perspective(800px) rotateY(0deg) translateX(0); }
+}
+.animate-card-flip { animation: card-flip-in 0.7s ease-out forwards; opacity: 0; }
+
+/* 3D hero depth layers */
+.depth-layer-1 { transform: translateZ(0px); }
+.depth-layer-2 { transform: translateZ(30px); }
+.depth-layer-3 { transform: translateZ(60px); }
+
+/* ═══════════════════════════════════════════
    CARD — mobile-safe, no touch-blocking layers
    ═══════════════════════════════════════════ */
 .card-sci {
