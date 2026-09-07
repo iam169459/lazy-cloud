@@ -1,10 +1,11 @@
 import {
   S3Client,
-  PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { PassThrough } from 'stream';
 import type { StorageProvider } from './db';
 
 function extractRegion(endpointUrl: string): string {
@@ -43,18 +44,31 @@ export function createS3Client(provider: StorageProvider): S3Client {
 export async function uploadToProvider(
   provider: StorageProvider,
   key: string,
-  body: Buffer,
+  body: Buffer | PassThrough,
   contentType: string
 ): Promise<void> {
   const client = createS3Client(provider);
-  await client.send(
-    new PutObjectCommand({
+
+  const bodyStream = body instanceof PassThrough ? body : (() => {
+    const pt = new PassThrough();
+    pt.end(body);
+    return pt;
+  })();
+
+  const upload = new Upload({
+    client,
+    params: {
       Bucket: provider.bucket_name,
       Key: key,
-      Body: body,
+      Body: bodyStream,
       ContentType: contentType,
-    })
-  );
+    },
+    queueSize: 4,
+    partSize: 10 * 1024 * 1024,
+    leavePartsOnError: false,
+  });
+
+  await upload.done();
 }
 
 export async function deleteFromProvider(

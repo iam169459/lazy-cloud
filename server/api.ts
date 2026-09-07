@@ -1,5 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { PassThrough } from 'stream';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
@@ -99,20 +100,37 @@ export async function cleanupExpiredFiles(): Promise<number> {
 
 async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const settings = await getAppSettings();
-  const bb = busboy({ headers: req.headers });
-  let uploadedFile: { name: string; data: Buffer[]; mimeType: string } | null = null;
+  const maxSize = parseInt(settings.maxFileSize) || 0;
+  const bb = busboy({
+    headers: req.headers,
+    limits: { fileSize: maxSize > 0 ? maxSize : undefined, files: 1 },
+  });
+
+  let fileName = '';
+  let mimeType = '';
+  let fileSize = 0;
+  let providerUsed: Awaited<ReturnType<typeof findProviderForSize>> = null;
+  let fileKey = '';
+  let fileId = '';
+  let uploadStream: PassThrough | null = null;
   let uploadError: string | null = null;
 
   bb.on('file', (_fieldname, file, info) => {
-    const chunks: Buffer[] = [];
-    file.on('data', (chunk) => chunks.push(chunk));
-    file.on('end', () => {
-      uploadedFile = {
-        name: info.filename || 'unnamed',
-        data: chunks,
-        mimeType: info.mimeType || 'application/octet-stream',
-      };
+    fileName = info.filename || 'unnamed';
+    mimeType = info.mimeType || 'application/octet-stream';
+
+    file.on('limit', () => {
+      uploadError = `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`;
+      file.resume();
     });
+
+    file.on('data', (chunk: Buffer) => {
+      fileSize += chunk.length;
+    });
+
+    uploadStream = new PassThrough();
+
+    file.pipe(uploadStream);
   });
 
   bb.on('error', (err: Error) => {
@@ -122,36 +140,28 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
   return new Promise<boolean>((resolve) => {
     bb.on('finish', async () => {
       if (uploadError) {
-        sendError(res, 400, uploadError);
+        if (uploadStream) uploadStream.destroy();
+        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
         return resolve(true);
       }
-      if (!uploadedFile) {
+      if (!fileName || !uploadStream) {
         sendError(res, 400, 'No file uploaded');
         return resolve(true);
       }
 
-      const fileBuffer = Buffer.concat(uploadedFile.data);
-      const fileSize = fileBuffer.length;
-
-      // Enforce max file size
-      const maxSize = parseInt(settings.maxFileSize) || 0;
-      if (maxSize > 0 && fileSize > maxSize) {
-        sendError(res, 413, `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`);
-        return resolve(true);
-      }
-
-      // Enforce allowed MIME types
       const allowed = (settings.allowedTypes || '*')
         .split(',')
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(uploadedFile.mimeType.toLowerCase())) {
-        sendError(res, 415, `File type ${uploadedFile.mimeType || 'unknown'} is not allowed.`);
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+        uploadStream.destroy();
+        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
         return resolve(true);
       }
 
-      const provider = await findProviderForSize(fileSize);
-      if (!provider) {
+      providerUsed = await findProviderForSize(fileSize);
+      if (!providerUsed) {
+        uploadStream.destroy();
         const allProviders = await listProviders();
         if (allProviders.length === 0) {
           sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
@@ -161,21 +171,21 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
         return resolve(true);
       }
 
-      const fileId = generateId();
-      const r2Key = `${fileId}/${uploadedFile.name}`;
+      fileId = generateId();
+      fileKey = `${fileId}/${fileName}`;
 
       try {
-        await uploadToProvider(provider, r2Key, fileBuffer, uploadedFile.mimeType);
+        await uploadToProvider(providerUsed, fileKey, uploadStream, mimeType);
         await createFileRecord({
           id: fileId,
-          original_name: uploadedFile.name,
+          original_name: fileName,
           file_size: fileSize,
-          mime_type: uploadedFile.mimeType,
-          r2_key: r2Key,
-          provider_id: provider.id,
+          mime_type: mimeType,
+          r2_key: fileKey,
+          provider_id: providerUsed.id,
         });
-        await updateProviderBytes(provider.id, fileSize);
-        sendJson(res, 200, { id: fileId, name: uploadedFile.name, size: fileSize });
+        await updateProviderBytes(providerUsed.id, fileSize);
+        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
       } catch (e: any) {
         sendError(res, 500, `Upload failed: ${e.message}`);
       }
@@ -188,19 +198,30 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
 
 async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const settings = await getAppSettings();
-  const bb = busboy({ headers: req.headers });
-  let uploadedFile: { name: string; data: Buffer[]; mimeType: string } | null = null;
+  const maxSize = parseInt(settings.maxFileSize) || 0;
+  const bb = busboy({
+    headers: req.headers,
+    limits: { fileSize: maxSize > 0 ? maxSize : undefined, files: 1 },
+  });
+
+  let fileName = '';
+  let mimeType = '';
+  let fileSize = 0;
+  const chunks: Buffer[] = [];
   let uploadError: string | null = null;
 
   bb.on('file', (_fieldname, file, info) => {
-    const chunks: Buffer[] = [];
-    file.on('data', (chunk) => chunks.push(chunk));
-    file.on('end', () => {
-      uploadedFile = {
-        name: info.filename || 'unnamed',
-        data: chunks,
-        mimeType: info.mimeType || 'application/octet-stream',
-      };
+    fileName = info.filename || 'unnamed';
+    mimeType = info.mimeType || 'application/octet-stream';
+
+    file.on('limit', () => {
+      uploadError = `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`;
+      file.resume();
+    });
+
+    file.on('data', (chunk: Buffer) => {
+      fileSize += chunk.length;
+      chunks.push(chunk);
     });
   });
 
@@ -211,29 +232,23 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
   return new Promise<boolean>((resolve) => {
     bb.on('finish', async () => {
       if (uploadError) {
-        sendError(res, 400, uploadError);
+        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
         return resolve(true);
       }
-      if (!uploadedFile) {
+      if (!fileName || chunks.length === 0) {
         sendError(res, 400, 'No file uploaded');
         return resolve(true);
       }
 
-      const fileBuffer = Buffer.concat(uploadedFile.data);
-      const fileSize = fileBuffer.length;
-
-      const maxSize = parseInt(settings.maxFileSize) || 0;
-      if (maxSize > 0 && fileSize > maxSize) {
-        sendError(res, 413, `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`);
-        return resolve(true);
-      }
+      const fileBuffer = Buffer.concat(chunks);
+      chunks.length = 0;
 
       const allowed = (settings.allowedTypes || '*')
         .split(',')
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(uploadedFile.mimeType.toLowerCase())) {
-        sendError(res, 415, `File type ${uploadedFile.mimeType || 'unknown'} is not allowed.`);
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
         return resolve(true);
       }
 
@@ -249,16 +264,16 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
       }
 
       const fileId = generateId();
-      const r2Key = `${fileId}/${uploadedFile.name}`;
+      const r2Key = `${fileId}/${fileName}`;
 
       try {
         const { encrypted, iv, authTag } = encryptFile(fileBuffer);
-        await uploadToProvider(provider, r2Key, encrypted, uploadedFile.mimeType);
+        await uploadToProvider(provider, r2Key, encrypted, mimeType);
         await createFileRecord({
           id: fileId,
-          original_name: uploadedFile.name,
+          original_name: fileName,
           file_size: fileSize,
-          mime_type: uploadedFile.mimeType,
+          mime_type: mimeType,
           r2_key: r2Key,
           provider_id: provider.id,
           encrypted: true,
@@ -266,7 +281,7 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
           enc_auth_tag: authTag,
         });
         await updateProviderBytes(provider.id, encrypted.length);
-        sendJson(res, 200, { id: fileId, name: uploadedFile.name, size: fileSize, encrypted: true });
+        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize, encrypted: true });
       } catch (e: any) {
         sendError(res, 500, `Encrypted upload failed: ${e.message}`);
       }
