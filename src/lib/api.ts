@@ -188,6 +188,36 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ username, password }),
     }) as Promise<{ success: boolean; username: string }>,
+
+  scanStorage: (token: string) =>
+    request('/api/admin/scan/storage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }) as Promise<{
+      buckets: { provider: string; bucket: string; files: { key: string; size: number }[]; error?: string }[];
+      summary: {
+        totalBuckets: number;
+        totalS3Objects: number;
+        totalDbRecords: number;
+        orphanedFiles: number;
+        orphanedKeys: string[];
+        totalStorageBytes: number;
+      };
+    }>,
+
+  scanDatabase: (token: string) =>
+    request('/api/admin/scan/database', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }) as Promise<{
+      records: { fileId: string; name: string; provider: string; exists: boolean; error?: string }[];
+      summary: {
+        totalDbRecords: number;
+        verified: number;
+        missing: number;
+        missingFiles: { id: string; name: string; reason: string }[];
+      };
+    }>,
 };
 
 function uploadRequest(

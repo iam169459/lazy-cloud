@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders } from 'lucide-react';
+import { Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle, Shield, Sliders, Scan } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -9,9 +9,10 @@ import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
 import AdminAdvanced from './AdminAdvanced';
+import AdminScan from './AdminScan';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'advanced';
+type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
@@ -51,6 +52,7 @@ export default function AdminPanel() {
     { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
     { id: 'security', label: 'Credentials', icon: <Shield className="w-4 h-4" /> },
     { id: 'advanced', label: 'Settings', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'scan', label: 'Scan', icon: <Scan className="w-4 h-4" /> },
   ];
 
   return (
@@ -95,6 +97,7 @@ export default function AdminPanel() {
         ) : tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
         : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
         : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
+        : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
         : <AdminAdvanced token={token!} onNotify={notify} />}
       </div>
 

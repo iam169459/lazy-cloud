@@ -2,6 +2,7 @@ import {
   S3Client,
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsCommand,
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -122,4 +123,43 @@ export async function getPresignedDownloadUrl(
     ResponseContentType: contentType,
   });
   return getSignedUrl(client, command, { expiresIn: 3600 });
+}
+
+export interface S3Object {
+  key: string;
+  size: number;
+  lastModified: Date;
+}
+
+export async function listObjects(
+  provider: StorageProvider
+): Promise<S3Object[]> {
+  const client = createS3Client(provider);
+  const objects: S3Object[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsCommand({
+        Bucket: provider.bucket_name,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (response.Contents) {
+      for (const obj of response.Contents) {
+        if (obj.Key) {
+          objects.push({
+            key: obj.Key,
+            size: obj.Size || 0,
+            lastModified: obj.LastModified || new Date(),
+          });
+        }
+      }
+    }
+
+    continuationToken = response.NextContinuationToken;
+  } while (continuationToken);
+
+  return objects;
 }

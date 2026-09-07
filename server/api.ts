@@ -3,7 +3,7 @@ import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptS
 import { PassThrough } from 'stream';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
-import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
+import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
 let dbInitialized = false;
@@ -176,18 +176,24 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
 
       try {
         await uploadToProvider(providerUsed, fileKey, uploadStream, mimeType);
-        await createFileRecord({
-          id: fileId,
-          original_name: fileName,
-          file_size: fileSize,
-          mime_type: mimeType,
-          r2_key: fileKey,
-          provider_id: providerUsed.id,
-        });
-        await updateProviderBytes(providerUsed.id, fileSize);
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            r2_key: fileKey,
+            provider_id: providerUsed.id,
+          });
+          await updateProviderBytes(providerUsed.id, fileSize);
+        } catch (dbErr: any) {
+          await deleteFromProvider(providerUsed, fileKey).catch(() => {});
+          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
+          return resolve(true);
+        }
         sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
       } catch (e: any) {
-        sendError(res, 500, `Upload failed: ${e.message}`);
+        sendError(res, 500, `Upload to storage failed: ${e.message}`);
       }
       resolve(true);
     });
@@ -269,21 +275,27 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
       try {
         const { encrypted, iv, authTag } = encryptFile(fileBuffer);
         await uploadToProvider(provider, r2Key, encrypted, mimeType);
-        await createFileRecord({
-          id: fileId,
-          original_name: fileName,
-          file_size: fileSize,
-          mime_type: mimeType,
-          r2_key: r2Key,
-          provider_id: provider.id,
-          encrypted: true,
-          enc_iv: iv,
-          enc_auth_tag: authTag,
-        });
-        await updateProviderBytes(provider.id, encrypted.length);
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: fileSize,
+            mime_type: mimeType,
+            r2_key: r2Key,
+            provider_id: provider.id,
+            encrypted: true,
+            enc_iv: iv,
+            enc_auth_tag: authTag,
+          });
+          await updateProviderBytes(provider.id, encrypted.length);
+        } catch (dbErr: any) {
+          await deleteFromProvider(provider, r2Key).catch(() => {});
+          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
+          return resolve(true);
+        }
         sendJson(res, 200, { id: fileId, name: fileName, size: fileSize, encrypted: true });
       } catch (e: any) {
-        sendError(res, 500, `Encrypted upload failed: ${e.message}`);
+        sendError(res, 500, `Encrypted upload to storage failed: ${e.message}`);
       }
       resolve(true);
     });
@@ -623,6 +635,79 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
       sendJson(res, 200, { success: true, note: 'Encryption setting updated. Use ENCRYPTION_KEY env var for custom keys.' });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/storage' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const providers = await listProviders();
+      const results: { provider: string; bucket: string; files: { key: string; size: number }[]; error?: string }[] = [];
+      for (const p of providers) {
+        try {
+          const objects = await listObjects(p);
+          results.push({
+            provider: p.provider_name,
+            bucket: p.bucket_name,
+            files: objects.map((o) => ({ key: o.key, size: o.size })),
+          });
+        } catch (e: any) {
+          results.push({
+            provider: p.provider_name,
+            bucket: p.bucket_name,
+            files: [],
+            error: e.message,
+          });
+        }
+      }
+      const allFiles = results.flatMap((r) => r.files);
+      const dbFiles = await listFiles();
+      const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
+      const orphaned = allFiles.filter((f) => !dbKeys.has(f.key));
+      const totalSize = allFiles.reduce((s, f) => s + f.size, 0);
+      sendJson(res, 200, {
+        buckets: results,
+        summary: {
+          totalBuckets: providers.length,
+          totalS3Objects: allFiles.length,
+          totalDbRecords: dbFiles.length,
+          orphanedFiles: orphaned.length,
+          orphanedKeys: orphaned.map((f) => f.key),
+          totalStorageBytes: totalSize,
+        },
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/scan/database' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const dbFiles = await listFiles();
+      const providers = await listProviders();
+      const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const results: { fileId: string; name: string; provider: string; exists: boolean; error?: string }[] = [];
+      for (const f of dbFiles) {
+        const provider = f.provider_id ? providerMap.get(f.provider_id) : null;
+        if (!provider) {
+          results.push({ fileId: f.id, name: f.original_name, provider: 'N/A', exists: false, error: 'Provider not found' });
+          continue;
+        }
+        try {
+          const objects = await listObjects(provider);
+          const found = objects.some((o) => o.key === f.r2_key);
+          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: found });
+        } catch (e: any) {
+          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: false, error: e.message });
+        }
+      }
+      const missing = results.filter((r) => !r.exists);
+      sendJson(res, 200, {
+        records: results,
+        summary: {
+          totalDbRecords: dbFiles.length,
+          verified: results.length - missing.length,
+          missing: missing.length,
+          missingFiles: missing.map((r) => ({ id: r.fileId, name: r.name, reason: r.error || 'Not found in S3' })),
+        },
+      });
       return true;
     }
 
