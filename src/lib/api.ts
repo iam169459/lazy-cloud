@@ -212,6 +212,12 @@ export const api = {
       body: JSON.stringify({ items }),
     }) as Promise<{ fixed: number; failed: number; results: { key: string; success: boolean; error?: string }[] }>,
 
+  autoFix: (token: string) =>
+    request('/api/admin/scan/auto-fix', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }) as Promise<{ fixed: number; failed: number; results: { key: string; success: boolean; error?: string }[]; message?: string }>,
+
   scanDatabase: (token: string) =>
     request('/api/admin/scan/database', {
       method: 'POST',

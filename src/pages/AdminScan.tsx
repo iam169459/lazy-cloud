@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw, Wrench } from 'lucide-react';
+import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw, Wrench, Zap } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -39,6 +39,7 @@ export default function AdminScan({ token, onNotify }: Props) {
   const [storageResult, setStorageResult] = useState<StorageScanResult | null>(null);
   const [dbResult, setDbResult] = useState<DbScanResult | null>(null);
   const [fixing, setFixing] = useState(false);
+  const [autoFixing, setAutoFixing] = useState(false);
   const [fixedKeys, setFixedKeys] = useState<Set<string>>(new Set());
 
   const handleStorageScan = async () => {
@@ -113,6 +114,29 @@ export default function AdminScan({ token, onNotify }: Props) {
     }
   };
 
+  const handleAutoFix = async () => {
+    setAutoFixing(true);
+    sounds.upload();
+    try {
+      const result = await api.autoFix(token);
+      if (result.fixed > 0) {
+        const newFixed = new Set(fixedKeys);
+        for (const r of result.results) {
+          if (r.success) newFixed.add(r.key);
+        }
+        setFixedKeys(newFixed);
+        onNotify('success', `Auto-fixed ${result.fixed} orphaned file(s) — all imported to database`);
+      } else {
+        onNotify('success', 'No orphaned files found — everything is in sync');
+      }
+      handleStorageScan();
+    } catch (e: any) {
+      onNotify('error', `Auto-fix failed: ${e.message}`);
+    } finally {
+      setAutoFixing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="animate-fade-up">
@@ -169,6 +193,29 @@ export default function AdminScan({ token, onNotify }: Props) {
           >
             {scanningDb ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
             {scanningDb ? 'Scanning database...' : 'Scan Database Records'}
+          </button>
+        </div>
+      </div>
+
+      <div className="card rounded-2xl p-5 animate-fade-up" style={{ animationDelay: '120ms' }}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-11 h-11 rounded-xl border flex items-center justify-center" style={{ background: `${colors.success}10`, borderColor: `${colors.success}25`, color: colors.success }}>
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">Auto Fix</h3>
+              <p className="text-xs" style={{ color: colors.textDim }}>Scan all buckets and automatically import any orphaned files into the database</p>
+            </div>
+          </div>
+          <button
+            onClick={handleAutoFix}
+            disabled={autoFixing}
+            className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm btn min-w-[180px]"
+            style={{ background: `linear-gradient(135deg, ${colors.success}, #059669)`, color: '#fff' }}
+          >
+            {autoFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {autoFixing ? 'Scanning & fixing...' : 'Auto Fix All'}
           </button>
         </div>
       </div>

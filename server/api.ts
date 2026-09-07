@@ -729,6 +729,57 @@ export async function handleApiRequest(
       return true;
     }
 
+    if (path === '/api/admin/scan/auto-fix' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const providers = await listProviders();
+      const dbFiles = await listFiles();
+      const dbKeys = new Set(dbFiles.map((f) => f.r2_key));
+      const allS3: { key: string; size: number; provider_id: string }[] = [];
+      for (const p of providers) {
+        try {
+          const objects = await listObjects(p);
+          for (const o of objects) {
+            allS3.push({ key: o.key, size: o.size, provider_id: p.id });
+          }
+        } catch {}
+      }
+      const orphaned = allS3.filter((f) => !dbKeys.has(f.key));
+      if (orphaned.length === 0) {
+        sendJson(res, 200, { fixed: 0, failed: 0, results: [], message: 'No orphaned files found' });
+        return true;
+      }
+      const results: { key: string; success: boolean; error?: string }[] = [];
+      for (const item of orphaned) {
+        const parts = item.key.split('/');
+        const fileId = parts[0] || generateId();
+        const fileName = parts.slice(1).join('/') || item.key;
+        try {
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: item.size,
+            mime_type: 'application/octet-stream',
+            r2_key: item.key,
+            provider_id: item.provider_id,
+          });
+          if (item.size > 0) {
+            await updateProviderBytes(item.provider_id, item.size).catch(() => {});
+          }
+          results.push({ key: item.key, success: true });
+        } catch (e: any) {
+          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+            results.push({ key: item.key, success: true });
+          } else {
+            results.push({ key: item.key, success: false, error: e.message });
+          }
+        }
+      }
+      const fixed = results.filter((r) => r.success).length;
+      const failed = results.filter((r) => !r.success).length;
+      sendJson(res, 200, { fixed, failed, results });
+      return true;
+    }
+
     if (path === '/api/admin/scan/fix-orphaned' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
