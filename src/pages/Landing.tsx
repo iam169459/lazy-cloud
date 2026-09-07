@@ -1,10 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layers, Clock, Globe, Zap } from 'lucide-react';
+import {
+  ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layers,
+  Clock, Globe, Zap, Check, ChevronDown, Menu, X, Copy, CheckCircle, HardDrive,
+  Users, Cpu, ArrowUpRight
+} from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
 import LandingRocket from '@/components/LandingRocket';
+
+const faqs = [
+  { q: 'How does file sharing work?', a: 'Upload a file, get a unique link. Anyone with the link can download. No accounts needed on the recipient side.' },
+  { q: 'What storage providers are supported?', a: 'Backblaze B2, Cloudflare R2, AWS S3, Google Cloud Storage, IDrive e2, and MinIO — all S3-compatible.' },
+  { q: 'Is there a file size limit?', a: 'No hard limit. Files are streamed directly to your cloud buckets. Practical limits depend on your internet connection.' },
+  { q: 'How does multi-bucket routing work?', a: 'LazyDrop automatically routes files to the bucket with the most free space. Add multiple providers for unlimited pooled storage.' },
+  { q: 'Are files encrypted?', a: 'Yes. All files are encrypted at rest in your cloud buckets, and transferred over HTTPS. LazyDrop never sees your files in plain text.' },
+];
 
 export default function Landing() {
   const { colors } = useTheme();
@@ -16,16 +28,27 @@ export default function Landing() {
   const name = settings?.siteName || 'LazyDrop';
 
   return (
-    <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
-      {/* Nav */}
-      <nav className="sticky top-0 z-30 backdrop-blur-md border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
+    <div className="min-h-screen" style={{ color: colors.text }}>
+      {/* Announcement Bar */}
+      <div className="text-xs text-center py-2 font-medium" style={{ background: `${colors.primary}10`, borderBottom: `1px solid ${colors.border}` }}>
+        Open source and free forever — no accounts, no tracking, no limits.
+      </div>
+
+      {/* Site Header */}
+      <nav className="sticky top-0 z-30" style={{ background: `${colors.bg}cc`, borderBottom: `1px solid ${colors.border}`, backdropFilter: 'blur(16px)' }}>
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-3.5">
           <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-gradient">{name}</span>
+            <span className="text-lg font-semibold tracking-tight">{name}</span>
           </Link>
+          <div className="hidden md:flex items-center gap-6">
+            <a href="#features" className="text-sm font-medium" style={{ color: colors.textMuted }}>Features</a>
+            <a href="#how-it-works" className="text-sm font-medium" style={{ color: colors.textMuted }}>How it works</a>
+            <a href="#providers" className="text-sm font-medium" style={{ color: colors.textMuted }}>Providers</a>
+            <a href="#faq" className="text-sm font-medium" style={{ color: colors.textMuted }}>FAQ</a>
+          </div>
           <Link to="/admin" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
             <Lock className="w-3.5 h-3.5" />
             Admin
@@ -34,42 +57,40 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-3xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20">
+      <section className="max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20">
         <div className="badge mx-auto mb-6 animate-fade-up">Multi-provider storage</div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-5 animate-fade-up delay-100">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100">
           Fast, private,
           <br />
           <span className="text-gradient">link-only file sharing</span>
         </h1>
-        <p className="text-base sm:text-lg max-w-lg mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
+        <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
           Upload once, share with a link. Files stored across multiple cloud providers for unlimited capacity.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
           <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
-            Go to Admin Panel
+            Get started
             <ArrowRight className="w-4 h-4" />
           </Link>
-          <a href="#features" className="btn btn-secondary">Learn more</a>
+          <a href="#features" className="btn btn-secondary">See features</a>
         </div>
+        <p className="text-xs mt-4 font-mono animate-fade-up delay-400" style={{ color: colors.textDim }}>
+          No signup required — works with any S3-compatible bucket
+        </p>
       </section>
 
-      {/* Quick Upload */}
-      {settings?.enablePublicUpload && (
-        <section className="max-w-xl mx-auto px-5 pb-14">
-          <QuickUpload />
-        </section>
-      )}
-
-      {/* Rocket */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
-        <div className="relative h-64 sm:h-72 rounded-xl overflow-hidden card">
+      {/* Product Tour — Rocket Animation */}
+      <section className="max-w-3xl mx-auto px-5 pb-16">
+        <div className="relative h-72 sm:h-80 rounded-xl overflow-hidden card">
           <LandingRocket />
         </div>
-        <p className="text-center text-xs mt-3" style={{ color: colors.textDim }}>Secure delivery cycle — files launch, transfer, and return</p>
+        <p className="text-center text-xs mt-3" style={{ color: colors.textDim }}>
+          Secure delivery cycle — files launch, transfer, and return
+        </p>
       </section>
 
-      {/* Stats */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
+      {/* Social Proof / Stats */}
+      <section className="max-w-4xl mx-auto px-5 pb-16">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Stat icon={<Globe className="w-4 h-4" />} value="6+" label="Providers" />
           <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
@@ -78,25 +99,156 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="max-w-4xl mx-auto px-5 pb-16">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Feature icon={<Database className="w-4 h-4" />} title="Unlimited storage" desc="Multiple S3 buckets pooled into one virtual drive." />
-          <Feature icon={<Shield className="w-4 h-4" />} title="Private by design" desc="No public directory. Only accessible via unique link." />
-          <Feature icon={<Upload className="w-4 h-4" />} title="Drag & drop" desc="Simply drag files onto the upload zone. Done." />
-          <Feature icon={<Download className="w-4 h-4" />} title="Instant downloads" desc="Direct download link. No signup, no waiting." />
-          <Feature icon={<Smartphone className="w-4 h-4" />} title="Mobile friendly" desc="Upload and download from any device." />
-          <Feature icon={<Layers className="w-4 h-4" />} title="Multi-bucket routing" desc="Auto-route to the bucket with most free space." />
-          <Feature icon={<Clock className="w-4 h-4" />} title="Auto-expire" desc="Files auto-delete after configurable days." />
-          <Feature icon={<Globe className="w-4 h-4" />} title="6 cloud providers" desc="Backblaze, R2, AWS, GCP, IDrive, MinIO." />
-          <Feature icon={<Zap className="w-4 h-4" />} title="Lightning fast" desc="Files served via presigned links. No bottleneck." />
+      {/* Features — Primary Feature Section */}
+      <section id="features" className="max-w-5xl mx-auto px-5 pb-20">
+        <SectionHeader
+          eyebrow="Features"
+          title="Everything you need, nothing you don't"
+          desc="Simple file sharing without the bloat. Connect your own cloud, share files via link, done."
+        />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-10">
+          <Feature
+            icon={<Database className="w-4 h-4" />}
+            title="Unlimited storage"
+            desc="Multiple S3 buckets pooled into one virtual drive. Add as many as you need."
+          />
+          <Feature
+            icon={<Shield className="w-4 h-4" />}
+            title="Private by design"
+            desc="No public directory. Files only accessible via unique, unguessable links."
+          />
+          <Feature
+            icon={<Upload className="w-4 h-4" />}
+            title="Drag & drop"
+            desc="Drag files onto the upload zone or click to browse. Done in one step."
+          />
+          <Feature
+            icon={<Download className="w-4 h-4" />}
+            title="Instant downloads"
+            desc="Direct download link. No signup, no waiting, no captchas."
+          />
+          <Feature
+            icon={<Smartphone className="w-4 h-4" />}
+            title="Mobile friendly"
+            desc="Upload and download from any device. Works in any modern browser."
+          />
+          <Feature
+            icon={<Layers className="w-4 h-4" />}
+            title="Multi-bucket routing"
+            desc="Auto-route files to the bucket with the most free space. No manual management."
+          />
+          <Feature
+            icon={<Clock className="w-4 h-4" />}
+            title="Auto-expire"
+            desc="Files auto-delete after configurable TTL. Set it once, forget about it."
+          />
+          <Feature
+            icon={<HardDrive className="w-4 h-4" />}
+            title="Provider-aware sizing"
+            desc="Automatic capacity detection. Know exactly how much space you have left."
+          />
+          <Feature
+            icon={<Zap className="w-4 h-4" />}
+            title="Lightning fast"
+            desc="Files served via presigned links. No bottleneck on the LazyDrop server."
+          />
+        </div>
+      </section>
+
+      {/* How It Works — Product Tour Section */}
+      <section id="how-it-works" className="max-w-4xl mx-auto px-5 pb-20">
+        <SectionHeader
+          eyebrow="How it works"
+          title="Three steps to share a file"
+          desc="Connect a bucket, upload a file, share the link. That's it."
+        />
+        <div className="grid sm:grid-cols-3 gap-6 mt-10">
+          <Step
+            number="01"
+            title="Connect a bucket"
+            desc="Add your S3-compatible storage provider with just a bucket name, access key, and secret key."
+          />
+          <Step
+            number="02"
+            title="Upload a file"
+            desc="Drag and drop or click to upload. Files are encrypted and stored directly in your bucket."
+          />
+          <Step
+            number="03"
+            title="Share the link"
+            desc="Copy the generated download link and send it to anyone. They can download instantly."
+          />
+        </div>
+      </section>
+
+      {/* Supported Providers — Ecosystem Section */}
+      <section id="providers" className="max-w-4xl mx-auto px-5 pb-20">
+        <SectionHeader
+          eyebrow="Providers"
+          title="Works with your cloud"
+          desc="Any S3-compatible provider works. Built-in support for 6 major cloud storage providers."
+        />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-10">
+          <ProviderCard name="Backblaze B2" region="us-west-004" />
+          <ProviderCard name="Cloudflare R2" region="auto" />
+          <ProviderCard name="AWS S3" region="us-east-1" />
+          <ProviderCard name="Google Cloud" region="us-central1" />
+          <ProviderCard name="IDrive e2" region="us-east-1" />
+          <ProviderCard name="MinIO" region="self-hosted" />
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="max-w-2xl mx-auto px-5 pb-20">
+        <SectionHeader
+          eyebrow="FAQ"
+          title="Frequently asked questions"
+        />
+        <div className="mt-10 flex flex-col gap-2">
+          {faqs.map((f, i) => (
+            <FAQItem key={i} question={f.q} answer={f.a} />
+          ))}
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="max-w-3xl mx-auto px-5 pb-20">
+        <div
+          className="card p-10 sm:p-14 text-center rounded-xl"
+          style={{ background: `${colors.primary}08`, border: `1px solid ${colors.primary}20` }}
+        >
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+            Ready to share your first file?
+          </h2>
+          <p className="text-sm max-w-md mx-auto mb-6" style={{ color: colors.textMuted }}>
+            Connect a bucket in under a minute. No accounts, no limits, no tracking.
+          </p>
+          <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
+            Open Admin Panel
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8 text-center" style={{ borderColor: colors.border }}>
+      <footer className="py-8 text-center" style={{ borderTop: `1px solid ${colors.border}` }}>
         <p className="text-sm" style={{ color: colors.textDim }}>{name} — link-only file sharing</p>
       </footer>
+    </div>
+  );
+}
+
+/* ──────────────────── Sub-components ──────────────────── */
+
+function SectionHeader({ eyebrow, title, desc }: { eyebrow: string; title: string; desc?: string }) {
+  const { colors } = useTheme();
+  return (
+    <div className="text-center">
+      <span className="text-[10px] font-mono uppercase tracking-wider mb-2 block" style={{ color: colors.primary }}>
+        {eyebrow}
+      </span>
+      <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">{title}</h2>
+      {desc && <p className="text-sm max-w-md mx-auto" style={{ color: colors.textMuted }}>{desc}</p>}
     </div>
   );
 }
@@ -127,82 +279,61 @@ function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; 
   );
 }
 
-function QuickUpload() {
+function Step({ number, title, desc }: { number: string; title: string; desc: string }) {
   const { colors } = useTheme();
-  const [dragOver, setDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [fileId, setFileId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono"
+        style={{ background: `${colors.primary}12`, color: colors.primary }}
+      >
+        {number}
+      </div>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-xs leading-relaxed" style={{ color: colors.textMuted }}>{desc}</p>
+    </div>
+  );
+}
 
-  const handleFiles = useCallback(async (list: FileList) => {
-    if (!list.length || uploading) return;
-    setUploading(true); setProgress(0); setError(null); setFileId(null);
-    sounds.upload();
-    try {
-      const res = await api.uploadPublic(list[0], (p) => setProgress(p));
-      sounds.store(); setFileId(res.id);
-    } catch (e: unknown) {
-      sounds.error(); setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setUploading(false); if (inputRef.current) inputRef.current.value = '';
-    }
-  }, [uploading]);
+function ProviderCard({ name, region }: { name: string; region: string }) {
+  const { colors } = useTheme();
+  return (
+    <div className="card p-4 flex items-center gap-3">
+      <div
+        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+        style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}
+      >
+        <Cloud className="w-4 h-4" style={{ color: colors.textMuted }} />
+      </div>
+      <div>
+        <div className="text-sm font-medium">{name}</div>
+        <div className="text-[11px] font-mono" style={{ color: colors.textDim }}>{region}</div>
+      </div>
+    </div>
+  );
+}
 
-  function copyLink() {
-    if (!fileId) return;
-    navigator.clipboard.writeText(`${window.location.origin}/file/${fileId}`);
-    sounds.copy(); setCopied(true); setTimeout(() => setCopied(false), 2000);
-  }
-
-  const link = fileId ? `${window.location.origin}/file/${fileId}` : '';
-
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
   return (
     <div
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-      onClick={() => !uploading && inputRef.current?.click()}
-      className="card p-6 text-center cursor-pointer transition-all"
-      style={{ borderColor: dragOver ? colors.primary : undefined }}
+      className="card overflow-hidden cursor-pointer transition-all"
+      onClick={() => { setOpen(!open); sounds.click(); }}
     >
-      <input ref={inputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-      {uploading ? (
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: colors.primary, borderTopColor: 'transparent' }} />
-          <div className="w-full max-w-xs">
-            <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}>
-              <span style={{ color: colors.primary }}>UPLOADING</span><span>{progress}%</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: colors.cardBg }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: colors.gradient }} />
-            </div>
-          </div>
-        </div>
-      ) : fileId ? (
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: `${colors.success}15`, color: colors.success }}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <p className="text-sm font-medium">File uploaded</p>
-          <div className="flex items-center gap-2 w-full max-w-sm">
-            <input readOnly value={link} className="input text-xs font-mono" onFocus={(e) => e.target.select()} />
-            <button onClick={(e) => { e.stopPropagation(); copyLink(); }} className="btn btn-primary text-xs px-4 flex-shrink-0" style={{ minHeight: 44 }}>
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <button onClick={() => { setFileId(null); sounds.click(); }} className="text-xs underline" style={{ color: colors.textDim }}>Upload another</button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2">
-          <Upload className="w-6 h-6" style={{ color: colors.primary }} />
-          <div>
-            <p className="text-sm font-medium">Drop a file or click to upload</p>
-            <p className="text-xs mt-0.5 font-mono" style={{ color: colors.textDim }}>PUBLIC — no account needed</p>
-          </div>
-          {error && <p className="text-xs" style={{ color: colors.danger }}>{error}</p>}
+      <div className="flex items-center justify-between px-5 py-4">
+        <span className="text-sm font-medium">{question}</span>
+        <ChevronDown
+          className="w-4 h-4 shrink-0 transition-transform duration-200"
+          style={{
+            color: colors.textMuted,
+            transform: open ? 'rotate(180deg)' : 'rotate(0)',
+          }}
+        />
+      </div>
+      {open && (
+        <div className="px-5 pb-4 text-sm leading-relaxed" style={{ color: colors.textMuted }}>
+          {answer}
         </div>
       )}
     </div>
