@@ -1,5 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
   * { box-sizing: border-box; }
@@ -25,7 +27,7 @@
   color: var(--text, #ffffff);
 }
 
-@layer utilities {
+@layer components {
   .card {
     background: var(--card-bg, rgba(255,255,255,0.02));
     border: 1px solid var(--card-border, rgba(255,255,255,0.06));
@@ -39,11 +41,18 @@
   }
 
   .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     border: 1px solid var(--border, rgba(255,255,255,0.08));
     border-radius: 12px;
+    padding: 0.625rem 1.25rem;
     transition: all 0.18s ease;
     font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
     cursor: pointer;
+    text-decoration: none;
   }
   .btn:active { transform: scale(0.97); }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -125,13 +134,15 @@
   }
 
   .badge {
+    display: inline-block;
     font-size: 0.7rem;
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 999px;
     background: var(--primary-glow, rgba(52,211,153,0.1));
     color: var(--primary, #34d399);
     border: 1px solid var(--border, rgba(255,255,255,0.1));
     font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .divider {
@@ -147,7 +158,9 @@
       linear-gradient(90deg, var(--grid-line, rgba(52,211,153,0.03)) 1px, transparent 1px);
     background-size: 60px 60px;
   }
+}
 
+@layer utilities {
   .animate-fade-up {
     animation: fadeUp 0.5s ease both;
   }
@@ -155,34 +168,37 @@
   .animate-fade-up.delay-200 { animation-delay: 200ms; }
   .animate-fade-up.delay-300 { animation-delay: 300ms; }
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
   .animate-scale-in {
     animation: scaleIn 0.15s ease both;
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
   }
 
   .animate-glow {
     animation: glow 4s ease-in-out infinite alternate;
   }
-  @keyframes glow {
-    from { box-shadow: 0 0 20px var(--primary-glow, rgba(52,211,153,0.15)); }
-    to { box-shadow: 0 0 40px var(--primary-glow, rgba(52,211,153,0.25)); }
-  }
 
   .animate-spin-slow {
-    animation: spin 3s linear infinite;
+    animation: spinSlow 3s linear infinite;
   }
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 20px var(--primary-glow, rgba(52,211,153,0.15)); }
+  to { box-shadow: 0 0 40px var(--primary-glow, rgba(52,211,153,0.25)); }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 640px) {
