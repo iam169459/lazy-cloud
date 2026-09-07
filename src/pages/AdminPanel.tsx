@@ -85,8 +85,8 @@ export default function AdminPanel() {
       <header className="sticky top-0 z-20 backdrop-blur-xl border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-left">
-            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
-              <Zap className="w-4 h-4" style={{ color: colors.bg }} strokeWidth={2.5} />
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center overflow-hidden logo-hover-spin" style={{ background: colors.gradient, boxShadow: `0 0 12px ${colors.primaryGlow}` }}>
+              <img src="/logo.svg" alt="LazyDrop" className="w-6 h-6 sm:w-7 sm:h-7 drop-shadow-lg" style={{ imageRendering: 'crisp-edges' }} />
             </div>
             <div className="flex items-center gap-2">
               <span className="font-bold tracking-tight text-gradient-sci text-sm sm:text-base">LazyDrop</span>

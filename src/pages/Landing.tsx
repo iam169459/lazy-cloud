@@ -60,8 +60,8 @@ export default function Landing() {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-4 sm:px-6 md:px-12 py-4 sm:py-6" style={{ transform: `translateZ(${40 + heroParallax * 0.2}px)` }}>
         <div className="flex items-center gap-2 sm:gap-3 animate-fade-in-left">
-          <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center animate-glow-pulse float-3d" style={{ background: colors.gradient }}>
-            <Zap className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: colors.bg }} strokeWidth={2.5} />
+          <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center animate-glow-pulse float-3d overflow-hidden logo-hover-spin" style={{ background: colors.gradient }}>
+            <img src="/logo.svg" alt="LazyDrop" className="w-7 h-7 sm:w-8 sm:h-8 drop-shadow-lg" style={{ imageRendering: 'crisp-edges' }} />
           </div>
           <div>
             <span className="text-lg sm:text-xl font-bold tracking-tight text-gradient-sci">{siteName}</span>
