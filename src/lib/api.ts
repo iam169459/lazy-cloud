@@ -71,6 +71,9 @@ export const api = {
   getDownloadUrl: (id: string) =>
     request(`/api/download?id=${encodeURIComponent(id)}`) as Promise<{ url: string }>,
 
+  getEncryptedDownloadUrl: (id: string) =>
+    request(`/api/download/encrypted?id=${encodeURIComponent(id)}`) as Promise<{ url: string }>,
+
   adminLogin: (username: string, password: string) =>
     request('/api/admin/login', {
       method: 'POST',
@@ -85,6 +88,9 @@ export const api = {
 
   uploadFile: (file: File, token: string, onProgress?: (pct: number) => void) =>
     uploadRequest(file, '/api/admin/upload', token, onProgress),
+
+  encryptFile: (file: File, token: string, onProgress?: (pct: number) => void) =>
+    uploadRequest(file, '/api/admin/upload/encrypted', token, onProgress),
 
   uploadPublic: (file: File, onProgress?: (pct: number) => void) =>
     uploadRequest(file, '/api/upload', null, onProgress),
@@ -128,6 +134,39 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ id }),
+    }) as Promise<{ success: boolean }>,
+
+  getSecurityStatus: (token: string) =>
+    request('/api/admin/security/status', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ encryption: { enabled: boolean; usingDefault: boolean }; fileTTL: { enabled: boolean; defaultDays: number }; sessionTimeout: number; ipWhitelist: string[] }>,
+
+  updateFileTTL: (settings: { enabled: boolean; defaultDays: number }, token: string) =>
+    request('/api/admin/security/file-ttl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(settings),
+    }) as Promise<{ success: boolean }>,
+
+  updateSessionTimeout: (minutes: number, token: string) =>
+    request('/api/admin/security/session-timeout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ minutes }),
+    }) as Promise<{ success: boolean }>,
+
+  updateIpWhitelist: (ips: string[], token: string) =>
+    request('/api/admin/security/ip-whitelist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ips }),
+    }) as Promise<{ success: boolean }>,
+
+  toggleEncryption: (enabled: boolean, token: string) =>
+    request('/api/admin/security/encryption', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ enabled }),
     }) as Promise<{ success: boolean }>,
 
   toggleProvider: (id: string, token: string) =>

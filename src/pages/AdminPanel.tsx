@@ -10,10 +10,11 @@ import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/li
 import AdminDashboard from './AdminDashboard';
 import AdminStorage from './AdminStorage';
 import AdminSecurity from './AdminSecurity';
+import AdminSecurityFeatures from './AdminSecurityFeatures';
 import AdminAdvanced from './AdminAdvanced';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'advanced';
+type Tab = 'dashboard' | 'storage' | 'security' | 'security-features' | 'advanced';
 
 export default function AdminPanel() {
   const { token, logout } = useAuth();
@@ -74,7 +75,8 @@ export default function AdminPanel() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'storage', label: 'Storage', icon: <Cloud className="w-4 h-4" /> },
-    { id: 'security', label: 'Security', icon: <Shield className="w-4 h-4" /> },
+    { id: 'security', label: 'Credentials', icon: <Shield className="w-4 h-4" /> },
+    { id: 'security-features', label: 'Security+Time', icon: <Lock className="w-4 h-4" /> },
     { id: 'advanced', label: 'Advanced', icon: <Sliders className="w-4 h-4" /> },
   ];
 
@@ -149,8 +151,10 @@ export default function AdminPanel() {
           <AdminDashboard files={files} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
         ) : tab === 'storage' ? (
           <AdminStorage providers={providers} token={token!} onRefresh={refreshAll} onNotify={showNotification} />
-        ) : tab === 'security' ? (
+        )        : tab === 'security' ? (
           <AdminSecurity token={token!} onNotify={showNotification} onCredentialsChanged={() => { logout(); navigate('/admin/login'); }} />
+        ) : tab === 'security-features' ? (
+          <AdminSecurityFeatures token={token!} onNotify={showNotification} />
         ) : (
           <AdminAdvanced token={token!} onNotify={showNotification} />
         )}

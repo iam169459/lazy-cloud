@@ -70,6 +70,30 @@ export async function deleteFromProvider(
   );
 }
 
+export async function downloadFromProvider(
+  provider: StorageProvider,
+  key: string
+): Promise<Buffer | null> {
+  const client = createS3Client(provider);
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: provider.bucket_name,
+        Key: key,
+      })
+    );
+    const body = response.Body;
+    if (!body) return null;
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  } catch {
+    return null;
+  }
+}
+
 export async function getPresignedDownloadUrl(
   provider: StorageProvider,
   key: string,

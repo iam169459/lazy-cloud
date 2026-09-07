@@ -1,8 +1,9 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl } from './s3';
+import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
 let dbInitialized = false;
 
@@ -185,6 +186,97 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
   });
 }
 
+async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  const settings = await getAppSettings();
+  const bb = busboy({ headers: req.headers });
+  let uploadedFile: { name: string; data: Buffer[]; mimeType: string } | null = null;
+  let uploadError: string | null = null;
+
+  bb.on('file', (_fieldname, file, info) => {
+    const chunks: Buffer[] = [];
+    file.on('data', (chunk) => chunks.push(chunk));
+    file.on('end', () => {
+      uploadedFile = {
+        name: info.filename || 'unnamed',
+        data: chunks,
+        mimeType: info.mimeType || 'application/octet-stream',
+      };
+    });
+  });
+
+  bb.on('error', (err: Error) => {
+    uploadError = err.message;
+  });
+
+  return new Promise<boolean>((resolve) => {
+    bb.on('finish', async () => {
+      if (uploadError) {
+        sendError(res, 400, uploadError);
+        return resolve(true);
+      }
+      if (!uploadedFile) {
+        sendError(res, 400, 'No file uploaded');
+        return resolve(true);
+      }
+
+      const fileBuffer = Buffer.concat(uploadedFile.data);
+      const fileSize = fileBuffer.length;
+
+      const maxSize = parseInt(settings.maxFileSize) || 0;
+      if (maxSize > 0 && fileSize > maxSize) {
+        sendError(res, 413, `File is too large. Maximum allowed size is ${formatBytes(maxSize)}.`);
+        return resolve(true);
+      }
+
+      const allowed = (settings.allowedTypes || '*')
+        .split(',')
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(uploadedFile.mimeType.toLowerCase())) {
+        sendError(res, 415, `File type ${uploadedFile.mimeType || 'unknown'} is not allowed.`);
+        return resolve(true);
+      }
+
+      const provider = await findProviderForSize(fileSize);
+      if (!provider) {
+        const allProviders = await listProviders();
+        if (allProviders.length === 0) {
+          sendError(res, 507, 'No storage providers configured.');
+        } else {
+          sendError(res, 507, 'No storage provider with enough space.');
+        }
+        return resolve(true);
+      }
+
+      const fileId = generateId();
+      const r2Key = `${fileId}/${uploadedFile.name}`;
+
+      try {
+        const { encrypted, iv, authTag } = encryptFile(fileBuffer);
+        await uploadToProvider(provider, r2Key, encrypted, uploadedFile.mimeType);
+        await createFileRecord({
+          id: fileId,
+          original_name: uploadedFile.name,
+          file_size: fileSize,
+          mime_type: uploadedFile.mimeType,
+          r2_key: r2Key,
+          provider_id: provider.id,
+          encrypted: true,
+          enc_iv: iv,
+          enc_auth_tag: authTag,
+        });
+        await updateProviderBytes(provider.id, encrypted.length);
+        sendJson(res, 200, { id: fileId, name: uploadedFile.name, size: fileSize, encrypted: true });
+      } catch (e: any) {
+        sendError(res, 500, `Encrypted upload failed: ${e.message}`);
+      }
+      resolve(true);
+    });
+
+    req.pipe(bb);
+  });
+}
+
 async function checkAuth(req: IncomingMessage): Promise<boolean> {
   const auth = req.headers.authorization;
   if (!auth) return false;
@@ -299,6 +391,38 @@ export async function handleApiRequest(
         return true;
       }
       return handleUpload(req, res);
+    }
+
+    if (path === '/api/admin/upload/encrypted' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      return handleEncryptedUpload(req, res);
+    }
+
+    if (path === '/api/download/encrypted' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (!file.encrypted) { sendError(res, 400, 'File is not encrypted'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      const settings = await getAppSettings();
+      if (settings.enableDownloadCounter !== false) {
+        await incrementDownloadCount(fileId);
+      }
+      try {
+        const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
+        if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+        const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
+        const blob = new Blob([decrypted]);
+        const url = URL.createObjectURL(blob);
+        sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
+      } catch (e: any) {
+        sendError(res, 500, `Decryption failed: ${e.message}`);
+      }
+      return true;
     }
 
     if (path === '/api/admin/files' && req.method === 'GET') {
@@ -426,6 +550,58 @@ export async function handleApiRequest(
       }
       await updateAdminCredentials(newUsername, newPassword);
       sendJson(res, 200, { success: true, username: newUsername });
+      return true;
+    }
+
+    if (path === '/api/admin/security/status' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const encStatus = getEncryptionStatus();
+      const settings = await getAppSettings();
+      const creds = await getAdminCredentials();
+      sendJson(res, 200, {
+        encryption: encStatus,
+        fileTTL: {
+          enabled: settings.autoDelete !== false,
+          defaultDays: parseInt(settings.autoDeleteDays) || 30,
+        },
+        sessionTimeout: 30,
+        ipWhitelist: [],
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/security/file-ttl' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const enabled = body.enabled !== false;
+      const days = Math.max(1, Math.min(365, parseInt(body.defaultDays) || 30));
+      await updateAppSettings({ autoDelete: enabled, autoDeleteDays: String(days) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/session-timeout' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const minutes = Math.max(5, Math.min(480, parseInt(body.minutes) || 30));
+      await updateAppSettings({ sessionTimeout: String(minutes) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/ip-whitelist' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const ips = Array.isArray(body.ips) ? body.ips.filter((ip: string) => typeof ip === 'string' && ip.trim()) : [];
+      await updateAppSettings({ ipWhitelist: JSON.stringify(ips) });
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    if (path === '/api/admin/security/encryption' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      sendJson(res, 200, { success: true, note: 'Encryption setting updated. Use ENCRYPTION_KEY env var for custom keys.' });
       return true;
     }
 

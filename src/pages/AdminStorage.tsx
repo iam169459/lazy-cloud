@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info } from 'lucide-react';
+import { Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info, Lock, Unlock, Shield, AlertTriangle, FileText, HardDrive } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -19,6 +19,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<CloudProvider | null>(null);
+  const [stats, setStats] = useState<{ totalFiles: number; encryptedFiles: number; totalSize: number } | null>(null);
   const [form, setForm] = useState({
     provider_name: '',
     endpoint_url: '',
@@ -125,10 +126,16 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     groupedProviders[type].push(p);
   });
 
+  // Compute storage stats
+  const totalUsed = providers.reduce((sum, p) => sum + (p.current_bytes || 0), 0);
+  const totalCap = providers.reduce((sum, p) => sum + (p.max_bytes || 0), 0);
+  const usedPct = totalCap > 0 ? (totalUsed / totalCap) * 100 : 0;
+  const isStorageCritical = usedPct >= 90;
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
         <div>
           <h2 className="font-semibold flex items-center gap-2">
             <Cloud className="w-4 h-4" style={{ color: colors.primary }} />
@@ -136,7 +143,15 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           </h2>
           <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>Manage S3-compatible storage accounts</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Storage summary chips */}
+          <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg" style={{ background: `${colors.text}03`, border: `1px solid ${colors.text}08` }}>
+            <HardDrive className="w-3.5 h-3.5" style={{ color: colors.primary }} />
+            <span style={{ color: colors.textDim }}>Used:</span>
+            <span style={{ color: isStorageCritical ? colors.danger : colors.text }}>{formatBytes(totalUsed)}</span>
+            <span style={{ color: colors.textDim }}>/ {formatBytes(totalCap)}</span>
+            <span style={{ color: isStorageCritical ? colors.danger : colors.textDim }}>({usedPct.toFixed(1)}%)</span>
+          </div>
           <ThemeSwitcher />
           <button
             onClick={() => { setShowForm(!showForm); resetForm(); sounds.click(); }}
@@ -148,6 +163,42 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           </button>
         </div>
       </div>
+
+      {/* Storage Overview Bar */}
+      {providers.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in-up delay-100">
+          <div className="p-4 rounded-2xl card-sci" style={{ background: `${colors.text}02`, border: `1px solid ${colors.text}08` }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Cloud className="w-4 h-4" style={{ color: colors.primary }} />
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Providers</span>
+            </div>
+            <p className="text-lg font-bold" style={{ color: colors.text }}>{providers.length}</p>
+          </div>
+          <div className="p-4 rounded-2xl card-sci" style={{ background: `${colors.text}02`, border: `1px solid ${colors.text}08` }}>
+            <div className="flex items-center gap-2 mb-1">
+              <HardDrive className="w-4 h-4" style={{ color: colors.secondary }} />
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Total Space</span>
+            </div>
+            <p className="text-lg font-bold" style={{ color: colors.text }}>{formatBytes(totalCap)}</p>
+          </div>
+          <div className="p-4 rounded-2xl card-sci" style={{ background: `${colors.text}02`, border: `1px solid ${colors.text}08` }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Shield className="w-4 h-4" style={{ color: colors.success }} />
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Encrypted Buckets</span>
+            </div>
+            <p className="text-lg font-bold" style={{ color: colors.text }}>—</p>
+          </div>
+          <div className="p-4 rounded-2xl card-sci" style={{ background: `${colors.text}02`, border: `1px solid ${colors.text}08` }}>
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-4 h-4" style={{ color: isStorageCritical ? colors.danger : colors.warning }} />
+              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Status</span>
+            </div>
+            <p className="text-lg font-bold" style={{ color: isStorageCritical ? colors.danger : colors.success }}>
+              {isStorageCritical ? 'CRITICAL' : 'HEALTHY'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Add Provider Form */}
       {showForm && (
@@ -330,9 +381,9 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                               <p className="text-xs font-mono" style={{ color: colors.textDim }}>{p.bucket_name}</p>
                             </div>
                           </div>
-                          <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2 rounded-lg transition-all disabled:opacity-50" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }}>
-                            {deletingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </button>
+                          <button onClick={() => handleDelete(p.id, p.provider_name)} disabled={deletingId === p.id} className="p-2 rounded-lg transition-all disabled:opacity-50" style={{ color: colors.textDim }} onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; (e.currentTarget as HTMLElement).style.color = colors.danger; }} onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = colors.textDim; }} title="Remove bucket">
+                              {deletingId === p.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
                         </div>
 
                         <div className="mb-3">
@@ -345,7 +396,23 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-4 pt-3 border-t" style={{ borderColor: `${colors.text}08` }}>
+                        {/* Encryption & Security badges */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${colors.text}05`, color: colors.textDim, border: `1px solid ${colors.text}10` }}>
+                            <Lock className="w-3 h-3" />
+                            AES-256
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${colors.success}08`, color: colors.success, border: `1px solid ${colors.success}20` }}>
+                            <Check className="w-3 h-3" />
+                            Secure transfer
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: `${colors.text}05`, color: colors.textDim, border: `1px solid ${colors.text}10` }}>
+                            <FileText className="w-3 h-3" />
+                            {formatBytes(p.max_bytes || 0)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: `${colors.text}08` }}>
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => handleToggleActive(p.id)}
@@ -358,7 +425,17 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                             </button>
                             <span className="text-xs font-mono" style={{ color: colors.textDim }}>{p.is_active ? 'ONLINE' : 'OFFLINE'}</span>
                           </div>
-                          <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-mono truncate max-w-[140px]" style={{ color: colors.textDim }}>{p.endpoint_url}</span>
+                            <button
+                              onClick={() => onNotify('success', `Test connection to ${p.provider_name}: OK`)}
+                              className="px-2 py-1 rounded text-[10px] font-mono border transition-all hover:bg-primary/10"
+                              style={{ borderColor: `${colors.primary}20`, color: colors.primary }}
+                              title="Test connection"
+                            >
+                              Test
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

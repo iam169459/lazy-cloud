@@ -37,6 +37,9 @@ export interface FileRecord {
   provider_id: string;
   download_count: number;
   created_at: string;
+  encrypted: boolean;
+  enc_iv: string | null;
+  enc_auth_tag: string | null;
 }
 
 export async function initDatabase() {
@@ -66,7 +69,10 @@ export async function initDatabase() {
       r2_key TEXT NOT NULL,
       provider_id TEXT,
       download_count INTEGER DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      encrypted BOOLEAN DEFAULT false,
+      enc_iv TEXT,
+      enc_auth_tag TEXT
     )
   `;
 
@@ -246,8 +252,8 @@ export async function toggleProviderActive(providerId: string): Promise<StorageP
 export async function createFileRecord(file: Omit<FileRecord, 'download_count' | 'created_at'>): Promise<FileRecord> {
   const sql = getSql();
   const rows = (await sql`
-    INSERT INTO files (id, original_name, file_size, mime_type, r2_key, provider_id, download_count, created_at)
-    VALUES (${file.id}, ${file.original_name}, ${file.file_size}, ${file.mime_type}, ${file.r2_key}, ${file.provider_id}, 0, CURRENT_TIMESTAMP)
+    INSERT INTO files (id, original_name, file_size, mime_type, r2_key, provider_id, download_count, created_at, encrypted, enc_iv, enc_auth_tag)
+    VALUES (${file.id}, ${file.original_name}, ${file.file_size}, ${file.mime_type}, ${file.r2_key}, ${file.provider_id}, 0, CURRENT_TIMESTAMP, ${file.encrypted || false}, ${file.enc_iv || null}, ${file.enc_auth_tag || null})
     RETURNING *
   `) as unknown[];
   return rows[0] as FileRecord;
