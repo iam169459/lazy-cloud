@@ -106,6 +106,11 @@ export async function initDatabase() {
   // Add created_at to storage_providers if missing (migration for existing DBs)
   await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 
+  // Add encryption columns to files if missing (migration for existing DBs)
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS enc_iv TEXT`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS enc_auth_tag TEXT`;
+
   // Indexes for the hot query paths
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_files_provider_id ON files (provider_id)`;
