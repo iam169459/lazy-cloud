@@ -1,6 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
-import { PassThrough } from 'stream';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects } from './s3';
@@ -108,11 +107,8 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
 
   let fileName = '';
   let mimeType = '';
+  const chunks: Buffer[] = [];
   let fileSize = 0;
-  let providerUsed: Awaited<ReturnType<typeof findProviderForSize>> = null;
-  let fileKey = '';
-  let fileId = '';
-  let uploadStream: PassThrough | null = null;
   let uploadError: string | null = null;
 
   bb.on('file', (_fieldname, file, info) => {
@@ -125,12 +121,11 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
     });
 
     file.on('data', (chunk: Buffer) => {
-      fileSize += chunk.length;
+      if (!uploadError) {
+        chunks.push(chunk);
+        fileSize += chunk.length;
+      }
     });
-
-    uploadStream = new PassThrough();
-
-    file.pipe(uploadStream);
   });
 
   bb.on('error', (err: Error) => {
@@ -140,28 +135,28 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
   return new Promise<boolean>((resolve) => {
     bb.on('finish', async () => {
       if (uploadError) {
-        if (uploadStream) uploadStream.destroy();
         sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
         return resolve(true);
       }
-      if (!fileName || !uploadStream) {
+      if (!fileName || chunks.length === 0) {
         sendError(res, 400, 'No file uploaded');
         return resolve(true);
       }
+
+      const fileBuffer = Buffer.concat(chunks);
+      chunks.length = 0;
 
       const allowed = (settings.allowedTypes || '*')
         .split(',')
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
       if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
-        uploadStream.destroy();
         sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
         return resolve(true);
       }
 
-      providerUsed = await findProviderForSize(fileSize);
+      const providerUsed = await findProviderForSize(fileSize);
       if (!providerUsed) {
-        uploadStream.destroy();
         const allProviders = await listProviders();
         if (allProviders.length === 0) {
           sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
@@ -171,11 +166,11 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
         return resolve(true);
       }
 
-      fileId = generateId();
-      fileKey = `${fileId}/${fileName}`;
+      const fileId = generateId();
+      const fileKey = `${fileId}/${fileName}`;
 
       try {
-        await uploadToProvider(providerUsed, fileKey, uploadStream, mimeType);
+        await uploadToProvider(providerUsed, fileKey, fileBuffer, mimeType);
         try {
           await createFileRecord({
             id: fileId,
@@ -287,7 +282,7 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
             enc_iv: iv,
             enc_auth_tag: authTag,
           });
-          await updateProviderBytes(provider.id, encrypted.length);
+          await updateProviderBytes(provider.id, fileBuffer.length);
         } catch (dbErr: any) {
           await deleteFromProvider(provider, r2Key).catch(() => {});
           sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
@@ -701,6 +696,7 @@ export async function handleApiRequest(
       const dbFiles = await listFiles();
       const providers = await listProviders();
       const providerMap = new Map(providers.map((p) => [p.id, p]));
+      const objectCache = new Map<string, { key: string; size: number }[]>();
       const results: { fileId: string; name: string; provider: string; exists: boolean; error?: string }[] = [];
       for (const f of dbFiles) {
         const provider = f.provider_id ? providerMap.get(f.provider_id) : null;
@@ -709,7 +705,11 @@ export async function handleApiRequest(
           continue;
         }
         try {
-          const objects = await listObjects(provider);
+          if (!objectCache.has(provider.id)) {
+            const objects = await listObjects(provider);
+            objectCache.set(provider.id, objects);
+          }
+          const objects = objectCache.get(provider.id)!;
           const found = objects.some((o) => o.key === f.r2_key);
           results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: found });
         } catch (e: any) {

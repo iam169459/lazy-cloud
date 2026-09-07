@@ -97,6 +97,15 @@ export function lazyDropApiPlugin(): Plugin {
         res.setHeader('X-XSS-Protection', '1; mode=block');
         res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
 
         if (url.startsWith('/api/')) {
           // Rate limit

@@ -213,7 +213,7 @@ export async function findProviderForSize(fileSize: number): Promise<StorageProv
   return (providers[0] as StorageProvider) ?? null;
 }
 
-export async function addProvider(provider: Omit<StorageProvider, 'id' | 'current_bytes' | 'is_active'>): Promise<StorageProvider> {
+export async function addProvider(provider: Omit<StorageProvider, 'id' | 'current_bytes' | 'is_active' | 'created_at'>): Promise<StorageProvider> {
   const sql = getSql();
   const id = generateId();
   const rows = (await sql`
@@ -238,7 +238,7 @@ export async function updateProviderBytes(providerId: string, delta: number): Pr
   const sql = getSql();
   await sql`
     UPDATE storage_providers
-    SET current_bytes = current_bytes + ${delta}
+    SET current_bytes = GREATEST(0, current_bytes + ${delta})
     WHERE id = ${providerId}
   `;
 }
