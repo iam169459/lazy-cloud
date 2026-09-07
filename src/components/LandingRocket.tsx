@@ -89,7 +89,7 @@ export default function LandingRocket() {
       if (barRef.current) barRef.current.style.width = `${Math.round(progress * 100)}%`;
       if (statusRef.current) {
         if (progress < 0.05) statusRef.current.textContent = 'INITIALIZING...';
-        else if (progress < 0.18) statusRef.current.textContent = '🚀 LIFTOFF';
+        else if (progress < 0.18) statusRef.current.textContent = 'LIFTOFF';
         else if (progress < 0.44) statusRef.current.textContent = 'ASCENDING';
         else if (progress < 0.52) statusRef.current.textContent = 'CRUISE VELOCITY';
         else if (progress < 0.56) statusRef.current.textContent = '✔ ORBIT';
@@ -260,10 +260,18 @@ export default function LandingRocket() {
 
         {/* Orbiting files */}
         <div className="absolute" style={{ top: '55%', left: '50%', width: 0, height: 0 }}>
-          <span className="rjf rjf-1 absolute" style={{ fontSize: '12px', opacity: 0.7 }}>📄</span>
-          <span className="rjf rjf-2 absolute" style={{ fontSize: '12px', opacity: 0.7 }}>📁</span>
-          <span className="rjf rjf-3 absolute" style={{ fontSize: '12px', opacity: 0.7 }}>📎</span>
-          <span className="rjf rjf-4 absolute" style={{ fontSize: '12px', opacity: 0.7 }}>💾</span>
+          <span className="rjf rjf-1 absolute" style={{ opacity: 0.7 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </span>
+          <span className="rjf rjf-2 absolute" style={{ opacity: 0.7 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span className="rjf rjf-3 absolute" style={{ opacity: 0.7 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </span>
+          <span className="rjf rjf-4 absolute" style={{ opacity: 0.7 }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>
+          </span>
         </div>
 
         {/* Trail */}

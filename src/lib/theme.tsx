@@ -20,7 +20,6 @@ interface ThemeColors {
   warning: string;
   success: string;
   gradient: string;
-  gradientText: string;
   cardBg: string;
   cardBorder: string;
   cardHover: string;
@@ -53,7 +52,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#f59e0b',
     success: '#34d399',
     gradient: 'linear-gradient(135deg, #34d399, #22d3ee, #3b82f6)',
-    gradientText: 'linear-gradient(135deg, #34d399, #22d3ee, #3b82f6, #a855f7)',
     cardBg: 'rgba(255,255,255,0.02)',
     cardBorder: 'rgba(255,255,255,0.06)',
     cardHover: 'rgba(52,211,153,0.05)',
@@ -84,7 +82,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#fbbf24',
     success: '#34d399',
     gradient: 'linear-gradient(135deg, #818cf8, #38bdf8, #a78bfa)',
-    gradientText: 'linear-gradient(135deg, #818cf8, #38bdf8, #a78bfa, #f472b6)',
     cardBg: 'rgba(255,255,255,0.03)',
     cardBorder: 'rgba(255,255,255,0.08)',
     cardHover: 'rgba(129,140,248,0.05)',
@@ -115,7 +112,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#f59e0b',
     success: '#10b981',
     gradient: 'linear-gradient(135deg, #10b981, #06b6d4, #6366f1)',
-    gradientText: 'linear-gradient(135deg, #10b981, #06b6d4, #6366f1)',
     cardBg: '#ffffff',
     cardBorder: 'rgba(0,0,0,0.08)',
     cardHover: 'rgba(16,185,129,0.03)',
@@ -146,7 +142,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#fbbf24',
     success: '#ffffff',
     gradient: 'linear-gradient(135deg, #ffffff, #a3a3a3, #ffffff)',
-    gradientText: 'linear-gradient(135deg, #ffffff, #d4d4d4, #a3a3a3)',
     cardBg: 'rgba(255,255,255,0.03)',
     cardBorder: 'rgba(255,255,255,0.1)',
     cardHover: 'rgba(255,255,255,0.06)',
@@ -177,7 +172,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#fbbf24',
     success: '#a855f7',
     gradient: 'linear-gradient(135deg, #a855f7, #c084fc, #e879f9)',
-    gradientText: 'linear-gradient(135deg, #a855f7, #c084fc, #e879f9, #f472b6)',
     cardBg: 'rgba(168,85,247,0.04)',
     cardBorder: 'rgba(168,85,247,0.12)',
     cardHover: 'rgba(168,85,247,0.08)',
@@ -208,7 +202,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     warning: '#ffff00',
     success: '#00ff88',
     gradient: 'linear-gradient(135deg, #00ff88, #00ffcc, #ff00ff)',
-    gradientText: 'linear-gradient(135deg, #00ff88, #00ffcc, #ff00ff, #ffff00)',
     cardBg: 'rgba(0,255,136,0.03)',
     cardBorder: 'rgba(0,255,136,0.15)',
     cardHover: 'rgba(0,255,136,0.08)',
