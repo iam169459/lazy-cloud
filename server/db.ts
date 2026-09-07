@@ -23,6 +23,7 @@ export interface StorageProvider {
   bucket_name: string;
   access_key_id: string;
   secret_access_key: string;
+  region: string;
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
@@ -55,6 +56,7 @@ export async function initDatabase() {
       bucket_name TEXT,
       access_key_id TEXT,
       secret_access_key TEXT,
+      region TEXT DEFAULT 'auto',
       max_bytes BIGINT DEFAULT 10188208025,
       current_bytes BIGINT DEFAULT 0,
       is_active BOOLEAN DEFAULT true,
@@ -110,6 +112,9 @@ export async function initDatabase() {
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS encrypted BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS enc_iv TEXT`;
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS enc_auth_tag TEXT`;
+
+  // Add region to storage_providers if missing (migration for existing DBs)
+  await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS region TEXT DEFAULT 'auto'`;
 
   // Indexes for the hot query paths
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
@@ -222,8 +227,8 @@ export async function addProvider(provider: Omit<StorageProvider, 'id' | 'curren
   const sql = getSql();
   const id = generateId();
   const rows = (await sql`
-    INSERT INTO storage_providers (id, provider_type, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, max_bytes, current_bytes, is_active)
-    VALUES (${id}, ${provider.provider_type || 's3'}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.max_bytes}, 0, true)
+    INSERT INTO storage_providers (id, provider_type, provider_name, endpoint_url, bucket_name, access_key_id, secret_access_key, region, max_bytes, current_bytes, is_active)
+    VALUES (${id}, ${provider.provider_type || 's3'}, ${provider.provider_name}, ${provider.endpoint_url}, ${provider.bucket_name}, ${provider.access_key_id}, ${provider.secret_access_key}, ${provider.region || 'auto'}, ${provider.max_bytes}, 0, true)
     RETURNING *
   `) as unknown[];
   return rows[0] as StorageProvider;

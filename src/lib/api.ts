@@ -21,6 +21,7 @@ export interface StorageProvider {
   bucket_name: string;
   access_key_id: string;
   secret_access_key: string;
+  region: string;
   max_bytes: number;
   current_bytes: number;
   is_active: boolean;
@@ -123,7 +124,7 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }) as Promise<{ providers: StorageProvider[] }>,
 
-  addProvider: (provider: Omit<StorageProvider, 'id' | 'current_bytes' | 'is_active'>, token: string) =>
+  addProvider: (provider: Omit<StorageProvider, 'id' | 'current_bytes' | 'is_active' | 'created_at'>, token: string) =>
     request('/api/admin/providers/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

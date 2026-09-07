@@ -70,6 +70,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
  bucket_name: form.bucket_name,
  access_key_id: form.access_key_id,
  secret_access_key: form.secret_access_key,
+ region: form.region || 'auto',
  max_bytes: parseInt(form.max_bytes) || 10188208025,
  }, token);
  sounds.store();
@@ -294,6 +295,10 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
 
  <FormField label="Max bytes (default ~9.5 GB)">
  <input type="number" value={form.max_bytes} onChange={(e) => updateField('max_bytes', e.target.value)} className="input" />
+ </FormField>
+
+ <FormField label="Region">
+ <input type="text" value={form.region} onChange={(e) => updateField('region', e.target.value)} placeholder="auto" className="input" />
  </FormField>
 
  <FormField label="Access key ID" required>

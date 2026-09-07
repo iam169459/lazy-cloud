@@ -30,8 +30,11 @@ function extractRegion(endpointUrl: string): string {
 }
 
 export function createS3Client(provider: StorageProvider): S3Client {
+  const region = provider.region && provider.region !== 'auto'
+    ? provider.region
+    : extractRegion(provider.endpoint_url);
   return new S3Client({
-    region: extractRegion(provider.endpoint_url),
+    region,
     endpoint: provider.endpoint_url,
     credentials: {
       accessKeyId: provider.access_key_id,
