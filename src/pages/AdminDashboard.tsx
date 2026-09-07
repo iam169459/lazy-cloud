@@ -33,21 +33,21 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
 
   return (
     <div className="space-y-4">
-      <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop} onClick={() => !uploading && ref.current?.click()} className="card p-6 sm:p-8 text-center cursor-pointer transition-all" style={{ borderColor: dragOver ? '#6366f1' : undefined }}>
+      <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={handleDrop} onClick={() => !uploading && ref.current?.click()} className="card p-6 sm:p-8 text-center cursor-pointer transition-all" style={{ borderColor: dragOver ? colors.primary : undefined }}>
         <input ref={ref} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
         {uploading ? (
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#818cf8' }} />
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
             <div className="w-full max-w-xs">
-              <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}><span style={{ color: '#818cf8' }}>UPLOADING</span><span>{progress}%</span></div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+              <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}><span style={{ color: colors.primary }}>UPLOADING</span><span>{progress}%</span></div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: colors.cardBg }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: colors.gradient }} />
               </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <Upload className="w-6 h-6" style={{ color: '#818cf8' }} />
+            <Upload className="w-6 h-6" style={{ color: colors.primary }} />
             <p className="text-sm font-medium">Drop a file or click to upload</p>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>Auto-routed to next available bucket</p>
           </div>
@@ -55,34 +55,34 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       </div>
 
       <div className="card overflow-x-auto">
-        <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+        <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: colors.border }}>
           <h2 className="text-sm font-semibold">Files ({files.length})</h2>
         </div>
         {files.length === 0 ? (
           <div className="py-12 text-center">
-            <FileText className="w-10 h-10 mx-auto mb-2" style={{ color: 'rgba(255,255,255,0.08)' }} />
+            <FileText className="w-10 h-10 mx-auto mb-2" style={{ color: colors.textDim }} />
             <p className="text-sm" style={{ color: colors.textMuted }}>No files yet</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[460px]">
               <thead>
-                <tr className="text-left text-[10px] border-b font-mono uppercase" style={{ color: '#64748b', borderColor: 'rgba(255,255,255,0.04)' }}>
+                <tr className="text-left text-[10px] border-b font-mono uppercase" style={{ color: colors.textDim, borderColor: colors.border }}>
                   <th className="px-4 py-2">Name</th><th className="px-4 py-2">Size</th><th className="px-4 py-2 hidden md:table-cell">Bucket</th><th className="px-4 py-2 hidden lg:table-cell">Date</th><th className="px-4 py-2 hidden sm:table-cell">Downloads</th><th className="px-4 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {files.map((f) => (
-                  <tr key={f.id} className="border-b transition-colors" style={{ borderColor: 'rgba(255,255,255,0.03)' }}>
-                    <td className="px-4 py-2.5"><div className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#818cf8' }} /><span className="text-xs font-medium truncate max-w-[160px]">{f.original_name}</span></div></td>
-                    <td className="px-4 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: '#94a3b8' }}>{formatBytes(f.file_size)}</td>
-                    <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.04)' }}>{f.provider_name || '—'}</span></td>
-                    <td className="px-4 py-2.5 text-xs hidden lg:table-cell whitespace-nowrap" style={{ color: '#94a3b8' }}>{formatDate(f.created_at)}</td>
-                    <td className="px-4 py-2.5 text-xs hidden sm:table-cell font-mono" style={{ color: '#94a3b8' }}>{f.download_count}</td>
+                  <tr key={f.id} className="border-b transition-colors hover:bg-[var(--bg-hover)]" style={{ borderColor: colors.border }}>
+                    <td className="px-4 py-2.5"><div className="flex items-center gap-2"><FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: colors.primary }} /><span className="text-xs font-medium truncate max-w-[160px]">{f.original_name}</span></div></td>
+                    <td className="px-4 py-2.5 text-xs font-mono whitespace-nowrap" style={{ color: colors.textMuted }}>{formatBytes(f.file_size)}</td>
+                    <td className="px-4 py-2.5 hidden md:table-cell"><span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: colors.cardBg }}>{f.provider_name || '—'}</span></td>
+                    <td className="px-4 py-2.5 text-xs hidden lg:table-cell whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(f.created_at)}</td>
+                    <td className="px-4 py-2.5 text-xs hidden sm:table-cell font-mono" style={{ color: colors.textMuted }}>{f.download_count}</td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => copyLink(f.id)} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center" style={{ color: copiedId === f.id ? '#22c55e' : '#64748b' }}>{copiedId === f.id ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}</button>
-                        <button onClick={() => del(f.id, f.original_name)} disabled={deletingId === f.id} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center disabled:opacity-50" style={{ color: '#64748b' }}>{deletingId === f.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
+                        <button onClick={() => copyLink(f.id)} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center" style={{ color: copiedId === f.id ? colors.success : colors.textDim }}>{copiedId === f.id ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}</button>
+                        <button onClick={() => del(f.id, f.original_name)} disabled={deletingId === f.id} className="p-2 rounded-md min-w-[36px] min-h-[36px] flex items-center justify-center disabled:opacity-50" style={{ color: colors.textDim }}>{deletingId === f.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}</button>
                       </div>
                     </td>
                   </tr>

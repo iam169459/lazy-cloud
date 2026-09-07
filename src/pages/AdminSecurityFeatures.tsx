@@ -366,11 +366,13 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  <Users className="w-4 h-4" style={{ color: colors.primary }} />
  <span className="flex-1 text-sm font-mono" style={{ color: colors.text }}>{ip}</span>
  <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>#{i + 1}</span>
- <button
- onClick={() => handleRemoveIp(ip)}
- className="p-2.5 rounded-lg transition-all hover:bg-red-500/10 min-w-[36px] min-h-[36px] flex items-center justify-center"
- style={{ color: colors.danger }}
- >
+  <button
+  onClick={() => handleRemoveIp(ip)}
+  className="p-2.5 rounded-lg transition-all min-w-[36px] min-h-[36px] flex items-center justify-center"
+  style={{ color: colors.danger }}
+  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${colors.danger}15`; }}
+  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+  >
  <EyeOff className="w-4 h-4" />
  </button>
  </div>

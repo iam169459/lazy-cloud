@@ -41,7 +41,7 @@ export default function AdminLogin() {
     <div className="min-h-screen flex flex-col items-center justify-center px-5 grid-bg" style={{ color: colors.text }}>
       <div className="w-full max-w-sm">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8 animate-fade-up" onClick={() => sounds.click()}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
             <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
           </div>
           <span className="text-lg font-semibold text-gradient">LazyDrop</span>
@@ -52,19 +52,19 @@ export default function AdminLogin() {
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Username</label>
-              <div className="input-group">
-                <span className="input-icon"><User className="w-4 h-4" /></span>
-                <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input" disabled={locked} />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><User className="w-4 h-4" /></span>
+                <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input pl-10" disabled={locked} />
               </div>
             </div>
             <div>
               <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Password</label>
-              <div className="input-group">
-                <span className="input-icon"><Lock className="w-4 h-4" /></span>
-                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Password" className="input" disabled={locked} />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Lock className="w-4 h-4" /></span>
+                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Password" className="input pl-10" disabled={locked} />
               </div>
             </div>
-            {err && <p className="text-sm text-center animate-shake" style={{ color: '#ef4444' }}>{err}</p>}
+            {err && <p className="text-sm text-center animate-shake" style={{ color: colors.danger }}>{err}</p>}
             <button type="submit" disabled={loading || locked} className="btn btn-primary w-full">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : locked ? 'Locked' : 'Sign in'}
             </button>

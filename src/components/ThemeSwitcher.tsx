@@ -26,8 +26,7 @@ export default function ThemeSwitcher() {
     <div className="relative">
       <button
         onClick={() => { setOpen(!open); sounds.click(); }}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-white/5"
-        style={{ color: 'var(--text-muted)' }}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all btn-ghost"
       >
         <Palette className="w-4 h-4" />
         Theme
@@ -51,15 +50,15 @@ export default function ThemeSwitcher() {
               <button
                 key={t.id}
                 onClick={() => handleSelect(t.id)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all hover:bg-white/5"
-                style={{ color: 'var(--text)' }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all btn-ghost"
+                style={{ color: 'var(--text)', justifyContent: 'flex-start' }}
               >
                 <div className="flex gap-1">
                   {t.colors.map((c, i) => (
                     <div
                       key={i}
                       className="w-3 h-3 rounded-full"
-                      style={{ background: c, border: '1px solid rgba(255,255,255,0.1)' }}
+                      style={{ background: c, border: '1px solid var(--border)' }}
                     />
                   ))}
                 </div>

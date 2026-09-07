@@ -21,12 +21,12 @@ export default function Landing() {
       <nav className="sticky top-0 z-30 backdrop-blur-md border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
           <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             <span className="text-lg font-semibold tracking-tight text-gradient">{name}</span>
           </Link>
-          <Link to="/admin" className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-all" style={{ color: colors.textMuted, border: `1px solid ${colors.border}` }} onClick={() => sounds.click()}>
+          <Link to="/admin" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
             <Lock className="w-3.5 h-3.5" />
             Admin
           </Link>
@@ -102,25 +102,27 @@ export default function Landing() {
 }
 
 function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
+  const { colors } = useTheme();
   return (
     <div className="card p-4 text-center">
-      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }}>
         {icon}
       </div>
       <div className="text-xl font-bold">{value}</div>
-      <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>{label}</div>
+      <div className="text-xs mt-0.5" style={{ color: colors.textDim }}>{label}</div>
     </div>
   );
 }
 
 function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  const { colors } = useTheme();
   return (
     <div className="card p-5">
-      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }}>
         {icon}
       </div>
       <h3 className="text-sm font-semibold mb-1">{title}</h3>
-      <p className="text-xs leading-relaxed" style={{ color: '#94a3b8' }}>{desc}</p>
+      <p className="text-xs leading-relaxed" style={{ color: colors.textMuted }}>{desc}</p>
     </div>
   );
 }
@@ -164,24 +166,24 @@ function QuickUpload() {
       onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
       onClick={() => !uploading && inputRef.current?.click()}
       className="card p-6 text-center cursor-pointer transition-all"
-      style={{ borderColor: dragOver ? '#6366f1' : undefined }}
+      style={{ borderColor: dragOver ? colors.primary : undefined }}
     >
       <input ref={inputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
       {uploading ? (
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
+          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: colors.primary, borderTopColor: 'transparent' }} />
           <div className="w-full max-w-xs">
             <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}>
-              <span style={{ color: '#818cf8' }}>UPLOADING</span><span>{progress}%</span>
+              <span style={{ color: colors.primary }}>UPLOADING</span><span>{progress}%</span>
             </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
+            <div className="h-1 rounded-full overflow-hidden" style={{ background: colors.cardBg }}>
+              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: colors.gradient }} />
             </div>
           </div>
         </div>
       ) : fileId ? (
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: `${colors.success}15`, color: colors.success }}>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           </div>
           <p className="text-sm font-medium">File uploaded</p>
@@ -195,12 +197,12 @@ function QuickUpload() {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2">
-          <Upload className="w-6 h-6" style={{ color: '#818cf8' }} />
+          <Upload className="w-6 h-6" style={{ color: colors.primary }} />
           <div>
             <p className="text-sm font-medium">Drop a file or click to upload</p>
             <p className="text-xs mt-0.5 font-mono" style={{ color: colors.textDim }}>PUBLIC — no account needed</p>
           </div>
-          {error && <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>}
+          {error && <p className="text-xs" style={{ color: colors.danger }}>{error}</p>}
         </div>
       )}
     </div>

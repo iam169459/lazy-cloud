@@ -212,7 +212,7 @@ export default function AdminScan({ token, onNotify }: Props) {
             onClick={handleAutoFix}
             disabled={autoFixing}
             className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-sm btn min-w-[180px]"
-            style={{ background: `linear-gradient(135deg, ${colors.success}, #059669)`, color: '#fff' }}
+            style={{ background: colors.gradient, color: '#fff' }}
           >
             {autoFixing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
             {autoFixing ? 'Scanning & fixing...' : 'Auto Fix All'}
