@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info,
-  HardDrive, RefreshCw, Zap, X
+  HardDrive, RefreshCw, Zap, X, Shield
 } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
