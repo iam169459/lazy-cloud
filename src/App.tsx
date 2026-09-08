@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, Component, ReactNode } from 'react';
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider } from '@/lib/theme';
 
@@ -16,8 +16,30 @@ function Loader() {
   );
 }
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="fixed inset-0 flex items-center justify-center p-6" style={{ background: '#0f172a', color: '#e2e8f0' }}>
+          <div className="max-w-md text-center space-y-4">
+            <p className="text-lg font-semibold" style={{ color: '#ef4444' }}>Something went wrong</p>
+            <p className="text-sm opacity-70">{this.state.error.message}</p>
+            <button onClick={() => { this.setState({ error: null }); window.location.reload(); }} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
+              Reload page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function App() {
   return (
+    <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
@@ -32,6 +54,7 @@ function App() {
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
