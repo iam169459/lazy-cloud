@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Cloud, Plus, Trash2, Loader2, Check, Server, Power, ExternalLink, Info,
+  Cloud, Plus, Trash2, Check, Server, Power, ExternalLink, Info,
   HardDrive, RefreshCw, Zap, X, Shield
 } from 'lucide-react';
 import { api, formatBytes, StorageProvider } from '@/lib/api';
@@ -303,19 +303,19 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
     },
     {
       label: 'Test connection',
-      icon: testingId === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />,
+      icon: <Zap className="w-3.5 h-3.5" />,
       onClick: (row) => handleTest(row.id),
       disabled: (row) => testingId === row.id,
     },
     {
       label: 'Refresh size',
-      icon: refreshingId === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />,
+      icon: <RefreshCw className="w-3.5 h-3.5" />,
       onClick: (row) => handleRefreshSize(row.id),
       disabled: (row) => refreshingId === row.id,
     },
     {
       label: 'Remove',
-      icon: deletingId === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />,
+      icon: <Trash2 className="w-3.5 h-3.5" />,
       onClick: (row) => handleDelete(row.id, row.provider_name),
       variant: 'danger',
       disabled: (row) => deletingId === row.id,
