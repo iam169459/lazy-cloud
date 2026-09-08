@@ -359,11 +359,13 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
           aria-hidden="true"
         />
       </button>
-      {open && (
-        <div className="px-5 pb-4 text-sm leading-relaxed" style={{ color: colors.textMuted }} role="region">
-          {answer}
+      <div className={`faq-content ${open ? 'open' : ''}`}>
+        <div>
+          <div className="px-5 pb-4 text-sm leading-relaxed" style={{ color: colors.textMuted }} role="region">
+            {answer}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

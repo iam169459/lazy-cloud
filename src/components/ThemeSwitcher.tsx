@@ -50,7 +50,7 @@ export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps)
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div
-              className="absolute left-full bottom-0 ml-2 w-56 rounded-xl p-2 z-50 animate-scale-in"
+              className="absolute right-0 bottom-full mb-2 w-56 rounded-xl p-2 z-50 animate-scale-in"
               style={{
                 background: 'rgba(15, 23, 42, 0.85)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -64,10 +64,8 @@ export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps)
                 <button
                   key={t.id}
                   onClick={() => handleSelect(t.id)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all hover:bg-white/5"
                   style={{ color: 'var(--text)', justifyContent: 'flex-start', background: 'transparent' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
                   <div className="flex gap-1">
                     {t.colors.map((c, i) => (

@@ -48,10 +48,12 @@ export default function AdminPanel() {
   const [providers, setProviders] = useState<StorageProvider[]>([]);
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const [notifExiting, setNotifExiting] = useState(false);
 
   const notify = useCallback((type: 'success' | 'error', msg: string) => {
+    setNotifExiting(false);
     setNotif({ type, msg }); sounds[type === 'success' ? 'notification' : 'error']();
-    setTimeout(() => setNotif(null), 4000);
+    setTimeout(() => { setNotifExiting(true); setTimeout(() => { setNotif(null); setNotifExiting(false); }, 300); }, 3700);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -275,12 +277,14 @@ export default function AdminPanel() {
                 <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
                 <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
               </div>
-            ) : tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
+            ) : <div key={tab} className="tab-content">
+            {tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
             : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
             : tab === 'system' ? <AdminSystem token={token!} onNotify={notify} />
             : <AdminAdvanced token={token!} onNotify={notify} />}
+            </div>}
           </div>
         </div>
       </div>
@@ -288,7 +292,7 @@ export default function AdminPanel() {
       {/* Toast Notification */}
       {notif && (
         <div
-          className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium animate-fade-up"
+          className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium animate-fade-up ${notifExiting ? 'toast-exit' : ''}`}
           role="alert"
           aria-live="assertive"
           style={{

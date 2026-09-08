@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTheme } from '@/lib/theme';
 
 /* ── FormSection: glass card with header ── */
@@ -29,7 +30,6 @@ export function FormSection({ title, icon, description, children }: {
 }
 
 /* ── FormField: label + input + help/error ── */
-let fieldCounter = 0;
 
 export function FormField({
   label,
@@ -45,7 +45,8 @@ export function FormField({
   children: React.ReactNode;
 }) {
   const { colors } = useTheme();
-  const id = `field-${label.toLowerCase().replace(/\s+/g, '-')}-${++fieldCounter}`;
+  const baseId = useId();
+  const id = `${baseId}`;
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;

@@ -193,9 +193,19 @@ npm run build`;
           Pull latest, install deps, and rebuild
         </p>
 
-        <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: colors.text }}>
-          <code>{updateScript}</code>
-        </pre>
+        <div className="relative">
+          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: colors.text }}>
+            <code>{updateScript}</code>
+          </pre>
+          <button
+            onClick={() => { navigator.clipboard.writeText(updateScript); sounds.copy(); }}
+            className="absolute top-2 right-2 p-2 rounded-lg transition-all"
+            style={{ background: 'rgba(255,255,255,0.05)', color: colors.textDim }}
+            title="Copy to clipboard"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </FormSection>
 
       {/* Links */}

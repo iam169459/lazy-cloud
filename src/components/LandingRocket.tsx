@@ -157,7 +157,7 @@ export default function LandingRocket() {
               borderRadius: '50% 50% 20% 20%',
               background: `linear-gradient(to bottom, #fff 0%, ${colors.primary} 25%, #ef4444 65%, transparent 100%)`,
               filter: 'blur(1px)',
-              animation: 'rocket-journey-flame-flicker 0.1s ease-in-out infinite',
+              animation: 'rocketFlameFlicker 0.1s ease-in-out infinite',
             }}
           />
           <div
@@ -171,7 +171,7 @@ export default function LandingRocket() {
               borderRadius: '50% 50% 20% 20%',
               background: `linear-gradient(to bottom, #fde047 0%, ${colors.primary} 55%, transparent 100%)`,
               filter: 'blur(0.5px)',
-              animation: 'rocket-journey-flame-inner 0.07s ease-in-out infinite',
+              animation: 'rocketFlameInner 0.07s ease-in-out infinite',
             }}
           />
         </div>

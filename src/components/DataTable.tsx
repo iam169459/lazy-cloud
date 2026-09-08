@@ -160,10 +160,8 @@ export default function DataTable<T extends Record<string, any>>({
                 return (
                   <tr
                     key={id}
-                    className="transition-colors"
+                    className="data-table-row transition-colors"
                     style={{ borderBottom: `1px solid rgba(255,255,255,0.03)` }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
                     {columns.map((col) => (
                       <td

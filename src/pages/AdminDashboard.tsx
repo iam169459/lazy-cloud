@@ -157,10 +157,8 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
                   return (
                     <tr
                       key={f.id}
-                      className="border-b transition-colors"
+                      className="data-table-row border-b transition-colors"
                       style={{ borderColor: 'rgba(255,255,255,0.04)' }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                     >
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
