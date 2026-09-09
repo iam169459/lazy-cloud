@@ -260,21 +260,33 @@ cmd_start() {
     sudo systemctl start "$SERVICE_NAME"
     ok "Service started."
   else
+    # Kill any existing instance first
+    if [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
+      kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
+      sleep 1
+    fi
+
     log "Starting dev server in background..."
     nohup npm run dev > /tmp/lazydrop.log 2>&1 &
     echo $! > /tmp/lazydrop.pid
-    sleep 2
-    if is_running; then
+    sleep 3
+
+    # Check if process is alive (not just PID file)
+    if kill -0 "$(cat /tmp/lazydrop.pid 2>/dev/null)" 2>/dev/null; then
       ok "Dev server started (PID: $(cat /tmp/lazydrop.pid))"
     else
       err "Failed to start. Check: cat /tmp/lazydrop.log"
     fi
   fi
 
+  # Grab actual port from log
+  local PORT_ACTUAL
+  PORT_ACTUAL=$(grep -oP 'http://localhost:\K[0-9]+' /tmp/lazydrop.log 2>/dev/null | head -1 || echo "$PORT")
+
   local IP
   IP=$(get_ip)
-  echo -e "  ${BOLD}Local:${NC}  http://localhost:5173"
-  echo -e "  ${BOLD}Network:${NC} http://${IP}:5173"
+  echo -e "  ${BOLD}Local:${NC}  http://localhost:${PORT_ACTUAL}"
+  echo -e "  ${BOLD}Network:${NC} http://${IP}:${PORT_ACTUAL}"
   echo ""
 }
 
@@ -285,12 +297,23 @@ cmd_stop() {
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
     sudo systemctl stop "$SERVICE_NAME"
     ok "Service stopped."
-  elif [ -f /tmp/lazydrop.pid ]; then
-    kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
-    rm -f /tmp/lazydrop.pid
-    ok "Dev server stopped."
   else
-    warn "No running instance found."
+    local killed=false
+    if [ -f /tmp/lazydrop.pid ]; then
+      PID=$(cat /tmp/lazydrop.pid)
+      if kill -0 "$PID" 2>/dev/null; then
+        kill "$PID" 2>/dev/null || true
+        killed=true
+      fi
+      rm -f /tmp/lazydrop.pid
+    fi
+    # Also kill any stray vite processes
+    pkill -f "vite" 2>/dev/null || true
+    if [ "$killed" = true ]; then
+      ok "Dev server stopped."
+    else
+      warn "No running instance found."
+    fi
   fi
 }
 
@@ -353,12 +376,18 @@ cmd_status() {
     fi
   elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
     echo -e "  ${BOLD}Process:${NC}   ${GREEN}running${NC} (PID: $(cat /tmp/lazydrop.pid))"
+  elif pgrep -f "vite" >/dev/null 2>&1; then
+    echo -e "  ${BOLD}Process:${NC}   ${GREEN}running${NC} (PID: $(pgrep -f vite | head -1))"
   else
     echo -e "  ${BOLD}Process:${NC}   ${RED}not running${NC}"
   fi
 
-  echo -e "  ${BOLD}Local:${NC}    http://localhost:${PORT}"
-  echo -e "  ${BOLD}Network:${NC}   http://${IP}:${PORT}"
+  local ACTUAL_PORT
+  ACTUAL_PORT=$(grep -oP 'http://localhost:\K[0-9]+' /tmp/lazydrop.log 2>/dev/null | head -1 || echo "$PORT")
+  [ -z "$ACTUAL_PORT" ] && ACTUAL_PORT="$PORT"
+
+  echo -e "  ${BOLD}Local:${NC}    http://localhost:${ACTUAL_PORT}"
+  echo -e "  ${BOLD}Network:${NC}   http://${IP}:${ACTUAL_PORT}"
   echo ""
 }
 
