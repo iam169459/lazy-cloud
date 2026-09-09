@@ -1,23 +1,19 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Check, Loader2, Link2, HardDrive, Scan, Plus, Share2, Lock, Clock, Copy, X, Download, Grid } from 'lucide-react';
+import { Upload, FileText, Trash2, Check, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider, ShareInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import DataTable, { Column, BulkAction } from '@/components/DataTable';
 import UploadQueue from '@/components/UploadQueue';
-import StorageAnalytics from '@/components/StorageAnalytics';
-
-import { StorageProvider } from '@/lib/api';
 
 interface Props {
   files: FileWithProvider[];
-  providers: StorageProvider[];
   token: string;
   onRefresh: () => void;
   onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
-export default function AdminDashboard({ files, providers, token, onRefresh, onNotify }: Props) {
+export default function AdminDashboard({ files, token, onRefresh, onNotify }: Props) {
   const { colors } = useTheme();
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -150,16 +146,6 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
       label: 'Size',
       sortable: true,
       render: (f) => <span className="text-xs font-mono whitespace-nowrap" style={{ color: colors.textMuted }}>{formatBytes(f.file_size)}</span>,
-    },
-    {
-      key: 'provider_name',
-      label: 'Bucket',
-      sortable: true,
-      render: (f) => (
-        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: colors.cardBg, color: colors.textMuted }}>
-          {f.provider_name || '—'}
-        </span>
-      ),
     },
     {
       key: 'created_at',
@@ -399,24 +385,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
           <Grid className="w-3.5 h-3.5" />
           Upload queue
         </button>
-        <button
-          onClick={() => { sounds.click(); onNotify('success', 'Navigate to Scan tab'); }}
-          className="btn btn-secondary text-xs"
-        >
-          <Scan className="w-3.5 h-3.5" />
-          Scan buckets
-        </button>
-        <button
-          onClick={() => { sounds.click(); onNotify('success', 'Navigate to Storage tab'); }}
-          className="btn btn-secondary text-xs"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add provider
-        </button>
       </div>
-
-      {/* Storage Analytics */}
-      <StorageAnalytics files={files} providers={providers} totalDownloads={files.reduce((sum, f) => sum + f.download_count, 0)} />
 
       {/* Recent Activity Table */}
       <DataTable
@@ -426,7 +395,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
         bulkActions={bulkActions}
         keyExtractor={(f) => f.id}
         searchPlaceholder="Search files..."
-        searchKeys={['original_name', 'provider_name', 'mime_type']}
+        searchKeys={['original_name', 'mime_type']}
         pageSize={10}
         selectable
         emptyIcon={<FileText className="w-10 h-10" />}

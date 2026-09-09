@@ -284,7 +284,7 @@ export default function AdminPanel() {
               </div>
             ) : <div key={tab} className="tab-content">
             <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.primary }} /></div>}>
-            {tab === 'dashboard' ? <AdminDashboard files={files} providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
+            {tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
             : tab === 'api-keys' ? <AdminApiKeys token={token!} onNotify={notify} />
