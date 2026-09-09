@@ -152,7 +152,7 @@ export default function DataTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className="glass-card overflow-hidden">
+    <div className="glass-card">
       {/* Search Bar */}
       {searchKeys.length > 0 && (
         <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
@@ -267,13 +267,14 @@ export default function DataTable<T extends Record<string, any>>({
                           </button>
                           {openMenu === id && (
                             <>
-                              <div className="fixed inset-0 z-30" onClick={() => setOpenMenu(null)} />
+                              <div className="fixed inset-0 z-50" onClick={() => setOpenMenu(null)} />
                               <div
-                                className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-40 animate-scale-in"
+                                className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-50 animate-scale-in"
                                 style={{
-                                  background: 'rgba(15, 23, 42, 0.9)',
+                                  background: colors.cardBg,
                                   border: `1px solid ${colors.border}`,
                                   backdropFilter: 'blur(20px)',
+                                  boxShadow: `0 8px 32px ${colors.bg}80`,
                                 }}
                               >
                                 {actions

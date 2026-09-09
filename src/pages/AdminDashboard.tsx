@@ -137,7 +137,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
           <div className="flex items-center gap-2">
             <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: colors.success }} />
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-medium truncate max-w-[160px]">{f.original_name}</span>
+              <span className="text-xs font-medium truncate max-w-[200px]">{f.original_name}</span>
               {isPopular && <span className="status-badge status-success">Popular</span>}
               {isLarge && !isPopular && <span className="status-badge status-warning">Large</span>}
             </div>
@@ -156,7 +156,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
       label: 'Bucket',
       sortable: true,
       render: (f) => (
-        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.04)', color: colors.textMuted }}>
+        <span className="text-[11px] font-mono px-1.5 py-0.5 rounded" style={{ background: colors.cardBg, color: colors.textMuted }}>
           {f.provider_name || '—'}
         </span>
       ),
