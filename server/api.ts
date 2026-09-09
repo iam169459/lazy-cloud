@@ -411,6 +411,7 @@ export async function handleApiRequest(
     const body = await parseJsonBody(req);
     const username = sanitize(body.username);
     const password = sanitize(body.password);
+    const email = sanitize(body.email) || '';
     if (!username || !password) {
       sendError(res, 400, 'Username and password are required');
       return true;
@@ -424,7 +425,7 @@ export async function handleApiRequest(
       return true;
     }
     // Save to database
-    await updateAdminCredentials(username, password);
+    await updateAdminCredentials(username, password, email);
     // Save to .env file
     try {
       const { writeFileSync, readFileSync, existsSync } = await import('fs');

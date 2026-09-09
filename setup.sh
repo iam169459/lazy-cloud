@@ -201,6 +201,25 @@ cmd_install() {
     echo ""
     read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Database URL (or press Enter to skip): ")" INPUT_DB
 
+    # Prompt for admin credentials
+    echo ""
+    echo -e "  ${BOLD}Admin Account Setup${NC}"
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin email (or press Enter to skip): ")" INPUT_EMAIL
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin username [admin]: ")" INPUT_USER
+    INPUT_USER="${INPUT_USER:-admin}"
+    read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Admin password: ")" INPUT_PASS
+    echo ""
+    if [ -n "$INPUT_PASS" ]; then
+      read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Confirm password: ")" INPUT_PASS2
+      echo ""
+      if [ "$INPUT_PASS" != "$INPUT_PASS2" ]; then
+        err "Passwords do not match"
+      fi
+      if [ ${#INPUT_PASS} -lt 6 ]; then
+        err "Password must be at least 6 characters"
+      fi
+    fi
+
     cat > .env <<ENVEOF
 # ═══════════════════════════════════════
 # LazyDrop Configuration
@@ -209,15 +228,22 @@ cmd_install() {
 # Database (required — get from https://neon.tech)
 DATABASE_URL=${INPUT_DB:-postgresql://user:password@host/dbname}
 
-# Admin credentials (set via web UI on first visit)
-# ADMIN_USERNAME=
-# ADMIN_PASSWORD=
+# Admin credentials (set via setup.sh or web UI on first visit)
+ADMIN_EMAIL=${INPUT_EMAIL}
+ADMIN_USERNAME=${INPUT_USER}
+ADMIN_PASSWORD=${INPUT_PASS}
 ENVEOF
     echo ""
     ok "Created .env"
-    echo ""
-    warn "Setup your admin account in the browser:"
-    echo "    Open the admin page and create your username & password"
+
+    if [ -n "$INPUT_PASS" ]; then
+      ok "Admin account: ${INPUT_USER}"
+      echo "  You can also manage credentials from the web UI."
+    else
+      echo ""
+      warn "Set up your admin account in the browser:"
+      echo "    Open the admin page and create your username & password"
+    fi
     echo ""
   else
     warn ".env already exists, skipping"

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, ArrowLeft, Loader2, Zap, User, Check } from 'lucide-react';
+import { Lock, ArrowLeft, Loader2, Zap, User, Check, Mail } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -18,6 +18,7 @@ export default function AdminLogin() {
   const [locked, setLocked] = useState(false);
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [setupMode, setSetupMode] = useState(false);
+  const [setupEmail, setSetupEmail] = useState('');
   const [setupPass2, setSetupPass2] = useState('');
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState(false);
@@ -60,7 +61,7 @@ export default function AdminLogin() {
       const res = await fetch('/api/admin/setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass }),
+        body: JSON.stringify({ username: user, password: pass, email: setupEmail }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -117,6 +118,13 @@ export default function AdminLogin() {
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><User className="w-4 h-4" /></span>
                       <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input pl-10" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Email <span className="text-[10px] opacity-50">(optional)</span></label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Mail className="w-4 h-4" /></span>
+                      <input type="email" value={setupEmail} onChange={(e) => setSetupEmail(e.target.value)} placeholder="admin@example.com" className="input pl-10" />
                     </div>
                   </div>
                   <div>

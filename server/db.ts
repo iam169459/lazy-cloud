@@ -149,6 +149,9 @@ export async function initDatabase() {
   // Settings JSON on admin_settings (idempotent — safe on every startup)
   await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS settings TEXT DEFAULT '{}'`;
 
+  // Email column (idempotent)
+  await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS email TEXT`;
+
   // Add created_at to storage_providers if missing (migration for existing DBs)
   await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 
@@ -180,19 +183,26 @@ export async function initDatabase() {
 export interface AdminCredentials {
   username: string;
   password: string;
+  email?: string;
 }
 
 export async function getAdminCredentials(): Promise<AdminCredentials | null> {
   const sql = getSql();
-  const rows = (await sql`SELECT username, password FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  const rows = (await sql`SELECT username, password, email FROM admin_settings WHERE id = 'singleton'`) as unknown[];
   if (rows.length > 0) {
     return rows[0] as AdminCredentials;
   }
-  // Check env vars
+  // Check env vars — seed DB if present
   const envUser = process.env.ADMIN_USERNAME;
   const envPass = process.env.ADMIN_PASSWORD;
+  const envEmail = process.env.ADMIN_EMAIL;
   if (envUser && envPass) {
-    return { username: envUser, password: envPass };
+    // Auto-seed from .env on first run
+    try {
+      await updateAdminCredentials(envUser, envPass, envEmail);
+      return { username: envUser, password: envPass, email: envEmail };
+    } catch {}
+    return { username: envUser, password: envPass, email: envEmail };
   }
   return null;
 }
@@ -204,13 +214,13 @@ export async function isAdminSetup(): Promise<boolean> {
   return !!(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
 }
 
-export async function updateAdminCredentials(username: string, password: string): Promise<void> {
+export async function updateAdminCredentials(username: string, password: string, email?: string): Promise<void> {
   const sql = getSql();
   await sql`
-    INSERT INTO admin_settings (id, username, password, updated_at)
-    VALUES ('singleton', ${username}, ${password}, CURRENT_TIMESTAMP)
+    INSERT INTO admin_settings (id, username, password, email, updated_at)
+    VALUES ('singleton', ${username}, ${password}, ${email || null}, CURRENT_TIMESTAMP)
     ON CONFLICT (id) DO UPDATE
-    SET username = ${username}, password = ${password}, updated_at = CURRENT_TIMESTAMP
+    SET username = ${username}, password = ${password}, email = ${email || null}, updated_at = CURRENT_TIMESTAMP
   `;
 }
 
