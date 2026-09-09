@@ -96,13 +96,18 @@ LazyDrop works with any S3-compatible endpoint. Free tiers included:
 
 | Script | Purpose |
 | --- | --- |
-| `npm run dev` | Start the Vite dev server (API included via plugin) |
-| `npm run build` | Production build (frontend + server) |
-| `npm start` | Start the production server |
-| `npm run preview` | Preview the production build |
-| `npm run typecheck` | Type-check the frontend and server |
-| `npm run lint` | Lint all source files |
-| `./setup.sh` | Auto-install or update (installs Node.js if missing) |
+| `lazydrop install` | Install LazyDrop (auto-installs Node.js if needed) |
+| `lazydrop start` | Start the dev server |
+| `lazydrop stop` | Stop the server |
+| `lazydrop restart` | Restart the server |
+| `lazydrop status` | Show status, config, and connection info |
+| `lazydrop update` | Pull latest changes and rebuild |
+| `lazydrop logs` | Follow live logs |
+| `lazydrop service` | Install as systemd service (VPS) |
+| `lazydrop uninstall` | Remove LazyDrop completely |
+| `npm run dev` | Start dev server directly |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
 
 ## Architecture
 
