@@ -36,7 +36,7 @@ else
   RUNNING_IN_REPO=false
 fi
 
-# ── Find the app directory ──
+# ── Find and cd to the app directory ──
 find_app() {
   if [ "$RUNNING_IN_REPO" = true ]; then
     cd "$APP_DIR"
@@ -72,36 +72,25 @@ install_node() {
   log "Node.js not found. Installing Node.js ${NODE_VERSION}..."
 
   if command -v fnm >/dev/null 2>&1; then
-    log "Using fnm..."
     fnm install "$NODE_VERSION" && fnm use "$NODE_VERSION" && return
   fi
-
   if [ -d "$HOME/.nvm" ]; then
-    log "Using nvm..."
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
     nvm install "$NODE_VERSION" && nvm use "$NODE_VERSION" && return
   fi
-
   if command -v volta >/dev/null 2>&1; then
-    log "Using volta..."
     volta install "node@$NODE_VERSION" && return
   fi
-
   if command -v apt-get >/dev/null 2>&1; then
-    log "Using apt..."
     curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
-    sudo apt-get install -y nodejs
-    return
+    sudo apt-get install -y nodejs && return
   fi
-
   if command -v brew >/dev/null 2>&1; then
-    log "Using Homebrew..."
-    brew install "node@${NODE_VERSION}"
-    return
+    brew install "node@${NODE_VERSION}" && return
   fi
 
-  log "Downloading Node.js binary..."
+  # Binary fallback
   detect_platform
   NODE_URL="https://nodejs.org/dist/v${NODE_VERSION}.0.0/node-v${NODE_VERSION}.0.0-${PLATFORM}-${ARCH}.tar.gz"
   TMP_DIR=$(mktemp -d)
@@ -115,14 +104,11 @@ install_node() {
   [ -f "$HOME/.zshrc" ] && PROFILE="$HOME/.zshrc"
   [ -f "$PROFILE" ] || PROFILE="$HOME/.profile"
   if [ -n "$PROFILE" ] && ! grep -q "lazydrop-node" "$PROFILE" 2>/dev/null; then
-    echo "" >> "$PROFILE"
-    echo "# LazyDrop Node.js" >> "$PROFILE"
-    echo "export PATH=\"$NODE_BIN:\$PATH\"" >> "$PROFILE"
+    echo -e "\n# LazyDrop Node.js\nexport PATH=\"$NODE_BIN:\$PATH\"" >> "$PROFILE"
   fi
   rm -rf "$TMP_DIR"
 }
 
-# ── Ensure Node.js is available ──
 ensure_node() {
   if command -v node >/dev/null 2>&1; then
     NODE_VER=$(node -v | sed 's/v//' | cut -d. -f1)
@@ -134,7 +120,6 @@ ensure_node() {
   command -v npm >/dev/null || err "npm installation failed."
 }
 
-# ── Ensure git is available ──
 ensure_git() {
   command -v git >/dev/null 2>&1 && return
   log "git not found. Installing..."
@@ -147,7 +132,6 @@ ensure_git() {
   fi
 }
 
-# ── Get public IP ──
 get_ip() {
   for url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.com"; do
     PUBLIC_IP=$(curl -fsSL --max-time 5 "$url" 2>/dev/null | tr -d '[:space:]') && break
@@ -155,13 +139,18 @@ get_ip() {
   echo "${PUBLIC_IP:-unknown}"
 }
 
-# ── Check if service is running ──
 is_running() {
-  if command -v systemctl >/dev/null 2>&1; then
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME" 2>/dev/null; then
     systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null
-  elif command -v pgrep >/dev/null 2>&1; then
-    pgrep -f "dist-server/production.js" >/dev/null 2>&1
+  elif [ -f /tmp/lazydrop.pid ]; then
+    kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null
+  else
+    false
   fi
+}
+
+has_service() {
+  command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME" 2>/dev/null
 }
 
 # ═══════════════════════════════════════════════
@@ -176,7 +165,6 @@ cmd_install() {
   echo -e "${CYAN}  ╔══════════════════════════════════════╗${NC}"
   echo -e "${CYAN}  ║     LazyDrop — Install               ║${NC}"
   echo -e "${CYAN}  ╚══════════════════════════════════════╝${NC}"
-  echo ""
   echo -e "  Node.js: $(node -v)  |  npm: $(npm -v)"
   echo ""
 
@@ -196,15 +184,12 @@ cmd_install() {
 
   if [ ! -f .env ]; then
     log "Creating .env..."
-
-    # Prompt for database URL
     echo ""
-    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Database URL (or press Enter to skip): ")" INPUT_DB
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Database URL (or Enter to skip): ")" INPUT_DB
 
-    # Prompt for admin credentials
     echo ""
-    echo -e "  ${BOLD}Admin Account Setup${NC}"
-    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin email (or press Enter to skip): ")" INPUT_EMAIL
+    echo -e "  ${BOLD}Admin Account${NC}"
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin email (or Enter to skip): ")" INPUT_EMAIL
     read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin username [admin]: ")" INPUT_USER
     INPUT_USER="${INPUT_USER:-admin}"
     read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Admin password: ")" INPUT_PASS
@@ -212,115 +197,97 @@ cmd_install() {
     if [ -n "$INPUT_PASS" ]; then
       read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Confirm password: ")" INPUT_PASS2
       echo ""
-      if [ "$INPUT_PASS" != "$INPUT_PASS2" ]; then
-        err "Passwords do not match"
-      fi
-      if [ ${#INPUT_PASS} -lt 6 ]; then
-        err "Password must be at least 6 characters"
-      fi
+      [ "$INPUT_PASS" = "$INPUT_PASS2" ] || err "Passwords do not match"
+      [ ${#INPUT_PASS} -ge 6 ] || err "Password must be at least 6 characters"
     fi
 
     cat > .env <<ENVEOF
-# ═══════════════════════════════════════
 # LazyDrop Configuration
-# ═══════════════════════════════════════
-
-# Database (required — get from https://neon.tech)
 DATABASE_URL=${INPUT_DB:-postgresql://user:password@host/dbname}
-
-# Admin credentials (set via setup.sh or web UI on first visit)
 ADMIN_EMAIL=${INPUT_EMAIL}
 ADMIN_USERNAME=${INPUT_USER}
 ADMIN_PASSWORD=${INPUT_PASS}
 ENVEOF
-    echo ""
     ok "Created .env"
-
-    if [ -n "$INPUT_PASS" ]; then
-      ok "Admin account: ${INPUT_USER}"
-      echo "  You can also manage credentials from the web UI."
-    else
-      echo ""
-      warn "Set up your admin account in the browser:"
-      echo "    Open the admin page and create your username & password"
-    fi
-    echo ""
+    [ -n "$INPUT_PASS" ] && ok "Admin: ${INPUT_USER}" || warn "Set admin in browser on first visit"
   else
-    warn ".env already exists, skipping"
+    warn ".env exists, skipping"
   fi
 
-  log "Building production bundle..."
+  log "Building..."
   npm run build
 
-  # Offer systemd service on Linux
-  if command -v systemctl >/dev/null 2>&1; then
-    echo ""
-    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Install as system service (runs on boot)? [Y/n]: ")" INSTALL_SVC
-    if [ "${INSTALL_SVC,,}" != "n" ]; then
-      install_systemd_service
-    fi
+  if has_service; then
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Install as system service? [Y/n]: ")" INSTALL_SVC
+    [ "${INSTALL_SVC,,}" != "n" ] && install_systemd_service
   fi
 
-  # Open firewall
   open_firewall
 
-  local IP
-  IP=$(get_ip)
-
   echo ""
-  ok "Installation complete!"
-  echo ""
-  echo -e "  ${BOLD}Edit config:${NC}    nano .env"
-  echo -e "  ${BOLD}Start dev server:${NC}  lazydrop start"
+  ok "Installed!"
+  echo -e "  ${BOLD}Start:${NC}  lazydrop start"
   echo -e "  ${BOLD}Local:${NC}  http://localhost:5173"
-  echo -e "  ${BOLD}Network:${NC} http://${IP}:5173"
+  echo -e "  ${BOLD}IP:${NC}     http://$(get_ip):5173"
   echo ""
+}
+
+# Internal stop — no messages, returns 0 if something was stopped
+_stop_internal() {
+  if has_service && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    sudo systemctl stop "$SERVICE_NAME" 2>/dev/null
+    return 0
+  fi
+  local stopped=false
+  if [ -f /tmp/lazydrop.pid ]; then
+    local PID
+    PID=$(cat /tmp/lazydrop.pid)
+    if kill -0 "$PID" 2>/dev/null; then
+      kill "$PID" 2>/dev/null || true
+      stopped=true
+    fi
+    rm -f /tmp/lazydrop.pid
+  fi
+  pkill -f "vite" 2>/dev/null || true
+  $stopped
+}
+
+# Internal start — no messages, returns 0 if started
+_start_internal() {
+  if has_service; then
+    sudo systemctl start "$SERVICE_NAME" 2>/dev/null
+    sleep 2
+    systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null
+    return $?
+  fi
+
+  # Dev server
+  if [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
+    return 0  # already running
+  fi
+  nohup npm run dev > /tmp/lazydrop.log 2>&1 &
+  echo $! > /tmp/lazydrop.pid
+  sleep 3
+  kill -0 "$(cat /tmp/lazydrop.pid 2>/dev/null)" 2>/dev/null
 }
 
 cmd_start() {
   find_app
-  log "Starting LazyDrop..."
 
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-    # Service exists - try to start
-    if sudo systemctl start "$SERVICE_NAME" 2>/dev/null; then
-      sleep 2
-      if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        ok "Service started."
-      else
-        warn "Service failed to start. Reinstalling service..."
-        install_systemd_service
-      fi
-    else
-      warn "Service failed to start. Reinstalling service..."
-      install_systemd_service
-    fi
+  if _start_internal; then
+    ok "Started."
   else
-    # No service - run dev server in background
-    # Kill any existing instance first
-    if [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
-      kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
-      sleep 1
-    fi
-
-    log "Starting dev server in background..."
-    nohup npm run dev > /tmp/lazydrop.log 2>&1 &
-    echo $! > /tmp/lazydrop.pid
-    sleep 3
-
-    # Check if process is alive (not just PID file)
-    if kill -0 "$(cat /tmp/lazydrop.pid 2>/dev/null)" 2>/dev/null; then
-      ok "Dev server started (PID: $(cat /tmp/lazydrop.pid))"
+    # Service exists but failed — try reinstalling
+    if has_service; then
+      warn "Service failed. Reinstalling..."
+      install_systemd_service
     else
       err "Failed to start. Check: cat /tmp/lazydrop.log"
     fi
   fi
 
-  # Grab actual port from log
-  local PORT_ACTUAL
+  local PORT_ACTUAL IP
   PORT_ACTUAL=$(grep -oP 'http://localhost:\K[0-9]+' /tmp/lazydrop.log 2>/dev/null | head -1 || echo "$PORT")
-
-  local IP
   IP=$(get_ip)
   echo -e "  ${BOLD}Local:${NC}  http://localhost:${PORT_ACTUAL}"
   echo -e "  ${BOLD}Network:${NC} http://${IP}:${PORT_ACTUAL}"
@@ -329,40 +296,32 @@ cmd_start() {
 
 cmd_stop() {
   find_app
-  log "Stopping LazyDrop..."
-
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-    sudo systemctl stop "$SERVICE_NAME"
-    ok "Service stopped."
+  if _stop_internal; then
+    ok "Stopped."
   else
-    local killed=false
-    if [ -f /tmp/lazydrop.pid ]; then
-      PID=$(cat /tmp/lazydrop.pid)
-      if kill -0 "$PID" 2>/dev/null; then
-        kill "$PID" 2>/dev/null || true
-        killed=true
-      fi
-      rm -f /tmp/lazydrop.pid
-    fi
-    # Also kill any stray vite processes
-    pkill -f "vite" 2>/dev/null || true
-    if [ "$killed" = true ]; then
-      ok "Dev server stopped."
-    else
-      warn "No running instance found."
-    fi
+    warn "Not running."
   fi
 }
 
 cmd_restart() {
-  cmd_stop
+  find_app
+  log "Restarting..."
+  _stop_internal 2>/dev/null
   sleep 1
-  cmd_start
+  if _start_internal; then
+    ok "Restarted."
+  else
+    if has_service; then
+      warn "Service failed. Reinstalling..."
+      install_systemd_service
+    else
+      err "Failed to restart. Check: cat /tmp/lazydrop.log"
+    fi
+  fi
 }
 
 cmd_status() {
   find_app
-
   local IP
   IP=$(get_ip)
 
@@ -372,49 +331,32 @@ cmd_status() {
   echo -e "${CYAN}  ╚══════════════════════════════════════╝${NC}"
   echo ""
 
-  # Version / branch
   if [ -d .git ]; then
     BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
     COMMIT=$(git log --oneline -1 2>/dev/null | cut -d' ' -f1 || echo "unknown")
     echo -e "  ${BOLD}Branch:${NC}    $BRANCH ($COMMIT)"
   fi
 
-  # Node.js
-  if command -v node >/dev/null 2>&1; then
-    echo -e "  ${BOLD}Node.js:${NC}   $(node -v)"
-  else
-    echo -e "  ${BOLD}Node.js:${NC}   ${RED}not installed${NC}"
-  fi
+  echo -e "  ${BOLD}Node.js:${NC}   $(node -v 2>/dev/null || echo 'not installed')"
 
-  # .env
-  if [ -f .env ]; then
-    if grep -q "DATABASE_URL=postgresql://user:password" .env 2>/dev/null; then
-      echo -e "  ${BOLD}Database:${NC}  ${YELLOW}not configured${NC} (edit .env)"
-    else
-      echo -e "  ${BOLD}Database:${NC}  ${GREEN}configured${NC}"
-    fi
+  if [ -f .env ] && grep -q "DATABASE_URL=postgresql://user:password" .env 2>/dev/null; then
+    echo -e "  ${BOLD}Database:${NC}  ${YELLOW}not configured${NC}"
+  elif [ -f .env ]; then
+    echo -e "  ${BOLD}Database:${NC}  ${GREEN}configured${NC}"
   else
     echo -e "  ${BOLD}Database:${NC}  ${RED}.env not found${NC}"
   fi
 
-  # Build
   if [ -f dist-server/production.js ]; then
     echo -e "  ${BOLD}Build:${NC}     ${GREEN}ready${NC}"
   else
-    echo -e "  ${BOLD}Build:${NC}     ${YELLOW}not built${NC} (run: lazydrop install)"
+    echo -e "  ${BOLD}Build:${NC}     ${YELLOW}not built${NC}"
   fi
 
-  # Service
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-      echo -e "  ${BOLD}Service:${NC}   ${GREEN}running${NC} (systemd)"
-    else
-      echo -e "  ${BOLD}Service:${NC}   ${RED}stopped${NC} (systemd)"
-    fi
+  if has_service && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    echo -e "  ${BOLD}Service:${NC}   ${GREEN}running${NC}"
   elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
     echo -e "  ${BOLD}Process:${NC}   ${GREEN}running${NC} (PID: $(cat /tmp/lazydrop.pid))"
-  elif pgrep -f "vite" >/dev/null 2>&1; then
-    echo -e "  ${BOLD}Process:${NC}   ${GREEN}running${NC} (PID: $(pgrep -f vite | head -1))"
   else
     echo -e "  ${BOLD}Process:${NC}   ${RED}not running${NC}"
   fi
@@ -422,7 +364,6 @@ cmd_status() {
   local ACTUAL_PORT
   ACTUAL_PORT=$(grep -oP 'http://localhost:\K[0-9]+' /tmp/lazydrop.log 2>/dev/null | head -1 || echo "$PORT")
   [ -z "$ACTUAL_PORT" ] && ACTUAL_PORT="$PORT"
-
   echo -e "  ${BOLD}Local:${NC}    http://localhost:${ACTUAL_PORT}"
   echo -e "  ${BOLD}Network:${NC}   http://${IP}:${ACTUAL_PORT}"
   echo ""
@@ -437,7 +378,6 @@ cmd_update() {
   echo -e "  Branch: ${BOLD}${BRANCH}${NC}"
   echo -e "  Local:  ${DIM}$(git log --oneline -1 2>/dev/null || echo 'unknown')${NC}"
 
-  # Fetch remote
   git fetch origin "$BRANCH" 2>/dev/null || true
 
   LOCAL=$(git rev-parse HEAD 2>/dev/null)
@@ -445,7 +385,6 @@ cmd_update() {
 
   if [ "$LOCAL" = "$REMOTE" ]; then
     echo -e "  Remote: ${GREEN}up to date${NC}"
-    echo ""
     ok "Already on the latest version!"
     echo ""
     return
@@ -457,62 +396,44 @@ cmd_update() {
   echo ""
 
   read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Update now? [Y/n]: ")" CONFIRM
-  if [ "${CONFIRM,,}" = "n" ]; then
-    log "Skipped."
-    return
-  fi
+  [ "${CONFIRM,,}" != "n" ] || { log "Skipped."; return; }
 
-  # Stash local changes
   if ! git diff --quiet 2>/dev/null; then
-    log "Stashing local changes..."
-    git stash push -m "auto-stash before update $(date +%Y%m%d-%H%M%S)" || true
+    git stash push -m "auto-stash $(date +%Y%m%d-%H%M%S)" || true
   fi
 
-  # Pull latest
-  log "Pulling latest..."
-  if ! git pull origin "$BRANCH" 2>&1; then
-    err "git pull failed. Check your network or git config."
-  fi
+  log "Pulling..."
+  git pull origin "$BRANCH" 2>&1 || err "git pull failed."
+  ok "Updated: $(git log --oneline -1 2>/dev/null)"
 
-  echo -e "  Updated: ${GREEN}$(git log --oneline -1 2>/dev/null)${NC}"
-  echo ""
-
-  # Install deps
   log "Installing dependencies..."
   npm install 2>&1 | tail -3
 
-  # Rebuild
   log "Rebuilding..."
-  if ! npm run build 2>&1 | tail -5; then
-    err "Build failed. Check the errors above."
-  fi
+  npm run build 2>&1 | tail -5 || err "Build failed."
 
-  # Restart service if running
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    log "Restarting service..."
-    sudo systemctl restart "$SERVICE_NAME"
-    ok "Service restarted."
-  elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
-    log "Restarting dev server..."
-    kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
-    rm -f /tmp/lazydrop.pid
-    sleep 1
-    cmd_start >/dev/null 2>&1
-    ok "Dev server restarted."
+  if is_running; then
+    log "Restarting..."
+    if has_service; then
+      sudo systemctl restart "$SERVICE_NAME" && ok "Service restarted."
+    else
+      _stop_internal 2>/dev/null; sleep 1
+      _start_internal && ok "Dev server restarted."
+    fi
   fi
 
   echo ""
-  ok "Update complete!"
+  ok "Done!"
   echo ""
 }
 
 cmd_logs() {
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
+  if has_service; then
     journalctl -u "$SERVICE_NAME" -f --no-pager
   elif [ -f /tmp/lazydrop.log ]; then
     tail -f /tmp/lazydrop.log
   else
-    err "No logs found. Start the server first: lazydrop start"
+    err "No logs. Start the server first."
   fi
 }
 
@@ -523,9 +444,9 @@ cmd_uninstall() {
   read -rp "$(echo -e "${RED}Are you sure? [y/N]:${NC} ")" CONFIRM
   [ "${CONFIRM,,}" = "y" ] || { log "Cancelled."; exit 0; }
 
-  cmd_stop 2>/dev/null || true
+  _stop_internal 2>/dev/null || true
 
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
+  if has_service; then
     sudo systemctl disable "$SERVICE_NAME" 2>/dev/null || true
     sudo rm -f /etc/systemd/system/$SERVICE_NAME.service
     sudo systemctl daemon-reload
@@ -537,28 +458,18 @@ cmd_uninstall() {
     rm -rf "$APP_DIR"
     ok "Removed $APP_DIR"
   else
-    log "Running from inside repo — not deleting. Remove manually if needed."
+    log "Running from inside repo — not deleting."
   fi
-
   ok "Uninstalled."
 }
 
-cmd_service() {
-  find_app
-  install_systemd_service
-}
-
 install_systemd_service() {
-  log "Installing systemd service..."
-
   find_app
   ABS_APP_DIR="$(cd "$APP_DIR" && pwd)"
 
-  # Make sure build exists
   if [ ! -f "$ABS_APP_DIR/dist-server/production.js" ]; then
     log "Building first..."
-    cd "$ABS_APP_DIR"
-    npm run build 2>&1 | tail -3
+    cd "$ABS_APP_DIR" && npm run build 2>&1 | tail -3
   fi
 
   sudo tee /etc/systemd/system/$SERVICE_NAME.service >/dev/null <<SVC
@@ -581,22 +492,15 @@ WantedBy=multi-user.target
 SVC
 
   sudo systemctl daemon-reload
-  sudo systemctl enable "$SERVICE_NAME"
+  sudo systemctl enable "$SERVICE_NAME" 2>/dev/null
   sudo systemctl restart "$SERVICE_NAME" 2>/dev/null || sudo systemctl start "$SERVICE_NAME"
   sleep 2
 
   if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    ok "Service installed and started!"
+    ok "Service installed & running."
   else
     warn "Service installed but may have issues. Check: journalctl -u $SERVICE_NAME -n 20"
   fi
-  echo ""
-  echo "  Commands:"
-  echo "    lazydrop status     — check status"
-  echo "    lazydrop restart    — restart"
-  echo "    lazydrop stop       — stop"
-  echo "    lazydrop logs       — view logs"
-  echo ""
 }
 
 open_firewall() {
@@ -621,15 +525,11 @@ show_menu() {
   echo -e "${CYAN}  ╚══════════════════════════════════════╝${NC}"
   echo ""
 
-  # Status indicator
-  local STATUS_COLOR="$RED"
-  local STATUS_TEXT="not running"
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-    STATUS_COLOR="$GREEN"
-    STATUS_TEXT="running (service)"
+  local STATUS_COLOR="$RED" STATUS_TEXT="not running"
+  if has_service && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    STATUS_COLOR="$GREEN"; STATUS_TEXT="running (service)"
   elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
-    STATUS_COLOR="$GREEN"
-    STATUS_TEXT="running"
+    STATUS_COLOR="$GREEN"; STATUS_TEXT="running"
   fi
   echo -e "  Status: ${STATUS_COLOR}${STATUS_TEXT}${NC}"
   echo ""
@@ -657,7 +557,7 @@ show_menu() {
     5) cmd_update ;;
     6) cmd_status ;;
     7) cmd_logs ;;
-    8) cmd_service ;;
+    8) install_systemd_service ;;
     9) cmd_uninstall ;;
     0|q|Q) echo "  Bye!"; exit 0 ;;
     *) warn "Invalid choice"; sleep 1; show_menu ;;
@@ -673,22 +573,19 @@ cmd_help() {
   echo -e "${CYAN}  LazyDrop CLI${NC}"
   echo ""
   echo -e "  ${BOLD}Usage:${NC}"
-  echo "    ./setup.sh              Interactive menu (recommended)"
+  echo "    ./setup.sh              Interactive menu"
   echo "    ./setup.sh <command>    Direct command"
   echo ""
   echo -e "  ${BOLD}Commands:${NC}"
-  echo "    install       Install LazyDrop (auto-installs Node.js if needed)"
-  echo "    start         Start the dev server"
+  echo "    install       Install LazyDrop"
+  echo "    start         Start the server"
   echo "    stop          Stop the server"
   echo "    restart       Restart the server"
-  echo "    status        Show status, config, and connection info"
-  echo "    update        Pull latest changes and rebuild"
+  echo "    status        Show status"
+  echo "    update        Pull latest and rebuild"
   echo "    logs          Follow live logs"
-  echo "    service       Install/reinstall as systemd service"
-  echo "    uninstall     Remove LazyDrop completely"
-  echo ""
-  echo -e "  ${BOLD}Quick start:${NC}"
-  echo "    curl -fsSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/setup.sh | bash"
+  echo "    service       Install as systemd service"
+  echo "    uninstall     Remove LazyDrop"
   echo ""
 }
 
@@ -710,11 +607,9 @@ else
     status)    cmd_status ;;
     update)    cmd_update ;;
     logs)      cmd_logs ;;
-    service)   cmd_service ;;
+    service)   install_systemd_service ;;
     uninstall) cmd_uninstall ;;
     help|-h|--help) cmd_help ;;
-    *)
-      err "Unknown command: $CMD\n\nRun: ./setup.sh for interactive menu"
-      ;;
+    *) err "Unknown command: $CMD\n\nRun: ./setup.sh for interactive menu" ;;
   esac
 fi
