@@ -256,9 +256,21 @@ cmd_start() {
   log "Starting LazyDrop..."
 
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-    sudo systemctl start "$SERVICE_NAME"
-    ok "Service started."
+    # Service exists - try to start
+    if sudo systemctl start "$SERVICE_NAME" 2>/dev/null; then
+      sleep 2
+      if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        ok "Service started."
+      else
+        warn "Service failed to start. Reinstalling service..."
+        install_systemd_service
+      fi
+    else
+      warn "Service failed to start. Reinstalling service..."
+      install_systemd_service
+    fi
   else
+    # No service - run dev server in background
     # Kill any existing instance first
     if [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
       kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
@@ -513,8 +525,15 @@ cmd_service() {
 install_systemd_service() {
   log "Installing systemd service..."
 
-  NODE_PATH=$(which node 2>/dev/null || echo "/usr/local/bin/node")
+  find_app
   ABS_APP_DIR="$(cd "$APP_DIR" && pwd)"
+
+  # Make sure build exists
+  if [ ! -f "$ABS_APP_DIR/dist-server/production.js" ]; then
+    log "Building first..."
+    cd "$ABS_APP_DIR"
+    npm run build 2>&1 | tail -3
+  fi
 
   sudo tee /etc/systemd/system/$SERVICE_NAME.service >/dev/null <<SVC
 [Unit]
@@ -525,8 +544,8 @@ After=network.target
 Type=simple
 User=$(whoami)
 WorkingDirectory=${ABS_APP_DIR}
-ExecStart=${NODE_PATH} dist-server/production.js
-Restart=always
+ExecStart=/usr/bin/env node dist-server/production.js
+Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
 EnvironmentFile=${ABS_APP_DIR}/.env
@@ -537,8 +556,14 @@ SVC
 
   sudo systemctl daemon-reload
   sudo systemctl enable "$SERVICE_NAME"
-  sudo systemctl start "$SERVICE_NAME"
-  ok "Service installed and started!"
+  sudo systemctl restart "$SERVICE_NAME" 2>/dev/null || sudo systemctl start "$SERVICE_NAME"
+  sleep 2
+
+  if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    ok "Service installed and started!"
+  else
+    warn "Service installed but may have issues. Check: journalctl -u $SERVICE_NAME -n 20"
+  fi
   echo ""
   echo "  Commands:"
   echo "    lazydrop status     — check status"
