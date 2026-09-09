@@ -1,5 +1,5 @@
 import { neon } from '@neondatabase/serverless';
-import { randomUUID } from 'crypto';
+import { randomUUID, scryptSync } from 'crypto';
 
 let sql: ReturnType<typeof neon> | null = null;
 

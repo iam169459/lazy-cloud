@@ -1,8 +1,8 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { join } from 'path';
 import { existsSync, readFileSync, statSync } from 'fs';
-import { initDatabase, cleanupExpiredFiles } from './api';
-import { handleApiRequest } from './api';
+import { initDatabase } from './db';
+import { handleApiRequest, cleanupExpiredFiles } from './api';
 
 const PORT = parseInt(process.env.PORT || '3000');
 const HOST = '0.0.0.0';
