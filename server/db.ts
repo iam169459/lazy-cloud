@@ -184,11 +184,12 @@ export interface AdminCredentials {
   username: string;
   password: string;
   email?: string;
+  totp_enabled?: boolean;
 }
 
 export async function getAdminCredentials(): Promise<AdminCredentials | null> {
   const sql = getSql();
-  const rows = (await sql`SELECT username, password, email FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  const rows = (await sql`SELECT username, password, email, totp_enabled FROM admin_settings WHERE id = 'singleton'`) as unknown[];
   if (rows.length > 0) {
     return rows[0] as AdminCredentials;
   }
@@ -221,6 +222,50 @@ export async function updateAdminCredentials(username: string, password: string,
     VALUES ('singleton', ${username}, ${password}, ${email || null}, CURRENT_TIMESTAMP)
     ON CONFLICT (id) DO UPDATE
     SET username = ${username}, password = ${password}, email = ${email || null}, updated_at = CURRENT_TIMESTAMP
+  `;
+}
+
+export async function getTotpSecret(): Promise<string | null> {
+  const sql = getSql();
+  const rows = (await sql`SELECT totp_secret FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  if (rows.length > 0) {
+    const row = rows[0] as any;
+    return row.totp_secret || null;
+  }
+  return null;
+}
+
+export async function getTotpEnabled(): Promise<boolean> {
+  const sql = getSql();
+  const rows = (await sql`SELECT totp_enabled FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  if (rows.length > 0) {
+    const row = rows[0] as any;
+    return row.totp_enabled === true;
+  }
+  return false;
+}
+
+export async function setTotpSecret(secret: string): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE admin_settings SET totp_secret = ${secret}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 'singleton'
+  `;
+}
+
+export async function enableTotp(secret: string): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE admin_settings SET totp_secret = ${secret}, totp_enabled = true, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 'singleton'
+  `;
+}
+
+export async function disableTotp(): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE admin_settings SET totp_secret = NULL, totp_enabled = false, updated_at = CURRENT_TIMESTAMP
+    WHERE id = 'singleton'
   `;
 }
 

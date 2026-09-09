@@ -494,6 +494,7 @@ export async function handleApiRequest(
 
       const inputUser = sanitize(body.username);
       const inputPass = sanitize(body.password);
+      const inputTotp = sanitize(body.totp);
 
       if (!inputUser || !inputPass) {
         sendError(res, 400, 'Username and password are required');
@@ -513,11 +514,32 @@ export async function handleApiRequest(
         valid = true;
       }
 
-      if (valid) {
-        sendJson(res, 200, { success: true, token });
-      } else {
+      if (!valid) {
         sendError(res, 401, 'Invalid username or password');
+        return true;
       }
+
+      // Check if 2FA is enabled
+      if (creds.totp_enabled) {
+        if (!inputTotp || inputTotp.length !== 6) {
+          sendJson(res, 200, { success: false, requiresTotp: true, message: 'Enter your 6-digit authenticator code' });
+          return true;
+        }
+        const { authenticator } = await import('otplib');
+        const { getTotpSecret } = await import('./db.js');
+        const secret = await getTotpSecret();
+        if (!secret) {
+          sendError(res, 500, '2FA misconfigured');
+          return true;
+        }
+        const totpValid = authenticator.verify({ token: inputTotp, secret });
+        if (!totpValid) {
+          sendError(res, 401, 'Invalid authenticator code');
+          return true;
+        }
+      }
+
+      sendJson(res, 200, { success: true, token });
       return true;
     }
 
@@ -1273,6 +1295,106 @@ export async function handleApiRequest(
       } catch (e: any) {
         sendError(res, 500, `Update failed: ${e.message}`);
       }
+      return true;
+    }
+
+    // ── 2FA: Check status ──
+    if (path === '/api/admin/2fa/status' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { getTotpEnabled } = await import('./db.js');
+      const enabled = await getTotpEnabled();
+      sendJson(res, 200, { enabled });
+      return true;
+    }
+
+    // ── 2FA: Setup (generate secret + QR) ──
+    if (path === '/api/admin/2fa/setup' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const QRCode = await import('qrcode');
+      const { getAdminCredentials, setTotpSecret, getTotpEnabled } = await import('./db.js');
+
+      if (await getTotpEnabled()) {
+        sendError(res, 400, '2FA is already enabled. Disable it first.');
+        return true;
+      }
+
+      const creds = await getAdminCredentials();
+      if (!creds) { sendError(res, 400, 'No admin credentials'); return true; }
+
+      const secret = authenticator.generateSecret();
+      const otpauth = authenticator.keyuri(creds.username, 'LazyDrop', secret);
+      const qrDataUrl = await QRCode.toDataURL(otpauth);
+
+      // Save secret (not enabled yet — waiting for verification)
+      await setTotpSecret(secret);
+
+      sendJson(res, 200, { secret, qr: qrDataUrl });
+      return true;
+    }
+
+    // ── 2FA: Verify & Enable ──
+    if (path === '/api/admin/2fa/verify' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const { getTotpSecret, enableTotp } = await import('./db.js');
+      const body = await parseJsonBody(req);
+      const code = sanitize(body.code);
+
+      if (!code || code.length !== 6) {
+        sendError(res, 400, 'Enter the 6-digit code from your authenticator app');
+        return true;
+      }
+
+      const secret = await getTotpSecret();
+      if (!secret) {
+        sendError(res, 400, 'No pending 2FA setup. Run setup first.');
+        return true;
+      }
+
+      const valid = authenticator.verify({ token: code, secret });
+      if (!valid) {
+        sendError(res, 400, 'Invalid code. Check your authenticator app.');
+        return true;
+      }
+
+      await enableTotp(secret);
+      sendJson(res, 200, { success: true, message: '2FA enabled successfully' });
+      return true;
+    }
+
+    // ── 2FA: Disable ──
+    if (path === '/api/admin/2fa/disable' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const { getTotpSecret, getTotpEnabled, disableTotp } = await import('./db.js');
+      const body = await parseJsonBody(req);
+      const code = sanitize(body.code);
+
+      if (!(await getTotpEnabled())) {
+        sendError(res, 400, '2FA is not enabled');
+        return true;
+      }
+
+      if (!code || code.length !== 6) {
+        sendError(res, 400, 'Enter your 6-digit code to confirm disable');
+        return true;
+      }
+
+      const secret = await getTotpSecret();
+      if (!secret) {
+        sendError(res, 500, 'No TOTP secret found');
+        return true;
+      }
+
+      const valid = authenticator.verify({ token: code, secret });
+      if (!valid) {
+        sendError(res, 400, 'Invalid code');
+        return true;
+      }
+
+      await disableTotp();
+      sendJson(res, 200, { success: true, message: '2FA disabled' });
       return true;
     }
 

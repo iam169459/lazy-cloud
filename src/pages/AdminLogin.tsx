@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, ArrowLeft, Loader2, Zap, User, Check, Mail } from 'lucide-react';
+import { Lock, ArrowLeft, Loader2, Zap, User, Check, Mail, Smartphone } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -22,6 +22,8 @@ export default function AdminLogin() {
   const [setupPass2, setSetupPass2] = useState('');
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupSuccess, setSetupSuccess] = useState(false);
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
   const [attempts, setAttempts] = useState(() => {
     const s = localStorage.getItem('ld_att');
     const t = localStorage.getItem('ld_lock');
@@ -40,9 +42,13 @@ export default function AdminLogin() {
     e.preventDefault();
     if (locked) return;
     setLoading(true); setErr(''); sounds.click();
-    const ok = await login(user, pass);
-    if (ok) { localStorage.removeItem('ld_att'); localStorage.removeItem('ld_lock'); sounds.success(); nav('/admin'); }
-    else {
+    const result = await login(user, pass, totpRequired ? totpCode : undefined);
+    if (result.requiresTotp) {
+      setTotpRequired(true); setErr(''); setLoading(false); return;
+    }
+    if (result.success) {
+      localStorage.removeItem('ld_att'); localStorage.removeItem('ld_lock'); sounds.success(); nav('/admin');
+    } else {
       const n = attempts + 1; setAttempts(n); localStorage.setItem('ld_att', String(n));
       if (n >= MAX) { localStorage.setItem('ld_lock', String(Date.now())); setLocked(true); setErr(`Locked for ${LOCK / 1000}s.`); setTimeout(() => { setLocked(false); setAttempts(0); localStorage.removeItem('ld_att'); localStorage.removeItem('ld_lock'); }, LOCK); }
       else { sounds.error(); setErr(`Invalid. ${MAX - n} left.`); }
@@ -169,25 +175,52 @@ export default function AdminLogin() {
         </Link>
         <div className="card p-6 animate-scale-up">
           <h1 className="text-lg font-bold text-center mb-1">Admin Access</h1>
-          <p className="text-xs text-center mb-5" style={{ color: colors.textDim }}>Enter your credentials</p>
+          <p className="text-xs text-center mb-5" style={{ color: colors.textDim }}>
+            {totpRequired ? 'Enter your authenticator code' : 'Enter your credentials'}
+          </p>
           <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Username</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><User className="w-4 h-4" /></span>
-                <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input pl-10" disabled={locked} />
+            {!totpRequired && (
+              <>
+                <div>
+                  <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Username</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><User className="w-4 h-4" /></span>
+                    <input type="text" value={user} onChange={(e) => setUser(e.target.value)} placeholder="admin" autoFocus className="input pl-10" disabled={locked} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Password</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Lock className="w-4 h-4" /></span>
+                    <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Password" className="input pl-10" disabled={locked} />
+                  </div>
+                </div>
+              </>
+            )}
+            {totpRequired && (
+              <div>
+                <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Authenticator Code</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Smartphone className="w-4 h-4" /></span>
+                  <input
+                    type="text"
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    autoFocus
+                    className="input pl-10 font-mono text-center tracking-[0.3em]"
+                    disabled={locked}
+                  />
+                </div>
+                <button type="button" onClick={() => { setTotpRequired(false); setTotpCode(''); setErr(''); }} className="text-xs mt-2" style={{ color: colors.textDim }}>
+                  Use different account
+                </button>
               </div>
-            </div>
-            <div>
-              <label className="block text-xs mb-1 font-medium" style={{ color: colors.textDim }}>Password</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Lock className="w-4 h-4" /></span>
-                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="Password" className="input pl-10" disabled={locked} />
-              </div>
-            </div>
+            )}
             {err && <p className="text-sm text-center animate-shake" style={{ color: colors.danger }}>{err}</p>}
             <button type="submit" disabled={loading || locked} className="btn btn-primary w-full">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : locked ? 'Locked' : 'Sign in'}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : locked ? 'Locked' : totpRequired ? 'Verify' : 'Sign in'}
             </button>
           </form>
         </div>
