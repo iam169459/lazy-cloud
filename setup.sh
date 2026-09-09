@@ -196,7 +196,27 @@ cmd_install() {
 
   if [ ! -f .env ]; then
     log "Creating .env..."
-    cat > .env <<'ENVEOF'
+
+    # Prompt for credentials
+    echo ""
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin username [admin]: ")" INPUT_USER
+    ADMIN_USER="${INPUT_USER:-admin}"
+
+    while true; do
+      read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Admin password: ")" INPUT_PASS
+      echo ""
+      [ -n "$INPUT_PASS" ] && break
+      warn "Password cannot be empty"
+    done
+
+    while true; do
+      read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Confirm password: ")" INPUT_PASS2
+      echo ""
+      [ "$INPUT_PASS" = "$INPUT_PASS2" ] && break
+      warn "Passwords do not match. Try again."
+    done
+
+    cat > .env <<ENVEOF
 # ═══════════════════════════════════════
 # LazyDrop Configuration
 # ═══════════════════════════════════════
@@ -204,9 +224,9 @@ cmd_install() {
 # Database (required — get from https://neon.tech)
 DATABASE_URL=postgresql://user:password@host/dbname
 
-# Admin credentials (change these!)
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=change-me-now
+# Admin credentials
+ADMIN_USERNAME=${ADMIN_USER}
+ADMIN_PASSWORD=${INPUT_PASS}
 
 # Optional: Supabase
 # SUPABASE_URL=https://your-project.supabase.co
@@ -219,9 +239,10 @@ ADMIN_PASSWORD=change-me-now
 # Optional: Upload password
 # LAZYDROP_UPLOAD_PASSWORD=your-upload-password
 ENVEOF
-    warn "Created .env — edit it before starting:"
-    echo "    nano .env"
     echo ""
+    ok "Created .env with your credentials"
+  else
+    warn ".env already exists, skipping"
   fi
 
   log "Building production bundle..."

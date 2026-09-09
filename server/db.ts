@@ -182,16 +182,26 @@ export interface AdminCredentials {
   password: string;
 }
 
-export async function getAdminCredentials(): Promise<AdminCredentials> {
+export async function getAdminCredentials(): Promise<AdminCredentials | null> {
   const sql = getSql();
   const rows = (await sql`SELECT username, password FROM admin_settings WHERE id = 'singleton'`) as unknown[];
   if (rows.length > 0) {
     return rows[0] as AdminCredentials;
   }
-  return {
-    username: process.env.ADMIN_USERNAME || 'admin',
-    password: process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024',
-  };
+  // Check env vars
+  const envUser = process.env.ADMIN_USERNAME;
+  const envPass = process.env.ADMIN_PASSWORD;
+  if (envUser && envPass) {
+    return { username: envUser, password: envPass };
+  }
+  return null;
+}
+
+export async function isAdminSetup(): Promise<boolean> {
+  const sql = getSql();
+  const rows = (await sql`SELECT username, password FROM admin_settings WHERE id = 'singleton'`) as unknown[];
+  if (rows.length > 0) return true;
+  return !!(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
 }
 
 export async function updateAdminCredentials(username: string, password: string): Promise<void> {

@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
@@ -394,6 +394,62 @@ export async function handleApiRequest(
     return true;
   }
 
+  // Check if admin setup is needed
+  if (path === '/api/admin/needs-setup') {
+    const needsSetup = !(await isAdminSetup());
+    sendJson(res, 200, { needsSetup });
+    return true;
+  }
+
+  // First-run setup: set admin credentials
+  if (path === '/api/admin/setup' && req.method === 'POST') {
+    const alreadySetup = await isAdminSetup();
+    if (alreadySetup) {
+      sendError(res, 400, 'Admin already configured');
+      return true;
+    }
+    const body = await parseJsonBody(req);
+    const username = sanitize(body.username);
+    const password = sanitize(body.password);
+    if (!username || !password) {
+      sendError(res, 400, 'Username and password are required');
+      return true;
+    }
+    if (username.length < 3) {
+      sendError(res, 400, 'Username must be at least 3 characters');
+      return true;
+    }
+    if (password.length < 6) {
+      sendError(res, 400, 'Password must be at least 6 characters');
+      return true;
+    }
+    // Save to database
+    await updateAdminCredentials(username, password);
+    // Save to .env file
+    try {
+      const { writeFileSync, readFileSync, existsSync } = await import('fs');
+      const envPath = '.env';
+      let envContent = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
+      // Update or add ADMIN_USERNAME
+      if (envContent.includes('ADMIN_USERNAME=')) {
+        envContent = envContent.replace(/ADMIN_USERNAME=.*/, `ADMIN_USERNAME=${username}`);
+      } else {
+        envContent += `\nADMIN_USERNAME=${username}`;
+      }
+      // Update or add ADMIN_PASSWORD
+      if (envContent.includes('ADMIN_PASSWORD=')) {
+        envContent = envContent.replace(/ADMIN_PASSWORD=.*/, `ADMIN_PASSWORD=${password}`);
+      } else {
+        envContent += `\nADMIN_PASSWORD=${password}`;
+      }
+      writeFileSync(envPath, envContent.trim() + '\n');
+    } catch (e: any) {
+      console.warn('[lazydrop] Could not write to .env:', e.message);
+    }
+    sendJson(res, 200, { success: true, message: 'Admin credentials configured. Please log in.' });
+    return true;
+  }
+
   try {
     if (path === '/api/file' && req.method === 'GET') {
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
@@ -434,8 +490,6 @@ export async function handleApiRequest(
     if (path === '/api/admin/login' && req.method === 'POST') {
       if (!applyRateLimit(req, res, 5, 300000)) return true; // 5 login attempts per 5 minutes
       const body = await parseJsonBody(req);
-      const DEFAULT_USER = process.env.ADMIN_USERNAME || 'admin';
-      const DEFAULT_PASS = process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024';
 
       const inputUser = sanitize(body.username);
       const inputPass = sanitize(body.password);
@@ -445,21 +499,17 @@ export async function handleApiRequest(
         return true;
       }
 
-      let valid = false;
-      let token = DEFAULT_PASS;
+      const creds = await getAdminCredentials();
+      if (!creds) {
+        sendError(res, 400, 'Admin not configured. Please run setup first.');
+        return true;
+      }
 
-      if (safeCompare(inputUser, DEFAULT_USER) && safeCompare(inputPass, DEFAULT_PASS)) {
+      let valid = false;
+      let token = creds.password;
+
+      if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
         valid = true;
-      } else {
-        try {
-          const creds = await getAdminCredentials();
-          if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
-            valid = true;
-            token = creds.password;
-          }
-        } catch {
-          // DB not available, only defaults work
-        }
       }
 
       if (valid) {
