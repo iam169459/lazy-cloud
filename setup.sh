@@ -12,6 +12,15 @@ BRANCH="dev"
 APP_DIR="lazydrop"
 NODE_VERSION="20"
 
+# ── Detect if running from inside the repo ──
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -d "$SCRIPT_DIR/.git" ] && grep -q "lazy-cloud" "$SCRIPT_DIR/.git/config" 2>/dev/null; then
+  APP_DIR="$SCRIPT_DIR"
+  RUNNING_IN_REPO=true
+else
+  RUNNING_IN_REPO=false
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -155,7 +164,11 @@ echo -e "  Node.js: $(node -v)  |  npm: $(npm -v)"
 echo ""
 
 # ── Detect mode: install or update ──
-if [ -d "$APP_DIR/.git" ]; then
+if [ "$RUNNING_IN_REPO" = true ]; then
+  MODE="update"
+  log "Running from inside the repo — setting up in place..."
+  cd "$APP_DIR"
+elif [ -d "$APP_DIR/.git" ]; then
   MODE="update"
   log "Existing installation found — updating..."
   cd "$APP_DIR"
@@ -285,10 +298,10 @@ if [ "$MODE" = "install" ]; then
   echo ""
   echo -e "  ${BOLD}Next steps:${NC}"
   echo "    1. Edit .env with your DATABASE_URL:"
-  echo "       nano $APP_DIR/.env"
+  echo "       nano .env"
   echo ""
   echo "    2. Start the server:"
-  echo "       cd $APP_DIR && npm run dev"
+  echo "       npm run dev"
   echo ""
   echo -e "  ${BOLD}Local:${NC}   http://localhost:5173"
   [ -n "$PUBLIC_IP" ] && echo -e "  ${BOLD}Network:${NC} http://${PUBLIC_IP}:5173"
@@ -304,9 +317,6 @@ if [ "$MODE" = "install" ]; then
   echo "    - Set DATABASE_URL in Render dashboard"
   echo "    - Build:  npm install && npm run build"
   echo "    - Start:  npm start"
-  echo ""
-  echo -e "  ${BOLD}Expose to internet:${NC}"
-  echo "    cd $APP_DIR && npm run tunnel"
   echo ""
 else
   ok "Update complete!"
