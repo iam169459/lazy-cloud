@@ -394,10 +394,35 @@ cmd_update() {
   find_app
 
   echo ""
-  log "Updating LazyDrop..."
-  echo -e "  Branch: ${BOLD}$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')${NC}"
-  echo -e "  Current: ${DIM}$(git log --oneline -1 2>/dev/null || echo 'unknown')${NC}"
+  log "Checking for updates..."
+  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$BRANCH")
+  echo -e "  Branch: ${BOLD}${BRANCH}${NC}"
+  echo -e "  Local:  ${DIM}$(git log --oneline -1 2>/dev/null || echo 'unknown')${NC}"
+
+  # Fetch remote
+  git fetch origin "$BRANCH" 2>/dev/null || true
+
+  LOCAL=$(git rev-parse HEAD 2>/dev/null)
+  REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null)
+
+  if [ "$LOCAL" = "$REMOTE" ]; then
+    echo -e "  Remote: ${GREEN}up to date${NC}"
+    echo ""
+    ok "Already on the latest version!"
+    echo ""
+    return
+  fi
+
+  AHEAD=$(git rev-list HEAD..origin/"$BRANCH" --count 2>/dev/null || echo "?")
+  echo -e "  Remote: ${YELLOW}${AHEAD} update(s) available${NC}"
+  echo -e "  Latest: ${DIM}$(git log --oneline -1 "origin/$BRANCH" 2>/dev/null)${NC}"
   echo ""
+
+  read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Update now? [Y/n]: ")" CONFIRM
+  if [ "${CONFIRM,,}" = "n" ]; then
+    log "Skipped."
+    return
+  fi
 
   # Stash local changes
   if ! git diff --quiet 2>/dev/null; then
@@ -406,13 +431,12 @@ cmd_update() {
   fi
 
   # Pull latest
-  BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$BRANCH")
-  log "Pulling latest from '$BRANCH'..."
+  log "Pulling latest..."
   if ! git pull origin "$BRANCH" 2>&1; then
     err "git pull failed. Check your network or git config."
   fi
 
-  echo -e "  Latest: ${DIM}$(git log --oneline -1 2>/dev/null)${NC}"
+  echo -e "  Updated: ${GREEN}$(git log --oneline -1 2>/dev/null)${NC}"
   echo ""
 
   # Install deps
