@@ -385,6 +385,12 @@ export async function handleApiRequest(
 ): Promise<boolean> {
   await ensureDb();
 
+  // Health check endpoint
+  if (path === '/api/health') {
+    sendJson(res, 200, { status: 'ok', timestamp: new Date().toISOString() });
+    return true;
+  }
+
   try {
     if (path === '/api/file' && req.method === 'GET') {
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');

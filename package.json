@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node dist-server/server/production.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:server": "tsc --noEmit -p tsconfig.server.json",
     "tunnel": "./ngrok.sh",
     "setup": "./setup.sh"
   },
