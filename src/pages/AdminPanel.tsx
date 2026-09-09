@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
@@ -8,15 +8,16 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/lib/api';
-import AdminDashboard from './AdminDashboard';
-import AdminStorage from './AdminStorage';
-import AdminSecurity from './AdminSecurity';
-import AdminAdvanced from './AdminAdvanced';
-import AdminScan from './AdminScan';
-import AdminSystem from './AdminSystem';
-import AdminApiKeys from './AdminApiKeys';
-import AdminAuditLog from './AdminAuditLog';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+
+const AdminDashboard = lazy(() => import('./AdminDashboard'));
+const AdminStorage = lazy(() => import('./AdminStorage'));
+const AdminSecurity = lazy(() => import('./AdminSecurity'));
+const AdminAdvanced = lazy(() => import('./AdminAdvanced'));
+const AdminScan = lazy(() => import('./AdminScan'));
+const AdminSystem = lazy(() => import('./AdminSystem'));
+const AdminApiKeys = lazy(() => import('./AdminApiKeys'));
+const AdminAuditLog = lazy(() => import('./AdminAuditLog'));
 
 type Tab = 'dashboard' | 'storage' | 'security' | 'api-keys' | 'audit-log' | 'advanced' | 'scan' | 'system';
 
@@ -284,6 +285,7 @@ export default function AdminPanel() {
                 <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
               </div>
             ) : <div key={tab} className="tab-content">
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.primary }} /></div>}>
             {tab === 'dashboard' ? <AdminDashboard files={files} providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
@@ -292,6 +294,7 @@ export default function AdminPanel() {
             : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
             : tab === 'system' ? <AdminSystem token={token!} onNotify={notify} />
             : <AdminAdvanced token={token!} onNotify={notify} />}
+            </Suspense>
             </div>}
           </div>
         </div>

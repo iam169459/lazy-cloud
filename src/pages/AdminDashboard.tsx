@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Check, Loader2, Link2, HardDrive, Scan, Plus, Share2, Lock, Clock, Copy, X, Download, Zap, Grid, XCircle, BarChart3 } from 'lucide-react';
+import { Upload, FileText, Trash2, Check, Loader2, Link2, HardDrive, Scan, Plus, Share2, Lock, Clock, Copy, X, Download, Grid } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider, ShareInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';

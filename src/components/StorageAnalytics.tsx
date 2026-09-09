@@ -1,13 +1,7 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
+import { BarChart, LineChart, Download } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { formatBytes } from '@/lib/api';
-
-interface ChartDataPoint {
-  name: string;
-  value: number;
-  [key: string]: any;
-}
 
 interface StorageAnalyticsProps {
   files: Array<{ created_at: string; file_size: number }>;
@@ -29,7 +23,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
     return Object.entries(counts)
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-30)
-      .map(([name, data]) => ({ name, uploads: data.count, size: data.size }));
+      .map(([name, data]) => ({ name: name.slice(5), uploads: data.count, size: data.size }));
   }, [files]);
 
   const providerUsage = useMemo(() => {
@@ -41,17 +35,12 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
     }));
   }, [providers]);
 
-  const downloadsByDay = useMemo(() => {
-    return [
-      { name: 'Mon', downloads: 0 },
-      { name: 'Tue', downloads: 0 },
-      { name: 'Wed', downloads: 0 },
-      { name: 'Thu', downloads: 0 },
-      { name: 'Fri', downloads: 0 },
-      { name: 'Sat', downloads: 0 },
-      { name: 'Sun', downloads: 0 },
-    ];
-  }, []);
+  const maxUploads = Math.max(...uploadsByDay.map((d) => d.uploads), 1);
+  const cumulativeSize = useMemo(() => {
+    let sum = 0;
+    return uploadsByDay.map((d) => ({ ...d, cumulative: (sum += d.size) }));
+  }, [uploadsByDay]);
+  const maxCumulative = Math.max(...cumulativeSize.map((d) => d.cumulative), 1);
 
   const totalUsed = providers.reduce((sum, p) => sum + p.current_bytes, 0);
   const totalCap = providers.reduce((sum, p) => sum + p.max_bytes, 0);
@@ -66,19 +55,19 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
             <BarChart className="w-4 h-4" style={{ color: '#22c55e' }} />
             Uploads (Last 30 Days)
           </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={uploadsByDay} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis type="number" tick={{ fill: colors.textDim, fontSize: 10 }} />
-                <YAxis dataKey="name" type="category" tick={{ fill: colors.textDim, fontSize: 10 }} width={80} />
-                <Tooltip
-                  contentStyle={{ background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  formatter={(value: number) => [value.toLocaleString(), 'uploads']}
+          <div className="h-48 flex items-end gap-[2px] overflow-x-auto">
+            {uploadsByDay.map((d, i) => (
+              <div key={i} className="flex-1 min-w-[4px] flex flex-col items-center gap-1" title={`${d.name}: ${d.uploads} files`}>
+                <div
+                  className="w-full rounded-t transition-all duration-500"
+                  style={{
+                    height: `${(d.uploads / maxUploads) * 100}%`,
+                    minHeight: d.uploads > 0 ? '4px' : '0',
+                    background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+                  }}
                 />
-                <Bar dataKey="uploads" fill="#22c55e" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -87,25 +76,29 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
             <LineChart className="w-4 h-4" style={{ color: '#3b82f6' }} />
             Storage Growth (Last 30 Days)
           </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={uploadsByDay}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="name" tick={{ fill: colors.textDim, fontSize: 10 }} />
-                <YAxis tick={{ fill: colors.textDim, fontSize: 10 }} tickFormatter={(v) => formatBytes(v)} />
-                <Tooltip
-                  contentStyle={{ background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                  formatter={(value: number) => [formatBytes(value), 'cumulative']}
-                />
-                <Area type="monotone" dataKey="size" stroke="#3b82f6" fillOpacity={0.2} fill="url(#colorStorage)" />
-                <defs>
-                  <linearGradient id="colorStorage" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-48 relative">
+            <div className="absolute inset-0 flex items-end gap-[2px] overflow-x-auto">
+              {cumulativeSize.map((d, i) => (
+                <div key={i} className="flex-1 min-w-[4px] flex flex-col items-center" title={`${d.name}: ${formatBytes(d.cumulative)}`}>
+                  <div
+                    className="w-full rounded-t transition-all duration-500"
+                    style={{
+                      height: `${(d.cumulative / maxCumulative) * 100}%`,
+                      minHeight: d.cumulative > 0 ? '4px' : '0',
+                      background: 'linear-gradient(180deg, rgba(59,130,246,0.4), rgba(59,130,246,0.05))',
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+              <polyline
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="2"
+                points={cumulativeSize.map((d, i) => `${(i / Math.max(cumulativeSize.length - 1, 1)) * 100}%,${100 - (d.cumulative / maxCumulative) * 100}%`).join(' ')}
+              />
+            </svg>
           </div>
         </div>
       </div>

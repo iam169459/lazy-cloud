@@ -20,8 +20,21 @@ export default defineConfig(({ mode }) => {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'router': ['react-router-dom'],
+          },
+        },
+      },
+      target: 'es2020',
+      minify: 'esbuild',
+      sourcemap: false,
+    },
     optimizeDeps: {
-      exclude: ['lucide-react'],
+      include: ['lucide-react'],
     },
     server: {
       host: '0.0.0.0',
