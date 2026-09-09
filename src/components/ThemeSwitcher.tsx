@@ -5,6 +5,7 @@ import { sounds } from '@/lib/sounds';
 
 const themeOptions: { id: ThemeId; label: string; colors: string[] }[] = [
   { id: 'black', label: 'Void Black', colors: ['#06060c', '#34d399', '#22d3ee'] },
+  { id: 'cyber', label: 'Cyberpunk', colors: ['#0a0e1a', '#00d4ff', '#ff6b35'] },
   { id: 'dark', label: 'Midnight', colors: ['#0f172a', '#818cf8', '#38bdf8'] },
   { id: 'light', label: 'Light', colors: ['#f8fafc', '#10b981', '#06b6d4'] },
   { id: 'bw', label: 'Monochrome', colors: ['#111111', '#ffffff', '#a3a3a3'] },

@@ -7,7 +7,6 @@ import {
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
-import LandingRocket from '@/components/LandingRocket';
 
 const faqs = [
   { q: 'How does file sharing work?', a: 'Upload a file, get a unique link. Anyone with the link can download. No accounts needed on the recipient side.' },
@@ -84,18 +83,8 @@ export default function Landing() {
           </p>
         </section>
 
-        {/* Product Tour — Rocket Animation */}
-        <section className="max-w-3xl mx-auto px-5 pb-16" aria-label="Product tour">
-          <div className="relative h-72 sm:h-80 rounded-xl overflow-hidden card">
-            <LandingRocket />
-          </div>
-          <p className="text-center text-xs mt-3" style={{ color: colors.textDim }}>
-            Secure delivery cycle — files launch, transfer, and return
-          </p>
-        </section>
-
-        {/* Social Proof / Stats */}
-        <section className="max-w-4xl mx-auto px-5 pb-16" aria-label="Key metrics">
+        {/* Stats Banner */}
+        <section className="max-w-3xl mx-auto px-5 pb-16" aria-label="Stats">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat icon={<Globe className="w-4 h-4" />} value="6+" label="Providers" />
             <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />

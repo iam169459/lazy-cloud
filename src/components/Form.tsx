@@ -14,7 +14,7 @@ export function FormSection({ title, icon, description, children }: {
       {(title || icon) && (
         <div className="flex items-center gap-2 mb-4">
           {icon && (
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${colors.primary}15`, color: colors.primary }}>
               {icon}
             </div>
           )}

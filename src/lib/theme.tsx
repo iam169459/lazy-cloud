@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ThemeId = 'black' | 'dark' | 'light' | 'bw' | 'purple' | 'neon';
+export type ThemeId = 'black' | 'dark' | 'light' | 'bw' | 'purple' | 'neon' | 'cyber';
 
 interface ThemeColors {
   bg: string;
@@ -213,6 +213,36 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(0,255,136,0.12)',
     orb2: 'rgba(0,255,204,0.08)',
     orb3: 'rgba(255,0,255,0.06)',
+  },
+  cyber: {
+    bg: '#0a0e1a',
+    bgCard: 'rgba(0,200,255,0.03)',
+    bgHover: 'rgba(0,200,255,0.06)',
+    border: 'rgba(0,200,255,0.12)',
+    borderActive: 'rgba(0,200,255,0.5)',
+    text: '#e0f4ff',
+    textMuted: '#7ec8e3',
+    textDim: '#3a6073',
+    primary: '#00d4ff',
+    primaryGlow: 'rgba(0,212,255,0.2)',
+    secondary: '#00ffc8',
+    accent: '#ff6b35',
+    accentGlow: 'rgba(255,107,53,0.15)',
+    danger: '#ff4757',
+    warning: '#ffc312',
+    success: '#00d4ff',
+    gradient: 'linear-gradient(135deg, #00d4ff, #00ffc8, #ff6b35)',
+    cardBg: 'rgba(0,200,255,0.03)',
+    cardBorder: 'rgba(0,200,255,0.12)',
+    cardHover: 'rgba(0,200,255,0.08)',
+    inputBg: 'rgba(0,200,255,0.04)',
+    inputBorder: 'rgba(0,200,255,0.15)',
+    inputFocus: 'rgba(0,212,255,0.4)',
+    scanline: 'rgba(0,200,255,0.015)',
+    gridLine: 'rgba(0,200,255,0.03)',
+    orb1: 'rgba(0,200,255,0.1)',
+    orb2: 'rgba(0,255,200,0.06)',
+    orb3: 'rgba(255,107,53,0.04)',
   },
 };
 
