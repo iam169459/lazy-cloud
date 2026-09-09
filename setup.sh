@@ -508,6 +508,61 @@ open_firewall() {
 }
 
 # ═══════════════════════════════════════════════
+# INTERACTIVE MENU
+# ═══════════════════════════════════════════════
+
+show_menu() {
+  clear
+  echo ""
+  echo -e "${CYAN}  ╔══════════════════════════════════════╗${NC}"
+  echo -e "${CYAN}  ║       LazyDrop — Manager             ║${NC}"
+  echo -e "${CYAN}  ╚══════════════════════════════════════╝${NC}"
+  echo ""
+
+  # Status indicator
+  local STATUS_COLOR="$RED"
+  local STATUS_TEXT="not running"
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    STATUS_COLOR="$GREEN"
+    STATUS_TEXT="running (service)"
+  elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
+    STATUS_COLOR="$GREEN"
+    STATUS_TEXT="running"
+  fi
+  echo -e "  Status: ${STATUS_COLOR}${STATUS_TEXT}${NC}"
+  echo ""
+  echo -e "  ${BOLD}What do you want to do?${NC}"
+  echo ""
+  echo "    1)  Install / Reinstall"
+  echo "    2)  Start server"
+  echo "    3)  Stop server"
+  echo "    4)  Restart server"
+  echo "    5)  Update (pull + rebuild)"
+  echo "    6)  View status"
+  echo "    7)  View logs"
+  echo "    8)  Install as system service"
+  echo "    9)  Uninstall"
+  echo "    0)  Exit"
+  echo ""
+  read -rp "  Pick [0-9]: " CHOICE
+  echo ""
+
+  case "$CHOICE" in
+    1) cmd_install ;;
+    2) cmd_start ;;
+    3) cmd_stop ;;
+    4) cmd_restart ;;
+    5) cmd_update ;;
+    6) cmd_status ;;
+    7) cmd_logs ;;
+    8) cmd_service ;;
+    9) cmd_uninstall ;;
+    0|q|Q) echo "  Bye!"; exit 0 ;;
+    *) warn "Invalid choice"; sleep 1; show_menu ;;
+  esac
+}
+
+# ═══════════════════════════════════════════════
 # HELP
 # ═══════════════════════════════════════════════
 
@@ -516,7 +571,8 @@ cmd_help() {
   echo -e "${CYAN}  LazyDrop CLI${NC}"
   echo ""
   echo -e "  ${BOLD}Usage:${NC}"
-  echo "    lazydrop <command>"
+  echo "    ./setup.sh              Interactive menu (recommended)"
+  echo "    ./setup.sh <command>    Direct command"
   echo ""
   echo -e "  ${BOLD}Commands:${NC}"
   echo "    install       Install LazyDrop (auto-installs Node.js if needed)"
@@ -528,17 +584,9 @@ cmd_help() {
   echo "    logs          Follow live logs"
   echo "    service       Install/reinstall as systemd service"
   echo "    uninstall     Remove LazyDrop completely"
-  echo "    help          Show this help"
   echo ""
   echo -e "  ${BOLD}Quick start:${NC}"
   echo "    curl -fsSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/setup.sh | bash"
-  echo ""
-  echo -e "  ${BOLD}Examples:${NC}"
-  echo "    lazydrop install"
-  echo "    lazydrop start"
-  echo "    lazydrop status"
-  echo "    lazydrop update"
-  echo "    lazydrop logs"
   echo ""
 }
 
@@ -546,21 +594,25 @@ cmd_help() {
 # ROUTER
 # ═══════════════════════════════════════════════
 
-CMD="${1:-help}"
+CMD="${1:-}"
 shift 2>/dev/null || true
 
-case "$CMD" in
-  install)   cmd_install ;;
-  start)     cmd_start ;;
-  stop)      cmd_stop ;;
-  restart)   cmd_restart ;;
-  status)    cmd_status ;;
-  update)    cmd_update ;;
-  logs)      cmd_logs ;;
-  service)   cmd_service ;;
-  uninstall) cmd_uninstall ;;
-  help|-h|--help) cmd_help ;;
-  *)
-    err "Unknown command: $CMD\n\nRun: lazydrop help"
-    ;;
-esac
+if [ -z "$CMD" ]; then
+  show_menu
+else
+  case "$CMD" in
+    install)   cmd_install ;;
+    start)     cmd_start ;;
+    stop)      cmd_stop ;;
+    restart)   cmd_restart ;;
+    status)    cmd_status ;;
+    update)    cmd_update ;;
+    logs)      cmd_logs ;;
+    service)   cmd_service ;;
+    uninstall) cmd_uninstall ;;
+    help|-h|--help) cmd_help ;;
+    *)
+      err "Unknown command: $CMD\n\nRun: ./setup.sh for interactive menu"
+      ;;
+  esac
+fi
