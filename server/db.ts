@@ -381,14 +381,6 @@ export interface ShareRecord {
   created_at: string;
 }
 
-export function getDb() {
-  return getSql();
-}
-
-export function generateId(): string {
-  return randomUUID();
-}
-
 export async function createShare(share: Omit<ShareRecord, 'id' | 'download_count' | 'created_at'>): Promise<ShareRecord> {
   const sql = getSql();
   const id = randomUUID();
