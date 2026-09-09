@@ -413,6 +413,51 @@ export async function incrementShareDownloadCount(id: string): Promise<void> {
   await sql`UPDATE shares SET download_count = download_count + 1 WHERE id = ${id}`;
 }
 
+export async function getShareById(id: string): Promise<ShareRecord | null> {
+  const sql = getSql();
+  const rows = (await sql`SELECT * FROM shares WHERE id = ${id}`) as unknown[];
+  return (rows[0] as ShareRecord) ?? null;
+}
+
+export async function getSharesByFileId(fileId: string): Promise<ShareRecord[]> {
+  const sql = getSql();
+  return (await sql`SELECT * FROM shares WHERE file_id = ${fileId} ORDER BY created_at DESC`) as unknown[] as ShareRecord[];
+}
+
+export async function validateShare(shareId: string, password?: string): Promise<ShareRecord | null> {
+  const sql = getSql();
+  const rows = (await sql`SELECT * FROM shares WHERE id = ${shareId}`) as unknown[];
+  const share = rows[0] as ShareRecord | undefined;
+  if (!share) return null;
+  if (share.expires_at && new Date(share.expires_at) < new Date()) return null;
+  if (share.download_limit && share.download_count >= share.download_limit) return null;
+  if (share.password_hash) {
+    if (!password) return null;
+    const hash = scryptSync(password, 'lazydrop-share', 64).toString('hex');
+    if (hash !== share.password_hash) return null;
+  }
+  return share;
+}
+
+export async function getStats(): Promise<{
+  totalFiles: number;
+  totalSize: number;
+  totalDownloads: number;
+  providerCount: number;
+}> {
+  const sql = getSql();
+  const files = (await sql`SELECT COUNT(*) as count, COALESCE(SUM(file_size), 0) as size, COALESCE(SUM(download_count), 0) as downloads FROM files`) as unknown[];
+  const providers = (await sql`SELECT COUNT(*) as count FROM storage_providers WHERE is_active = true`) as unknown[];
+  const f = files[0] as any;
+  const p = providers[0] as any;
+  return {
+    totalFiles: parseInt(f.count) || 0,
+    totalSize: parseInt(f.size) || 0,
+    totalDownloads: parseInt(f.downloads) || 0,
+    providerCount: parseInt(p.count) || 0,
+  };
+}
+
 export interface ApiKeyRecord {
   id: string;
   name: string;
