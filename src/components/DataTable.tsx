@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal, CheckSquare, Square, Download, Trash2, Copy } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 
 export interface Column<T> {
@@ -20,10 +20,19 @@ export interface Action<T> {
   hidden?: (row: T) => boolean;
 }
 
+export interface BulkAction<T> {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: (rows: T[]) => void;
+  variant?: 'default' | 'danger';
+  disabled?: (rows: T[]) => boolean;
+}
+
 interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
   actions?: Action<T>[];
+  bulkActions?: BulkAction<T>[];
   keyExtractor: (row: T) => string;
   searchPlaceholder?: string;
   searchKeys?: (keyof T & string)[];
@@ -33,12 +42,15 @@ interface DataTableProps<T> {
   emptyDescription?: string;
   loading?: boolean;
   loadingText?: string;
+  selectable?: boolean;
+  onSelectionChange?: (selected: T[]) => void;
 }
 
 export default function DataTable<T extends Record<string, any>>({
   columns,
   data,
   actions,
+  bulkActions,
   keyExtractor,
   searchPlaceholder = 'Search...',
   searchKeys = [],
@@ -48,6 +60,8 @@ export default function DataTable<T extends Record<string, any>>({
   emptyDescription,
   loading,
   loadingText = 'Loading...',
+  selectable = false,
+  onSelectionChange,
 }: DataTableProps<T>) {
   const { colors } = useTheme();
   const [search, setSearch] = useState('');
@@ -55,6 +69,8 @@ export default function DataTable<T extends Record<string, any>>({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [selectAllPage, setSelectAllPage] = useState(false);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return data;
@@ -77,6 +93,45 @@ export default function DataTable<T extends Record<string, any>>({
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
   const paged = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+  const selectedRows = useMemo(() => paged.filter((row) => selectedKeys.has(keyExtractor(row))), [paged, selectedKeys, keyExtractor]);
+  const allPageSelected = paged.length > 0 && paged.every((row) => selectedKeys.has(keyExtractor(row)));
+
+  const toggleRow = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleAllPage = useCallback(() => {
+    if (allPageSelected) {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        paged.forEach((row) => next.delete(keyExtractor(row)));
+        return next;
+      });
+    } else {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        paged.forEach((row) => next.add(keyExtractor(row)));
+        return next;
+      });
+    }
+  }, [allPageSelected, paged, keyExtractor]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedKeys(new Set());
+  }, []);
+
+  const handleBulkAction = useCallback((action: BulkAction<T>) => {
+    if (selectedRows.length === 0) return;
+    if (action.disabled && action.disabled(selectedRows)) return;
+    action.onClick(selectedRows);
+    clearSelection();
+  }, [selectedRows, clearSelection]);
 
   function handleSort(key: string) {
     if (sortKey === key) {
@@ -129,6 +184,19 @@ export default function DataTable<T extends Record<string, any>>({
           <table className="w-full">
             <thead>
               <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+                {selectable && (
+                  <th className="px-4 py-2.5 w-10">
+                    <label className="inline-flex items-center justify-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAllPage}
+                        className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }}
+                        aria-label="Select all on page"
+                      />
+                    </label>
+                  </th>
+                )}
                 {columns.map((col) => (
                   <th
                     key={col.key}
@@ -157,12 +225,26 @@ export default function DataTable<T extends Record<string, any>>({
             <tbody>
               {paged.map((row) => {
                 const id = keyExtractor(row);
+                const isSelected = selectedKeys.has(id);
                 return (
                   <tr
                     key={id}
-                    className="data-table-row transition-colors"
+                    className={`data-table-row transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
                     style={{ borderBottom: `1px solid rgba(255,255,255,0.03)` }}
                   >
+                    {selectable && (
+                      <td className="px-4 py-2.5">
+                        <label className="inline-flex items-center justify-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleRow(id)}
+                            className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }}
+                            aria-label="Select row"
+                          />
+                        </label>
+                      </td>
+                    )}
                     {columns.map((col) => (
                       <td
                         key={col.key}
@@ -223,6 +305,36 @@ export default function DataTable<T extends Record<string, any>>({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Bulk Actions Toolbar */}
+      {selectable && selectedKeys.size > 0 && bulkActions && bulkActions.length > 0 && (
+        <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderTop: `1px solid rgba(255,255,255,0.06)`, background: 'rgba(34,197,94,0.05)' }}>
+          <span className="text-xs font-mono" style={{ color: colors.textMuted }}>
+            {selectedKeys.size} selected
+          </span>
+          <button onClick={clearSelection} className="text-xs px-2 py-1 rounded" style={{ color: colors.textMuted, background: 'transparent', border: '1px solid var(--border)' }}>
+            Clear
+          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            {bulkActions.map((action, i) => (
+              <button
+                key={i}
+                onClick={() => handleBulkAction(action)}
+                disabled={action.disabled && action.disabled(selectedRows)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-40"
+                style={{
+                  background: action.variant === 'danger' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
+                  color: action.variant === 'danger' ? '#ef4444' : colors.text,
+                  border: '1px solid transparent',
+                }}
+              >
+                {action.icon}
+                {action.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

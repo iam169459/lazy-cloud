@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
-  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal
+  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal, Key, Activity
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -14,14 +14,18 @@ import AdminSecurity from './AdminSecurity';
 import AdminAdvanced from './AdminAdvanced';
 import AdminScan from './AdminScan';
 import AdminSystem from './AdminSystem';
+import AdminApiKeys from './AdminApiKeys';
+import AdminAuditLog from './AdminAuditLog';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'advanced' | 'scan' | 'system';
+type Tab = 'dashboard' | 'storage' | 'security' | 'api-keys' | 'audit-log' | 'advanced' | 'scan' | 'system';
 
 const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Files', icon: <FileText className="w-[18px] h-[18px]" /> },
   { id: 'storage', label: 'Storage', icon: <Cloud className="w-[18px] h-[18px]" /> },
   { id: 'security', label: 'Credentials', icon: <Shield className="w-[18px] h-[18px]" /> },
+  { id: 'api-keys', label: 'API Keys', icon: <Key className="w-[18px] h-[18px]" /> },
+  { id: 'audit-log', label: 'Audit Log', icon: <Activity className="w-[18px] h-[18px]" /> },
   { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
   { id: 'scan', label: 'Scan', icon: <Scan className="w-[18px] h-[18px]" /> },
   { id: 'system', label: 'System', icon: <Terminal className="w-[18px] h-[18px]" /> },
@@ -31,6 +35,8 @@ const pageDescriptions: Record<Tab, string> = {
   dashboard: 'Upload, manage, and share your files.',
   storage: 'Connect and manage S3-compatible storage buckets.',
   security: 'Update admin credentials and security settings.',
+  'api-keys': 'Manage API keys for programmatic access.',
+  'audit-log': 'View admin action audit trail.',
   advanced: 'Configure themes, file TTL, and system preferences.',
   scan: 'Scan storage buckets for orphaned or mismatched files.',
   system: 'System info, update, and maintenance.',
@@ -278,9 +284,11 @@ export default function AdminPanel() {
                 <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
               </div>
             ) : <div key={tab} className="tab-content">
-            {tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
+            {tab === 'dashboard' ? <AdminDashboard files={files} providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
+            : tab === 'api-keys' ? <AdminApiKeys token={token!} onNotify={notify} />
+            : tab === 'audit-log' ? <AdminAuditLog token={token!} onNotify={notify} />
             : tab === 'scan' ? <AdminScan token={token!} onNotify={notify} />
             : tab === 'system' ? <AdminSystem token={token!} onNotify={notify} />
             : <AdminAdvanced token={token!} onNotify={notify} />}
@@ -314,6 +322,8 @@ const pageTitles: Record<Tab, string> = {
   dashboard: 'Files',
   storage: 'Storage',
   security: 'Credentials',
+  'api-keys': 'API Keys',
+  'audit-log': 'Audit Log',
   advanced: 'Settings',
   scan: 'Scan',
   system: 'System',

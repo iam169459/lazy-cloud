@@ -5,6 +5,8 @@ import { ThemeProvider } from '@/lib/theme';
 
 const Landing = lazy(() => import('@/pages/Landing'));
 const DownloadPage = lazy(() => import('@/pages/Download'));
+const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
+const SharePage = lazy(() => import('@/pages/SharePage'));
 const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 
@@ -47,6 +49,8 @@ function App() {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/file/:fileId" element={<DownloadPage />} />
+              <Route path="/preview/:id" element={<PreviewPage />} />
+              <Route path="/s/:id" element={<SharePage />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>

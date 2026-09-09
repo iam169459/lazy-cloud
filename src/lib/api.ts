@@ -13,6 +13,66 @@ export interface FileWithProvider extends FileInfo {
   provider_id: string;
 }
 
+export interface ShareInfo {
+  shareId: string;
+  file: {
+    id: string;
+    name: string;
+    size: number;
+    mimeType: string;
+    createdAt: string;
+  };
+  requiresPassword: boolean;
+  expiresAt: string | null;
+  downloadLimit: number | null;
+  downloadsRemaining: number | null;
+}
+
+export interface ShareCreateResult {
+  share: {
+    id: string;
+    file_id: string;
+    password_hash: string | null;
+    expires_at: string | null;
+    download_limit: number | null;
+    download_count: number;
+    created_at: string;
+  };
+  shareUrl: string;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  key_hash: string;
+  permissions: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface ApiKeyCreateResult {
+  key: {
+    id: string;
+    name: string;
+    permissions: string;
+    last_used_at: string | null;
+    expires_at: string | null;
+    created_at: string;
+    key: string;
+  };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  admin_id: string | null;
+  action: string;
+  details: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
 export interface StorageProvider {
   id: string;
   provider_type: string;
@@ -210,6 +270,57 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ username, password }),
     }) as Promise<{ success: boolean; username: string }>,
+
+  getShareInfo: (shareId: string) =>
+    request(`/api/share?id=${encodeURIComponent(shareId)}`) as Promise<ShareInfo>,
+
+  downloadSharedFile: (shareId: string, password?: string) =>
+    request(`/api/share/download?id=${encodeURIComponent(shareId)}${password ? `&password=${encodeURIComponent(password)}` : ''}`) as Promise<{ url: string; name: string; size: number }>,
+
+  createShare: (fileId: string, password?: string, expiresInDays?: number, downloadLimit?: number, token?: string) =>
+    request('/api/admin/shares', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ fileId, password, expiresInDays, downloadLimit }),
+    }) as Promise<ShareCreateResult>,
+
+  listShares: (fileId: string, token: string) =>
+    request(`/api/admin/shares?fileId=${encodeURIComponent(fileId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ shares: any[] }>,
+
+  deleteShare: (shareId: string, token: string) =>
+    request('/api/admin/shares/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id: shareId }),
+    }) as Promise<{ success: boolean }>,
+
+  listApiKeys: (token: string) =>
+    request('/api/admin/api-keys', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ keys: ApiKey[] }>,
+
+  createApiKey: (name: string, permissions: string, expiresInDays: number | undefined, token: string) =>
+    request('/api/admin/api-keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ name, permissions, expiresInDays }),
+    }) as Promise<ApiKeyCreateResult>,
+
+  deleteApiKey: (id: string, token: string) =>
+    request('/api/admin/api-keys/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    }) as Promise<{ success: boolean }>,
+
+  getAuditLogs: (token: string, limit?: number, offset?: number) =>
+    request(`/api/admin/audit-log${limit ? `?limit=${limit}` : ''}${offset ? `${limit ? '&' : '?'}offset=${offset}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ logs: AuditLogEntry[] }>,
+
+  getPreviewUrl: (fileId: string) => `/api/preview?id=${encodeURIComponent(fileId)}`,
 
   scanStorage: (token: string) =>
     request('/api/admin/scan/storage', {

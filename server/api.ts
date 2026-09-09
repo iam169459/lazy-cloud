@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles, getDb } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
@@ -61,6 +61,64 @@ function sanitize(str: unknown): string {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>'"&;]/g, '').trim().slice(0, 500);
 }
+
+// ── Rate Limiting ──
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 60; // 60 requests per minute
+
+function getClientIp(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0]).trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function checkRateLimit(ip: string, maxRequests = RATE_LIMIT_MAX_REQUESTS, windowMs = RATE_LIMIT_WINDOW): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: maxRequests - 1, resetAt: now + windowMs };
+  }
+  
+  if (entry.count >= maxRequests) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: maxRequests - entry.count, resetAt: entry.resetAt };
+}
+
+function applyRateLimit(req: IncomingMessage, res: ServerResponse, maxRequests = RATE_LIMIT_MAX_REQUESTS, windowMs = RATE_LIMIT_WINDOW): boolean {
+  const ip = getClientIp(req);
+  const { allowed, remaining, resetAt } = checkRateLimit(ip, maxRequests, windowMs);
+  
+  res.setHeader('X-RateLimit-Limit', maxRequests.toString());
+  res.setHeader('X-RateLimit-Remaining', remaining.toString());
+  res.setHeader('X-RateLimit-Reset', Math.ceil(resetAt / 1000).toString());
+  
+  if (!allowed) {
+    const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
+    res.setHeader('Retry-After', retryAfter.toString());
+    sendJson(res, 429, { error: 'Too many requests', retryAfter });
+    return false;
+  }
+  return true;
+}
+
+// Clean up old entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetAt) rateLimitStore.delete(ip);
+  }
+}, 5 * 60 * 1000);
 
 /**
  * Delete files older than settings.autoDeleteDays (when auto-delete is on).
@@ -307,10 +365,17 @@ async function checkAuth(req: IncomingMessage): Promise<boolean> {
   if (token === DEFAULT_PASS) return true;
   try {
     const creds = await getAdminCredentials();
-    return token === creds.password;
-  } catch {
-    return false;
-  }
+    if (token === creds.password) return true;
+  } catch {}
+  try {
+    const apiKey = await getApiKeyByHash(token);
+    if (apiKey) {
+      if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) return false;
+      await updateApiKeyLastUsed(apiKey.id);
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 export async function handleApiRequest(
@@ -338,6 +403,7 @@ export async function handleApiRequest(
     }
 
     if (path === '/api/download' && req.method === 'GET') {
+      if (!applyRateLimit(req, res, 30, 60000)) return true; // 30 downloads per minute
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
@@ -357,6 +423,7 @@ export async function handleApiRequest(
     }
 
     if (path === '/api/admin/login' && req.method === 'POST') {
+      if (!applyRateLimit(req, res, 5, 300000)) return true; // 5 login attempts per 5 minutes
       const body = await parseJsonBody(req);
       const DEFAULT_USER = process.env.ADMIN_USERNAME || 'admin';
       const DEFAULT_PASS = process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024';
@@ -403,10 +470,12 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/upload' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 10, 60000)) return true; // 10 uploads per minute
       return handleUpload(req, res);
     }
 
     if (path === '/api/upload' && req.method === 'POST') {
+      if (!applyRateLimit(req, res, 5, 60000)) return true; // 5 public uploads per minute
       const settings = await getAppSettings();
       if (!settings.enablePublicUpload) {
         sendError(res, 403, 'Public uploads are disabled');
@@ -417,11 +486,13 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/upload/encrypted' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 10, 60000)) return true;
       return handleEncryptedUpload(req, res);
     }
 
     if (path === '/api/download/encrypted' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 30, 60000)) return true;
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
@@ -880,6 +951,206 @@ export async function handleApiRequest(
       const fixed = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;
       sendJson(res, 200, { fixed, failed, results });
+      return true;
+    }
+
+    // ── Preview ──
+    if (path === '/api/preview' && req.method === 'GET') {
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+
+      try {
+        const fileBuffer = await downloadFromProvider(provider, file.r2_key);
+        if (!fileBuffer) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+
+        let contentBuffer = fileBuffer;
+        let contentType = file.mime_type || 'application/octet-stream';
+
+        if (file.encrypted) {
+          try {
+            contentBuffer = decryptFile(fileBuffer, file.enc_iv!, file.enc_auth_tag!);
+          } catch {
+            sendError(res, 500, 'Failed to decrypt file for preview');
+            return true;
+          }
+        }
+
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : contentBuffer.length - 1;
+          const chunkSize = (end - start) + 1;
+          const chunk = contentBuffer.subarray(start, end + 1);
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${contentBuffer.length}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=3600',
+          });
+          res.end(chunk);
+          return true;
+        }
+
+        res.writeHead(200, {
+          'Content-Length': contentBuffer.length,
+          'Content-Type': contentType,
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=3600',
+        });
+        res.end(contentBuffer);
+        return true;
+      } catch (e: any) {
+        sendError(res, 500, `Preview failed: ${e.message}`);
+        return true;
+      }
+    }
+
+    // ── Shares ──
+    if (path === '/api/share' && req.method === 'GET') {
+      const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      const share = await getShareById(shareId);
+      if (!share) { sendError(res, 404, 'Share not found'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (share.expires_at && new Date(share.expires_at) < new Date()) { sendError(res, 410, 'Share has expired'); return true; }
+      if (share.download_limit && share.download_count >= share.download_limit) { sendError(res, 410, 'Download limit reached'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      sendJson(res, 200, {
+        shareId: share.id,
+        file: {
+          id: file.id,
+          name: file.original_name,
+          size: file.file_size,
+          mimeType: file.mime_type,
+          createdAt: file.created_at,
+        },
+        requiresPassword: !!share.password_hash,
+        expiresAt: share.expires_at,
+        downloadLimit: share.download_limit,
+        downloadsRemaining: share.download_limit ? share.download_limit - share.download_count : null,
+      });
+      return true;
+    }
+
+    if (path === '/api/share/download' && req.method === 'GET') {
+      const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      const password = new URL(req.url || '', 'http://localhost').searchParams.get('password');
+      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      const share = await validateShare(shareId, password);
+      if (!share) { sendError(res, 403, share ? 'Share expired or limit reached' : 'Invalid share or password'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      await incrementDownloadCount(file.id);
+      await incrementShareDownloadCount(shareId);
+      if (file.encrypted) {
+        try {
+          const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
+          if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+          const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
+          const blob = new Blob([decrypted]);
+          const url = URL.createObjectURL(blob);
+          sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
+        } catch (e: any) {
+          sendError(res, 500, `Decryption failed: ${e.message}`);
+        }
+        return true;
+      }
+      const url = await getPresignedDownloadUrl(provider, file.r2_key, file.original_name, file.mime_type || 'application/octet-stream');
+      sendJson(res, 200, { url });
+      return true;
+    }
+
+    if (path === '/api/admin/shares' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const { fileId, password, expiresInDays, downloadLimit } = body;
+      if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null;
+      const share = await createShare(fileId, password || null, expiresAt, downloadLimit || null);
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      sendJson(res, 200, {
+        share,
+        shareUrl: `${baseUrl}/s/${share.id}`,
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/shares' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('fileId');
+      if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
+      const shares = await getSharesByFileId(fileId);
+      sendJson(res, 200, { shares });
+      return true;
+    }
+
+    if (path === '/api/admin/shares/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      await deleteShare(body.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── API Keys ──
+    if (path === '/api/admin/api-keys' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const keys = await listApiKeys();
+      const safeKeys = keys.map(k => ({
+        id: k.id,
+        name: k.name,
+        permissions: k.permissions,
+        last_used_at: k.last_used_at,
+        expires_at: k.expires_at,
+        created_at: k.created_at,
+      }));
+      sendJson(res, 200, { keys: safeKeys });
+      return true;
+    }
+
+    if (path === '/api/admin/api-keys' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const { name, permissions, expiresInDays } = body;
+      if (!name) { sendError(res, 400, 'Name is required'); return true; }
+      const perms = permissions || 'read';
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null;
+      const result = await createApiKey(name, perms, expiresAt);
+      sendJson(res, 200, { key: result });
+      return true;
+    }
+
+    if (path === '/api/admin/api-keys/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      await deleteApiKey(body.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── Audit Log ──
+    if (path === '/api/admin/audit-log' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const url = new URL(req.url || '', 'http://localhost');
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const logs = await listAuditLogs(limit, offset);
+      sendJson(res, 200, { logs });
       return true;
     }
 

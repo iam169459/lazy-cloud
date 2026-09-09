@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, AlertCircle, Zap, Package } from 'lucide-react';
+import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, AlertCircle, Zap, Package, Eye, Maximize2 } from 'lucide-react';
 import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -25,6 +25,8 @@ export default function DownloadPage() {
     catch (e: any) { sounds.error(); setError(e.message || 'Download failed'); }
     finally { setDownloading(false); }
   }
+
+  const canPreview = (mimeType: string) => mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf';
 
   if (loading) {
     return (
@@ -76,6 +78,17 @@ export default function DownloadPage() {
             <button onClick={handleDownload} disabled={downloading} className="btn btn-primary w-full">
               {downloading ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing...</> : <><Download className="w-4 h-4" /> Download file</>}
             </button>
+            {file && canPreview(file.mime_type) && (
+              <Link
+                to={`/preview/${file.id}`}
+                className="btn btn-secondary w-full flex items-center justify-center gap-2"
+                onClick={() => sounds.click()}
+              >
+                <Eye className="w-4 h-4" />
+                <span>Preview</span>
+                <Maximize2 className="w-3.5 h-3.5" />
+              </Link>
+            )}
             <div className="flex items-center justify-center gap-1.5 mt-4 text-xs" style={{ color: colors.textDim }}>
               <Package className="w-3 h-3" />
               Downloaded {file.download_count} time{file.download_count !== 1 ? 's' : ''}
