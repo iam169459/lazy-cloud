@@ -392,29 +392,56 @@ cmd_status() {
 
 cmd_update() {
   find_app
-  log "Updating LazyDrop..."
 
+  echo ""
+  log "Updating LazyDrop..."
+  echo -e "  Branch: ${BOLD}$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')${NC}"
+  echo -e "  Current: ${DIM}$(git log --oneline -1 2>/dev/null || echo 'unknown')${NC}"
+  echo ""
+
+  # Stash local changes
   if ! git diff --quiet 2>/dev/null; then
     log "Stashing local changes..."
-    git stash push -m "auto-stash before update $(date +%Y%m%d-%H%M%S)"
+    git stash push -m "auto-stash before update $(date +%Y%m%d-%H%M%S)" || true
   fi
 
+  # Pull latest
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$BRANCH")
   log "Pulling latest from '$BRANCH'..."
-  git pull origin "$BRANCH"
+  if ! git pull origin "$BRANCH" 2>&1; then
+    err "git pull failed. Check your network or git config."
+  fi
 
+  echo -e "  Latest: ${DIM}$(git log --oneline -1 2>/dev/null)${NC}"
+  echo ""
+
+  # Install deps
   log "Installing dependencies..."
-  npm install
+  npm install 2>&1 | tail -3
 
+  # Rebuild
   log "Rebuilding..."
-  npm run build
+  if ! npm run build 2>&1 | tail -5; then
+    err "Build failed. Check the errors above."
+  fi
 
+  # Restart service if running
   if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
     log "Restarting service..."
     sudo systemctl restart "$SERVICE_NAME"
+    ok "Service restarted."
+  elif [ -f /tmp/lazydrop.pid ] && kill -0 "$(cat /tmp/lazydrop.pid)" 2>/dev/null; then
+    log "Restarting dev server..."
+    kill "$(cat /tmp/lazydrop.pid)" 2>/dev/null || true
+    rm -f /tmp/lazydrop.pid
+    sleep 1
+    cmd_start >/dev/null 2>&1
+    ok "Dev server restarted."
   fi
 
+  echo ""
   ok "Update complete!"
+  echo ""
 }
 
 cmd_logs() {
