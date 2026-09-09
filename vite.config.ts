@@ -1,9 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
-import { lazyDropApiPlugin } from './server/plugin';
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   for (const [key, value] of Object.entries(env)) {
@@ -13,8 +12,15 @@ export default defineConfig(({ mode }) => {
     }
   }
 
+  const plugins = [react()];
+
+  if (mode === 'development') {
+    const { lazyDropApiPlugin } = await import('./server/plugin');
+    plugins.push(lazyDropApiPlugin());
+  }
+
   return {
-    plugins: [react(), lazyDropApiPlugin()],
+    plugins,
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

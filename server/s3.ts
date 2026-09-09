@@ -129,11 +129,15 @@ export async function downloadFromProvider(
     );
     const body = response.Body;
     if (!body) return null;
-    const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.from(chunk));
+    const chunks: Uint8Array[] = [];
+    const stream = body.transformToWebStream();
+    const reader = stream.getReader();
+    let result = await reader.read();
+    while (!result.done) {
+      chunks.push(result.value);
+      result = await reader.read();
     }
-    return Buffer.concat(chunks);
+    return Buffer.concat(chunks.map(c => Buffer.from(c)));
   } catch {
     return null;
   }

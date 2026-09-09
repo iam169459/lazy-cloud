@@ -1,5 +1,5 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, randomBytes, scryptSync } from 'crypto';
 import busboy from 'busboy';
 import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
@@ -237,6 +237,9 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
             mime_type: mimeType,
             r2_key: fileKey,
             provider_id: providerUsed.id,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
           });
           await updateProviderBytes(providerUsed.id, fileSize);
         } catch (dbErr: any) {
@@ -885,6 +888,9 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: item.key,
             provider_id: item.provider_id,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
           });
           if (item.size > 0) {
             await updateProviderBytes(item.provider_id, item.size).catch(() => {});
@@ -941,6 +947,9 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: key,
             provider_id: providerId,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
           });
           if (size > 0) {
             await updateProviderBytes(providerId, size).catch(() => {});
@@ -1052,7 +1061,7 @@ export async function handleApiRequest(
       const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       const password = new URL(req.url || '', 'http://localhost').searchParams.get('password');
       if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
-      const share = await validateShare(shareId, password);
+      const share = await validateShare(shareId, password ?? undefined);
       if (!share) { sendError(res, 403, share ? 'Share expired or limit reached' : 'Invalid share or password'); return true; }
       const file = await getFileRecord(share.file_id);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
@@ -1086,8 +1095,8 @@ export async function handleApiRequest(
       if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
-      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null;
-      const share = await createShare(fileId, password || null, expiresAt, downloadLimit || null);
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+      const share = await createShare({ file_id: fileId, password_hash: password || null, expires_at: expiresAt, download_limit: downloadLimit || null });
       const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
       sendJson(res, 200, {
         share,
@@ -1135,8 +1144,10 @@ export async function handleApiRequest(
       const { name, permissions, expiresInDays } = body;
       if (!name) { sendError(res, 400, 'Name is required'); return true; }
       const perms = permissions || 'read';
-      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null;
-      const result = await createApiKey(name, perms, expiresAt);
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+      const rawKey = `ld_${randomBytes(32).toString('hex')}`;
+      const keyHash = scryptSync(rawKey, 'lazydrop-apikey', 64).toString('hex');
+      const result = await createApiKey({ name, key_hash: keyHash, permissions: perms, expires_at: expiresAt });
       sendJson(res, 200, { key: result });
       return true;
     }

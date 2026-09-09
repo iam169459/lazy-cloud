@@ -213,6 +213,8 @@ export interface AppSettings {
   enableDownloadCounter: boolean;
   enablePublicUpload: boolean;
   maxStoragePerBucket: string;
+  sessionTimeout: string;
+  ipWhitelist: string;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -224,6 +226,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableDownloadCounter: true,
   enablePublicUpload: false,
   maxStoragePerBucket: '10188208025',
+  sessionTimeout: '30',
+  ipWhitelist: '',
 };
 
 export async function getAppSettings(): Promise<AppSettings> {
