@@ -145,7 +145,7 @@ export default function DataTable<T extends Record<string, any>>({
   if (loading) {
     return (
       <div className="glass-card p-12 text-center">
-        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: '#22c55e', borderTopColor: 'transparent' }} />
+        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: colors.success, borderTopColor: 'transparent' }} />
         <p className="text-sm" style={{ color: colors.textMuted }}>{loadingText}</p>
       </div>
     );
@@ -155,7 +155,7 @@ export default function DataTable<T extends Record<string, any>>({
     <div className="glass-card overflow-hidden">
       {/* Search Bar */}
       {searchKeys.length > 0 && (
-        <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+        <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
             <input
@@ -183,7 +183,7 @@ export default function DataTable<T extends Record<string, any>>({
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+              <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid ${colors.border}` }}>
                 {selectable && (
                   <th className="px-4 py-2.5 w-10">
                     <label className="inline-flex items-center justify-center cursor-pointer">
@@ -230,7 +230,7 @@ export default function DataTable<T extends Record<string, any>>({
                   <tr
                     key={id}
                     className={`data-table-row transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
-                    style={{ borderBottom: `1px solid rgba(255,255,255,0.03)` }}
+                    style={{ borderBottom: `1px solid ${colors.border}` }}
                   >
                     {selectable && (
                       <td className="px-4 py-2.5">
@@ -272,7 +272,7 @@ export default function DataTable<T extends Record<string, any>>({
                                 className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-40 animate-scale-in"
                                 style={{
                                   background: 'rgba(15, 23, 42, 0.9)',
-                                  border: '1px solid rgba(255,255,255,0.08)',
+                                  border: `1px solid ${colors.border}`,
                                   backdropFilter: 'blur(20px)',
                                 }}
                               >
@@ -285,9 +285,9 @@ export default function DataTable<T extends Record<string, any>>({
                                       disabled={action.disabled?.(row)}
                                       className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors text-left disabled:opacity-40"
                                       style={{
-                                        color: action.variant === 'danger' ? '#ef4444' : colors.text,
+                                        color: action.variant === 'danger' ? colors.danger : colors.text,
                                       }}
-                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = action.variant === 'danger' ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)'; }}
+                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = action.variant === 'danger' ? `${colors.danger}14` : colors.cardBg; }}
                                       onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                                     >
                                       {action.icon}
@@ -310,7 +310,7 @@ export default function DataTable<T extends Record<string, any>>({
 
       {/* Bulk Actions Toolbar */}
       {selectable && selectedKeys.size > 0 && bulkActions && bulkActions.length > 0 && (
-        <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderTop: `1px solid rgba(255,255,255,0.06)`, background: 'rgba(34,197,94,0.05)' }}>
+        <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderTop: `1px solid ${colors.border}`, background: `${colors.success}0d` }}>
           <span className="text-xs font-mono" style={{ color: colors.textMuted }}>
             {selectedKeys.size} selected
           </span>
@@ -325,8 +325,8 @@ export default function DataTable<T extends Record<string, any>>({
                 disabled={action.disabled && action.disabled(selectedRows)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-40"
                 style={{
-                  background: action.variant === 'danger' ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)',
-                  color: action.variant === 'danger' ? '#ef4444' : colors.text,
+                  background: action.variant === 'danger' ? `${colors.danger}1a` : colors.cardBg,
+                  color: action.variant === 'danger' ? colors.danger : colors.text,
                   border: '1px solid transparent',
                 }}
               >
@@ -340,7 +340,7 @@ export default function DataTable<T extends Record<string, any>>({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+        <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${colors.border}` }}>
           <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>
             Page {safePage + 1} of {totalPages}
           </span>
@@ -371,8 +371,8 @@ export default function DataTable<T extends Record<string, any>>({
                   onClick={() => setPage(pageNum)}
                   className="w-7 h-7 rounded-md text-[11px] font-mono transition-colors"
                   style={{
-                    background: safePage === pageNum ? 'rgba(34,197,94,0.12)' : 'transparent',
-                    color: safePage === pageNum ? '#22c55e' : colors.textDim,
+                    background: safePage === pageNum ? `${colors.success}1f` : 'transparent',
+                    color: safePage === pageNum ? colors.success : colors.textDim,
                   }}
                 >
                   {pageNum + 1}

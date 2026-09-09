@@ -261,14 +261,14 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
           <div className="min-w-[120px]">
             <div className="flex justify-between text-[11px] font-mono mb-1">
               <span style={{ color: colors.textMuted }}>{formatBytes(current)}</span>
-              <span style={{ color: isWarning ? '#f59e0b' : colors.textDim }}>{pct.toFixed(0)}%</span>
+              <span style={{ color: isWarning ? colors.warning : colors.textDim }}>{pct.toFixed(0)}%</span>
             </div>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
               <div
                 className="h-full rounded-full transition-all duration-700"
                 style={{
                   width: `${Math.min(pct, 100)}%`,
-                  background: pct > 90 ? 'linear-gradient(90deg, #f59e0b, #ef4444)' : 'linear-gradient(90deg, #22c55e, #3b82f6)',
+                   background: pct > 90 ? `linear-gradient(90deg, ${colors.warning}, ${colors.danger})` : `linear-gradient(90deg, ${colors.success}, ${colors.accent})`,
                 }}
               />
             </div>
@@ -328,28 +328,28 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Cloud className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Cloud className="w-4 h-4" style={{ color: colors.success }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Providers</span>
           </div>
           <p className="text-xl font-bold">{providers.length}</p>
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <HardDrive className="w-4 h-4" style={{ color: '#3b82f6' }} />
+            <HardDrive className="w-4 h-4" style={{ color: colors.accent }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Total Space</span>
           </div>
           <p className="text-xl font-bold">{formatBytes(totalCap)}</p>
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Shield className="w-4 h-4" style={{ color: colors.success }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Active</span>
           </div>
           <p className="text-xl font-bold">{activeCount} / {providers.length}</p>
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <HardDrive className="w-4 h-4" style={{ color: usedPct >= 90 ? '#f59e0b' : '#22c55e' }} />
+            <HardDrive className="w-4 h-4" style={{ color: usedPct >= 90 ? colors.warning : colors.success }} />
             <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>Used</span>
           </div>
           <p className="text-xl font-bold">{usedPct.toFixed(1)}%</p>
@@ -396,7 +396,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       {showForm && (
         <div className="glass-card p-6 animate-fade-up">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
-            <Server className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Server className="w-4 h-4" style={{ color: colors.success }} />
             Select Cloud Provider
           </h3>
 
@@ -408,8 +408,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                 onClick={() => handleSelectProvider(p)}
                 className="relative p-3 rounded-xl border text-left transition-all duration-200"
                 style={{
-                  background: selectedProvider?.id === p.id ? `${p.color}15` : 'rgba(255,255,255,0.02)',
-                  borderColor: selectedProvider?.id === p.id ? `${p.color}50` : 'rgba(255,255,255,0.06)',
+                  background: selectedProvider?.id === p.id ? `${p.color}15` : colors.cardBg,
+                  borderColor: selectedProvider?.id === p.id ? `${p.color}50` : colors.border,
                 }}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -429,8 +429,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
               onClick={() => { setSelectedProvider(null); resetForm(); sounds.click(); }}
               className="relative p-3 rounded-xl border text-left transition-all duration-200"
               style={{
-                background: !selectedProvider ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.02)',
-                borderColor: !selectedProvider ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.06)',
+                background: !selectedProvider ? 'rgba(34,197,94,0.1)' : colors.cardBg,
+                borderColor: !selectedProvider ? 'rgba(34,197,94,0.4)' : colors.border,
               }}
             >
               <div className="flex items-center gap-2 mb-1">
@@ -500,7 +500,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
 
             {selectedProvider && (
               <div className="flex items-start gap-2 p-3 rounded-lg" style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.1)' }}>
-                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#22c55e' }} />
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.success }} />
                 <div className="text-xs" style={{ color: colors.textDim }}>
                   Get your credentials from <a href={selectedProvider.docsUrl} target="_blank" rel="noopener" className="underline" style={{ color: selectedProvider.color }}>{selectedProvider.name} docs</a>
                 </div>

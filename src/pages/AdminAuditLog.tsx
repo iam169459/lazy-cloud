@@ -48,7 +48,7 @@ export default function AdminAuditLog({ token, onNotify }: Props) {
       label: 'Action',
       sortable: true,
       render: (row) => (
-        <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+        <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>
           {row.action}
         </span>
       ),

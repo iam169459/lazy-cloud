@@ -125,7 +125,7 @@ npm run build`;
       {/* Page Header */}
       <div className="animate-fade-up">
         <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
-          <Terminal className="w-4 h-4" style={{ color: '#22c55e' }} />
+          <Terminal className="w-4 h-4" style={{ color: colors.success }} />
           System
         </h2>
         <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
@@ -138,7 +138,7 @@ npm run build`;
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {systemInfo.map((item) => (
             <div key={item.label} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>
                 {item.icon}
               </div>
               <div>
@@ -155,9 +155,9 @@ npm run build`;
         {/* One-click Update */}
         <div className="glass-card p-4 flex flex-col gap-3 mb-4" style={{ border: '1px solid rgba(34,197,94,0.2)' }}>
           <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Zap className="w-4 h-4" style={{ color: colors.success }} />
             <h4 className="text-sm font-semibold">Quick Update</h4>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Recommended</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>Recommended</span>
           </div>
           <p className="text-xs font-mono" style={{ color: colors.textDim }}>
             Pull latest code, install deps, rebuild, and restart — all in one click
@@ -171,7 +171,7 @@ npm run build`;
         <div className="grid md:grid-cols-2 gap-4">
           <div className="glass-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <GitBranch className="w-4 h-4" style={{ color: '#22c55e' }} />
+              <GitBranch className="w-4 h-4" style={{ color: colors.success }} />
               <h4 className="text-sm font-semibold">Pull Only</h4>
             </div>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>
@@ -185,7 +185,7 @@ npm run build`;
 
           <div className="glass-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <HardDrive className="w-4 h-4" style={{ color: '#f59e0b' }} />
+              <HardDrive className="w-4 h-4" style={{ color: colors.warning }} />
               <h4 className="text-sm font-semibold">Rebuild Only</h4>
             </div>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>
@@ -199,7 +199,7 @@ npm run build`;
         </div>
 
         <div className="flex items-start gap-2 p-3 rounded-xl mt-2" style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)' }}>
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} />
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.accent }} />
           <p className="text-xs font-mono" style={{ color: colors.textDim }}>
             Quick Update does everything: pull + install + build + restart. Use Pull or Rebuild for individual steps.
           </p>
@@ -213,13 +213,13 @@ npm run build`;
         </p>
 
         <div className="relative">
-          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: colors.text }}>
+          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, color: colors.text }}>
             <code>{installScript}</code>
           </pre>
           <button
             onClick={handleCopyScript}
             className="absolute top-2 right-2 p-2 rounded-lg transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', color: copied ? '#22c55e' : colors.textDim }}
+            style={{ background: 'rgba(255,255,255,0.05)', color: copied ? colors.success : colors.textDim }}
             title="Copy to clipboard"
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -234,7 +234,7 @@ npm run build`;
         </p>
 
         <div className="relative">
-          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', color: colors.text }}>
+          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, color: colors.text }}>
             <code>{updateScript}</code>
           </pre>
           <button
@@ -251,7 +251,7 @@ npm run build`;
       {/* Links */}
       <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 animate-fade-up delay-100">
         <div className="flex items-center gap-2">
-          <ExternalLink className="w-4 h-4" style={{ color: '#22c55e' }} />
+          <ExternalLink className="w-4 h-4" style={{ color: colors.success }} />
           <span className="text-sm font-semibold">Useful Links</span>
         </div>
         <div className="flex flex-wrap gap-3">

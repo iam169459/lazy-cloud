@@ -77,7 +77,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#22c55e' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
         <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING...</p>
       </div>
     );
@@ -90,7 +90,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
       {/* Page Header */}
       <div className="animate-fade-up">
         <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
-          <Shield className="w-4 h-4" style={{ color: '#22c55e' }} />
+          <Shield className="w-4 h-4" style={{ color: colors.success }} />
           Security / Credentials
         </h2>
         <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
@@ -106,8 +106,8 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
             <label className="block text-[11px] font-mono uppercase tracking-wider mb-1.5" style={{ color: colors.textDim }}>
               Current username
             </label>
-            <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)', color: colors.textDim }}>
-              <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: 'rgba(34,197,94,0.5)' }} />
+            <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: colors.cardBg, borderColor: colors.border, color: colors.textDim }}>
+              <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: `${colors.success}80` }} />
               <span className="truncate">{currentUsername || 'admin'}</span>
             </div>
           </div>
@@ -181,9 +181,9 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
 
       {/* Warning */}
       <div className="max-w-lg glass-card p-3 sm:p-4 flex items-start gap-3 animate-fade-up delay-200" style={{ border: '1px solid rgba(245,158,11,0.15)' }}>
-        <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
-        <p className="text-[11px] sm:text-xs leading-relaxed font-mono" style={{ color: 'rgba(245,158,11,0.7)' }}>
-          If no custom credentials have been set, the system falls back to default credentials (username: <span style={{ color: '#f59e0b' }}>admin</span>).
+        <Lock className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.warning }} />
+        <p className="text-[11px] sm:text-xs leading-relaxed font-mono" style={{ color: `${colors.warning}b3` }}>
+          If no custom credentials have been set, the system falls back to default credentials (username: <span style={{ color: colors.warning }}>admin</span>).
         </p>
       </div>
     </div>

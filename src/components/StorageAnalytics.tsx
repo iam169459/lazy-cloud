@@ -29,9 +29,9 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
   const providerUsage = useMemo(() => {
     return providers.map((p) => ({
       name: p.provider_name.length > 15 ? p.provider_name.slice(0, 12) + '...' : p.provider_name,
-      used: p.current_bytes,
-      capacity: p.max_bytes,
-      pct: p.max_bytes > 0 ? (p.current_bytes / p.max_bytes) * 100 : 0,
+      used: Number(p.current_bytes),
+      capacity: Number(p.max_bytes),
+      pct: Number(p.max_bytes) > 0 ? (Number(p.current_bytes) / Number(p.max_bytes)) * 100 : 0,
     }));
   }, [providers]);
 
@@ -42,17 +42,17 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
   }, [uploadsByDay]);
   const maxCumulative = Math.max(...cumulativeSize.map((d) => d.cumulative), 1);
 
-  const totalUsed = providers.reduce((sum, p) => sum + p.current_bytes, 0);
-  const totalCap = providers.reduce((sum, p) => sum + p.max_bytes, 0);
+  const totalUsed = providers.reduce((sum, p) => sum + Number(p.current_bytes), 0);
+  const totalCap = providers.reduce((sum, p) => sum + Number(p.max_bytes), 0);
 
-  const chartColors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  const chartColors = [colors.success, colors.accent, colors.warning, colors.danger, colors.accent, colors.primary];
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="glass-card p-4">
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <BarChart className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <BarChart className="w-4 h-4" style={{ color: colors.success }} />
             Uploads (Last 30 Days)
           </h3>
           <div className="h-48 flex items-end gap-[2px] overflow-x-auto">
@@ -63,7 +63,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
                   style={{
                     height: `${(d.uploads / maxUploads) * 100}%`,
                     minHeight: d.uploads > 0 ? '4px' : '0',
-                    background: 'linear-gradient(180deg, #22c55e, #16a34a)',
+                    background: `linear-gradient(180deg, ${colors.success}, ${colors.success}cc)`,
                   }}
                 />
               </div>
@@ -73,7 +73,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
 
         <div className="glass-card p-4">
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <LineChart className="w-4 h-4" style={{ color: '#3b82f6' }} />
+            <LineChart className="w-4 h-4" style={{ color: colors.accent }} />
             Storage Growth (Last 30 Days)
           </h3>
           <div className="h-48 relative">
@@ -85,7 +85,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
                     style={{
                       height: `${(d.cumulative / maxCumulative) * 100}%`,
                       minHeight: d.cumulative > 0 ? '4px' : '0',
-                      background: 'linear-gradient(180deg, rgba(59,130,246,0.4), rgba(59,130,246,0.05))',
+                      background: `linear-gradient(180deg, ${colors.accent}66, ${colors.accent}0d)`,
                     }}
                   />
                 </div>
@@ -94,7 +94,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
             <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
               <polyline
                 fill="none"
-                stroke="#3b82f6"
+                stroke={colors.accent}
                 strokeWidth="2"
                 points={cumulativeSize.map((d, i) => `${(i / Math.max(cumulativeSize.length - 1, 1)) * 100}%,${100 - (d.cumulative / maxCumulative) * 100}%`).join(' ')}
               />
@@ -105,14 +105,14 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
 
       <div className="glass-card p-4">
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <BarChart className="w-4 h-4" style={{ color: '#f59e0b' }} />
+          <BarChart className="w-4 h-4" style={{ color: colors.warning }} />
           Provider Usage
         </h3>
         <div className="space-y-3">
           {providerUsage.map((p, i) => (
             <div key={p.name} className="flex items-center gap-3">
               <span className="text-xs font-mono w-32 truncate" style={{ color: colors.textMuted }}>{p.name}</span>
-              <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: colors.cardBg }}>
                 <div
                   className="h-full rounded-full transition-all duration-700"
                   style={{
@@ -121,7 +121,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
                   }}
                 />
               </div>
-              <span className="text-xs font-mono w-24 text-right" style={{ color: p.pct > 90 ? '#f59e0b' : colors.textMuted }}>
+              <span className="text-xs font-mono w-24 text-right" style={{ color: p.pct > 90 ? colors.warning : colors.textMuted }}>
                 {p.pct.toFixed(1)}%
               </span>
               <span className="text-[10px] font-mono w-28 text-right" style={{ color: colors.textDim }}>
@@ -135,7 +135,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>
               <BarChart className="w-4 h-4" />
             </div>
             <span className="text-xs font-medium" style={{ color: colors.textMuted }}>Total Files</span>
@@ -144,7 +144,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', color: colors.accent }}>
               <LineChart className="w-4 h-4" />
             </div>
             <span className="text-xs font-medium" style={{ color: colors.textMuted }}>Total Storage</span>
@@ -153,7 +153,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.1)', color: colors.warning }}>
               <Download className="w-4 h-4" />
             </div>
             <span className="text-xs font-medium" style={{ color: colors.textMuted }}>Total Downloads</span>
@@ -162,7 +162,7 @@ export default function StorageAnalytics({ files, providers, totalDownloads }: S
         </div>
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.1)', color: colors.accent }}>
               <BarChart className="w-4 h-4" />
             </div>
             <span className="text-xs font-medium" style={{ color: colors.textMuted }}>Providers</span>

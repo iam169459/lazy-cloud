@@ -135,7 +135,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
         const isLarge = f.file_size > 50 * 1024 * 1024;
         return (
           <div className="flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#22c55e' }} />
+            <FileText className="w-3.5 h-3.5 flex-shrink-0" style={{ color: colors.success }} />
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-xs font-medium truncate max-w-[160px]">{f.original_name}</span>
               {isPopular && <span className="status-badge status-success">Popular</span>}
@@ -305,12 +305,12 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
                     </div>
                     <div className="flex flex-wrap gap-2 text-[10px] font-mono mb-2" style={{ color: 'var(--text-dim)' }}>
                       {s.requiresPassword && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}><Lock className="w-3 h-3" />Password</span>}
-                      {s.expiresAt && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}><Clock className="w-3 h-3" />Expires {formatDate(s.expiresAt)}</span>}
-                      {s.downloadLimit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>{s.downloadsRemaining !== null ? `${s.downloadsRemaining}/${s.downloadLimit}` : 'Unlimited'}</span>}
+                      {s.expiresAt && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: colors.danger }}><Clock className="w-3 h-3" />Expires {formatDate(s.expiresAt)}</span>}
+                      {s.downloadLimit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>{s.downloadsRemaining !== null ? `${s.downloadsRemaining}/${s.downloadLimit}` : 'Unlimited'}</span>}
                     </div>
                     <button
                       onClick={() => deleteShare(s.id)}
-                      className="text-xs font-medium text-right" style={{ color: '#ef4444' }}
+                      className="text-xs font-medium text-right" style={{ color: colors.danger }}
                     >
                       Delete share
                     </button>
@@ -348,7 +348,7 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
         onClick={() => !uploading && ref.current?.click()}
         className="glass-card p-6 sm:p-8 text-center cursor-pointer"
         style={{
-          borderColor: dragOver ? '#22c55e' : undefined,
+          borderColor: dragOver ? colors.success : undefined,
           transition: 'all 0.2s ease',
         }}
         role="button"
@@ -359,23 +359,23 @@ export default function AdminDashboard({ files, providers, token, onRefresh, onN
         <input ref={ref} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
         {uploading ? (
           <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#22c55e' }} />
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
             <div className="w-full max-w-xs">
               <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}>
-                <span style={{ color: '#22c55e' }}>UPLOADING</span>
+                <span style={{ color: colors.success }}>UPLOADING</span>
                 <span>{progress}%</span>
               </div>
               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <div
                   className="h-full rounded-full transition-all"
-                  style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #22c55e, #3b82f6)' }}
+                   style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${colors.success}, ${colors.accent})` }}
                 />
               </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <Upload className="w-6 h-6" style={{ color: '#22c55e' }} />
+            <Upload className="w-6 h-6" style={{ color: colors.success }} />
             <p className="text-sm font-medium">Drop a file or click to upload</p>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>Auto-routed to next available bucket</p>
           </div>

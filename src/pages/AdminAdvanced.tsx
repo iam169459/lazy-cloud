@@ -131,7 +131,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#22c55e' }} />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
         <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING_SETTINGS...</p>
       </div>
     );
@@ -144,7 +144,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       {/* Page Header */}
       <div className="animate-fade-up">
         <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
-          <Settings className="w-4 h-4" style={{ color: '#22c55e' }} />
+          <Settings className="w-4 h-4" style={{ color: colors.success }} />
           Advanced Settings
         </h2>
         <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
@@ -166,8 +166,8 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                   className="px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer"
                   style={{
                     background: theme === t ? 'rgba(34,197,94,0.12)' : 'transparent',
-                    borderColor: theme === t ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.08)',
-                    color: theme === t ? '#22c55e' : colors.textDim,
+                    borderColor: theme === t ? 'rgba(34,197,94,0.4)' : colors.border,
+                    color: theme === t ? colors.success : colors.textDim,
                   }}
                 >
                   {t.charAt(0).toUpperCase() + t.slice(1)}

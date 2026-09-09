@@ -179,12 +179,12 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
                   <span className="text-xs font-medium truncate max-w-[200px]">{item.file.name}</span>
                   <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>{formatBytes(item.file.size)}</span>
                 </div>
-                <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: colors.cardBg }}>
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{
                       width: `${item.progress}%`,
-                      background: item.status === 'error' ? 'linear-gradient(90deg, #ef4444, #f59e0b)' : 'linear-gradient(90deg, #22c55e, #3b82f6)',
+                      background: item.status === 'error' ? `linear-gradient(90deg, ${colors.danger}, ${colors.warning})` : `linear-gradient(90deg, ${colors.success}, ${colors.accent})`,
                     }}
                   />
                 </div>
@@ -193,14 +193,14 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
                     {item.status === 'pending' ? 'Waiting...' : item.status === 'uploading' ? `${item.progress}%` : item.status === 'completed' ? 'Done' : 'Error'}
                   </span>
                   {item.status === 'error' && (
-                    <span className="text-[10px]" style={{ color: '#ef4444' }}>{item.error}</span>
+                    <span className="text-[10px]" style={{ color: colors.danger }}>{item.error}</span>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 {item.status === 'uploading' && <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--primary)' }} />}
-                {item.status === 'completed' && <CheckCircle className="w-4 h-4" style={{ color: '#22c55e' }} />}
-                {item.status === 'error' && <AlertCircle className="w-4 h-4" style={{ color: '#ef4444' }} />}
+                {item.status === 'completed' && <CheckCircle className="w-4 h-4" style={{ color: colors.success }} />}
+                {item.status === 'error' && <AlertCircle className="w-4 h-4" style={{ color: colors.danger }} />}
                 {item.status === 'error' && (
                   <button onClick={() => retryItem(item.id)} className="p-1 rounded" style={{ color: colors.textMuted }} title="Retry">
                     <Loader2 className="w-3.5 h-3.5" />

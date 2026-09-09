@@ -125,7 +125,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
       label: 'Permissions',
       sortable: true,
       render: (row) => (
-        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>
           {row.permissions}
         </span>
       ),
@@ -148,7 +148,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
         if (!row.expires_at) return <span className="text-xs" style={{ color: colors.textDim }}>Never</span>;
         const expired = new Date(row.expires_at) < new Date();
         return (
-          <span className="text-xs" style={{ color: expired ? '#ef4444' : colors.textMuted }}>
+          <span className="text-xs" style={{ color: expired ? colors.danger : colors.textMuted }}>
             {expired ? 'Expired ' : ''}{new Date(row.expires_at).toLocaleDateString()}
           </span>
         );
@@ -214,7 +214,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
       {showForm && (
         <div className="glass-card p-6 animate-fade-up">
           <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
-            <Key className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Key className="w-4 h-4" style={{ color: colors.success }} />
             Create API Key
           </h3>
           <form onSubmit={handleCreate} noValidate className="space-y-4">
@@ -260,7 +260,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
           <div className="glass-card w-full max-w-md animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
             <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
               <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Key className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <Key className="w-4 h-4" style={{ color: colors.success }} />
                 API Key Created
               </h3>
             </div>
@@ -275,7 +275,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
                   Copy
                 </button>
               </div>
-              <div className="flex items-center gap-2 text-xs p-3 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444' }}>
+              <div className="flex items-center gap-2 text-xs p-3 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: colors.danger }}>
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>This key will only be shown once. Save it securely.</span>
               </div>

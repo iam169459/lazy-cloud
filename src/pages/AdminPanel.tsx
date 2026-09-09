@@ -88,7 +88,7 @@ export default function AdminPanel() {
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          style={{ background: `${colors.bg}cc`, backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />
@@ -102,16 +102,16 @@ export default function AdminPanel() {
         style={{
           width: sidebarWidth,
           minWidth: sidebarWidth,
-          background: 'rgba(15, 23, 42, 0.75)',
+          background: colors.cardBg,
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRight: `1px solid rgba(255, 255, 255, 0.06)`,
+          borderRight: `1px solid ${colors.border}`,
         }}
         role="navigation"
         aria-label="Admin navigation"
       >
         {/* Logo */}
-        <div className="h-14 px-4 flex items-center shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+        <div className="h-14 px-4 flex items-center shrink-0" style={{ borderBottom: `1px solid ${colors.border}` }}>
           <Link
             to="/"
             className="flex items-center gap-2.5 overflow-hidden"
@@ -145,13 +145,13 @@ export default function AdminPanel() {
                   style={{
                     padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
                     justifyContent: collapsed ? 'center' : 'flex-start',
-                    background: isActive ? 'rgba(34, 197, 94, 0.1)' : 'transparent',
-                    color: isActive ? '#22c55e' : colors.textMuted,
+                    background: isActive ? colors.primaryGlow : 'transparent',
+                    color: isActive ? colors.primary : colors.textMuted,
                   }}
                   aria-current={isActive ? 'page' : undefined}
                   title={collapsed ? item.label : undefined}
                 >
-                  <span style={{ color: isActive ? '#22c55e' : colors.textDim, flexShrink: 0 }}>
+                  <span style={{ color: isActive ? colors.primary : colors.textDim, flexShrink: 0 }}>
                     {item.icon}
                   </span>
                   {!collapsed && <span className="truncate">{item.label}</span>}
@@ -162,7 +162,7 @@ export default function AdminPanel() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="px-2 py-3 shrink-0" style={{ borderTop: `1px solid rgba(255,255,255,0.06)` }}>
+        <div className="px-2 py-3 shrink-0" style={{ borderTop: `1px solid ${colors.border}` }}>
           <div className="flex flex-col gap-0.5">
             {/* Collapse Toggle — desktop only */}
             <button
@@ -307,9 +307,9 @@ export default function AdminPanel() {
           role="alert"
           aria-live="assertive"
           style={{
-            background: notif.type === 'success' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-            border: `1px solid ${notif.type === 'success' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
-            color: notif.type === 'success' ? '#22c55e' : '#ef4444',
+            background: notif.type === 'success' ? `${colors.success}14` : `${colors.danger}14`,
+            border: `1px solid ${notif.type === 'success' ? `${colors.success}33` : `${colors.danger}33`}`,
+            color: notif.type === 'success' ? colors.success : colors.danger,
             backdropFilter: 'blur(12px)',
           }}
         >
@@ -353,11 +353,11 @@ function SummaryCard({ icon, label, value, accent, progress }: {
         <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
           <div
             className="h-full rounded-full transition-all duration-700"
-            style={{
+              style={{
               width: `${Math.min(progress, 100)}%`,
               background: progress > 90
-                ? 'linear-gradient(90deg, #f59e0b, #ef4444)'
-                : 'linear-gradient(90deg, #22c55e, #3b82f6)',
+                ? `linear-gradient(90deg, ${colors.warning}, ${colors.danger})`
+                : `linear-gradient(90deg, ${colors.success}, ${colors.accent})`,
             }}
           />
         </div>
