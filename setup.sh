@@ -221,6 +221,63 @@ for url in "https://api.ipify.org" "https://ifconfig.me" "https://icanhazip.com"
   PUBLIC_IP=$(curl -fsSL --max-time 5 "$url" 2>/dev/null | tr -d '[:space:]') && break
 done
 
+# ── VPS mode: install as systemd service ──
+install_service() {
+  if [ "$MODE" = "install" ] && command -v systemctl >/dev/null 2>&1; then
+    echo ""
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Install as system service (runs on boot)? [Y/n]: ")" INSTALL_SVC
+    if [ "${INSTALL_SVC,,}" != "n" ]; then
+      log "Installing systemd service..."
+
+      # Find node binary path
+      NODE_PATH=$(which node 2>/dev/null || echo "/usr/local/bin/node")
+      NPM_PATH=$(which npm 2>/dev/null || echo "/usr/local/bin/npm")
+      ABS_APP_DIR="$(cd "$APP_DIR" && pwd)"
+
+      sudo tee /etc/systemd/system/lazydrop.service >/dev/null <<SVC
+[Unit]
+Description=LazyDrop File Sharing Server
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=${ABS_APP_DIR}
+ExecStart=${NODE_PATH} dist-server/production.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=${ABS_APP_DIR}/.env
+
+[Install]
+WantedBy=multi-user.target
+SVC
+
+      sudo systemctl daemon-reload
+      sudo systemctl enable lazydrop
+      sudo systemctl start lazydrop
+      ok "Service installed and started!"
+      echo ""
+      echo "  Commands:"
+      echo "    sudo systemctl status lazydrop    — check status"
+      echo "    sudo systemctl restart lazydrop   — restart"
+      echo "    sudo systemctl stop lazydrop      — stop"
+      echo "    journalctl -u lazydrop -f         — view logs"
+    fi
+  fi
+}
+
+# ── VPS: open firewall port ──
+open_firewall() {
+  if command -v ufw >/dev/null 2>&1; then
+    sudo ufw allow 3000/tcp >/dev/null 2>&1 && ok "Firewall: opened port 3000" || true
+  elif command -v firewall-cmd >/dev/null 2>&1; then
+    sudo firewall-cmd --permanent --add-port=3000/tcp >/dev/null 2>&1
+    sudo firewall-cmd --reload >/dev/null 2>&1
+    ok "Firewall: opened port 3000"
+  fi
+}
+
 # ── Done ──
 echo ""
 if [ "$MODE" = "install" ]; then
@@ -236,6 +293,12 @@ if [ "$MODE" = "install" ]; then
   echo -e "  ${BOLD}Local:${NC}   http://localhost:5173"
   [ -n "$PUBLIC_IP" ] && echo -e "  ${BOLD}Network:${NC} http://${PUBLIC_IP}:5173"
   echo ""
+
+  # VPS setup
+  install_service
+  open_firewall
+
+  echo ""
   echo -e "  ${BOLD}Production (Render):${NC}"
   echo "    - Push to GitHub, connect on render.com"
   echo "    - Set DATABASE_URL in Render dashboard"
@@ -248,8 +311,8 @@ if [ "$MODE" = "install" ]; then
 else
   ok "Update complete!"
   echo ""
-  echo "  If the dev server is running, it hot-reloads automatically."
-  echo "  For production: restart your hosting service."
+  echo "  If running as service: sudo systemctl restart lazydrop"
+  echo "  If dev server: it hot-reloads automatically."
   echo ""
   echo -e "  ${BOLD}Local:${NC}   http://localhost:5173"
   [ -n "$PUBLIC_IP" ] && echo -e "  ${BOLD}Network:${NC} http://${PUBLIC_IP}:5173"
