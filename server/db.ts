@@ -444,21 +444,25 @@ export async function validateShare(shareId: string, password?: string): Promise
 }
 
 export async function getStats(): Promise<{
-  totalFiles: number;
-  totalSize: number;
-  totalDownloads: number;
-  providerCount: number;
+  files: { total_files: string; total_bytes: string; total_downloads: string };
+  providers: { total_providers: string; used_bytes: string; capacity_bytes: string };
 }> {
   const sql = getSql();
   const files = (await sql`SELECT COUNT(*) as count, COALESCE(SUM(file_size), 0) as size, COALESCE(SUM(download_count), 0) as downloads FROM files`) as unknown[];
-  const providers = (await sql`SELECT COUNT(*) as count FROM storage_providers WHERE is_active = true`) as unknown[];
+  const providers = (await sql`SELECT COUNT(*) as count, COALESCE(SUM(current_bytes), 0) as used, COALESCE(SUM(max_bytes), 0) as capacity FROM storage_providers`) as unknown[];
   const f = files[0] as any;
   const p = providers[0] as any;
   return {
-    totalFiles: parseInt(f.count) || 0,
-    totalSize: parseInt(f.size) || 0,
-    totalDownloads: parseInt(f.downloads) || 0,
-    providerCount: parseInt(p.count) || 0,
+    files: {
+      total_files: String(parseInt(f.count) || 0),
+      total_bytes: String(parseInt(f.size) || 0),
+      total_downloads: String(parseInt(f.downloads) || 0),
+    },
+    providers: {
+      total_providers: String(parseInt(p.count) || 0),
+      used_bytes: String(parseInt(p.used) || 0),
+      capacity_bytes: String(parseInt(p.capacity) || 0),
+    },
   };
 }
 
