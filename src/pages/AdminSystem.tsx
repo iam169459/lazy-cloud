@@ -20,6 +20,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
   const { colors } = useTheme();
   const [pulling, setPulling] = useState(false);
   const [building, setBuilding] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const systemInfo = [
@@ -66,6 +67,29 @@ export default function AdminSystem({ token, onNotify }: Props) {
       onNotify('error', errMsg(e));
     } finally {
       setBuilding(false);
+    }
+  }
+
+  async function handleUpdate() {
+    sounds.click();
+    setUpdating(true);
+    try {
+      const res = await fetch('/api/admin/system/update', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Update failed');
+      sounds.success();
+      const msg = data.restarted
+        ? `${data.message} — server restarted`
+        : `${data.message} — restart server to apply`;
+      onNotify('success', msg);
+    } catch (e: any) {
+      sounds.error();
+      onNotify('error', errMsg(e));
+    } finally {
+      setUpdating(false);
     }
   }
 
@@ -128,25 +152,41 @@ npm run build`;
 
       {/* Update Actions */}
       <FormSection title="Update & Deploy" icon={<RefreshCw className="w-4 h-4" />}>
+        {/* One-click Update */}
+        <div className="glass-card p-4 flex flex-col gap-3 mb-4" style={{ border: '1px solid rgba(34,197,94,0.2)' }}>
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4" style={{ color: '#22c55e' }} />
+            <h4 className="text-sm font-semibold">Quick Update</h4>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>Recommended</span>
+          </div>
+          <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+            Pull latest code, install deps, rebuild, and restart — all in one click
+          </p>
+          <SaveButton loading={updating} onClick={handleUpdate}>
+            <Zap className={`w-3.5 h-3.5 ${updating ? 'animate-spin' : ''}`} />
+            {updating ? 'Updating...' : 'Update & Restart'}
+          </SaveButton>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-4">
           <div className="glass-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <GitBranch className="w-4 h-4" style={{ color: '#22c55e' }} />
-              <h4 className="text-sm font-semibold">Pull Latest</h4>
+              <h4 className="text-sm font-semibold">Pull Only</h4>
             </div>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>
               Pull the latest code from GitHub (dev branch)
             </p>
             <SaveButton loading={pulling} onClick={handlePull}>
               <RefreshCw className={`w-3.5 h-3.5 ${pulling ? 'animate-spin' : ''}`} />
-              Pull & Update
+              Pull
             </SaveButton>
           </div>
 
           <div className="glass-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <HardDrive className="w-4 h-4" style={{ color: '#f59e0b' }} />
-              <h4 className="text-sm font-semibold">Rebuild</h4>
+              <h4 className="text-sm font-semibold">Rebuild Only</h4>
             </div>
             <p className="text-xs font-mono" style={{ color: colors.textDim }}>
               Reinstall deps and rebuild production bundle
@@ -161,7 +201,7 @@ npm run build`;
         <div className="flex items-start gap-2 p-3 rounded-xl mt-2" style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)' }}>
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} />
           <p className="text-xs font-mono" style={{ color: colors.textDim }}>
-            Pull only fetches code changes. Rebuild also reinstalls dependencies and rebuilds the bundle. Both require the server to restart.
+            Quick Update does everything: pull + install + build + restart. Use Pull or Rebuild for individual steps.
           </p>
         </div>
       </FormSection>

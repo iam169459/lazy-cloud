@@ -1248,6 +1248,33 @@ export async function handleApiRequest(
       return true;
     }
 
+    // ── System: Full Update (pull + rebuild + restart) ──
+    if (path === '/api/admin/system/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      try {
+        const pullResult = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString();
+        execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
+        execSync('npm run build', { cwd: process.cwd(), timeout: 120000 });
+
+        // Try to restart systemd service
+        let restarted = false;
+        try {
+          execSync('sudo systemctl restart lazydrop', { timeout: 10000 });
+          restarted = true;
+        } catch {}
+
+        sendJson(res, 200, {
+          message: 'Update complete',
+          pull: pullResult.trim(),
+          restarted,
+        });
+      } catch (e: any) {
+        sendError(res, 500, `Update failed: ${e.message}`);
+      }
+      return true;
+    }
+
     return false;
   } catch (e: any) {
     console.error('API error:', e);
