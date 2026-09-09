@@ -269,12 +269,12 @@ export default function DataTable<T extends Record<string, any>>({
                             <>
                               <div className="fixed inset-0 z-50" onClick={() => setOpenMenu(null)} />
                               <div
-                                className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-50 animate-scale-in"
+                                className="absolute right-0 bottom-full mb-1 w-44 rounded-xl py-1.5 z-50 animate-scale-in"
                                 style={{
                                   background: colors.cardBg,
                                   border: `1px solid ${colors.border}`,
                                   backdropFilter: 'blur(20px)',
-                                  boxShadow: `0 8px 32px ${colors.bg}80`,
+                                  boxShadow: `0 -8px 32px ${colors.bg}80`,
                                 }}
                               >
                                 {actions
