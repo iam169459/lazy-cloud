@@ -165,9 +165,8 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
 
   let fileName = '';
   let mimeType = '';
-  const chunks: Buffer[] = [];
-  let fileSize = 0;
   let uploadError: string | null = null;
+  let resolved = false;
 
   bb.on('file', (_fieldname, file, info) => {
     fileName = info.filename || 'unnamed';
@@ -178,62 +177,40 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
       file.resume();
     });
 
-    file.on('data', (chunk: Buffer) => {
-      if (!uploadError) {
-        chunks.push(chunk);
-        fileSize += chunk.length;
-      }
-    });
-  });
-
-  bb.on('error', (err: Error) => {
-    uploadError = err.message;
-  });
-
-  return new Promise<boolean>((resolve) => {
-    bb.on('finish', async () => {
-      if (uploadError) {
-        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
-        return resolve(true);
-      }
-      if (!fileName || chunks.length === 0) {
-        sendError(res, 400, 'No file uploaded');
-        return resolve(true);
-      }
-
-      const fileBuffer = Buffer.concat(chunks);
-      chunks.length = 0;
-
-      const allowed = (settings.allowedTypes || '*')
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
-        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
-        return resolve(true);
-      }
-
-      const providerUsed = await findProviderForSize(fileSize);
-      if (!providerUsed) {
-        const allProviders = await listProviders();
-        if (allProviders.length === 0) {
-          sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
-        } else {
-          sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
-        }
-        return resolve(true);
-      }
-
-      const fileId = generateId();
-      const fileKey = `${fileId}/${fileName}`;
-
+    // Stream directly to S3 — no in-memory buffering
+    (async () => {
       try {
-        await uploadToProvider(providerUsed, fileKey, fileBuffer, mimeType);
-        try {
+        const allowed = (settings.allowedTypes || '*')
+          .split(',')
+          .map((t: string) => t.trim().toLowerCase())
+          .filter(Boolean);
+        if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+          uploadError = `File type ${mimeType || 'unknown'} is not allowed.`;
+          file.resume();
+          return;
+        }
+
+        const providers = await listProviders();
+        const providerUsed = providers[0];
+        if (!providerUsed) {
+          uploadError = 'No storage providers configured. Go to Storage Settings and add a bucket first.';
+          file.resume();
+          return;
+        }
+
+        const fileId = generateId();
+        const fileKey = `${fileId}/${fileName}`;
+
+        // Stream directly to S3
+        await uploadToProvider(providerUsed, fileKey, file, mimeType);
+
+        if (!uploadError && !resolved) {
+          resolved = true;
+          // File record created with size 0 — will be updated by background scan
           await createFileRecord({
             id: fileId,
             original_name: fileName,
-            file_size: fileSize,
+            file_size: 0,
             mime_type: mimeType,
             r2_key: fileKey,
             provider_id: providerUsed.id,
@@ -241,15 +218,26 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
             enc_iv: null,
             enc_auth_tag: null,
           });
-          await updateProviderBytes(providerUsed.id, fileSize);
-        } catch (dbErr: any) {
-          await deleteFromProvider(providerUsed, fileKey).catch(() => {});
-          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
-          return resolve(true);
+          sendJson(res, 200, { id: fileId, name: fileName, size: 0 });
         }
-        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
       } catch (e: any) {
-        sendError(res, 500, `Upload to storage failed: ${e.message}`);
+        if (!resolved) {
+          resolved = true;
+          sendError(res, 500, `Upload to storage failed: ${e.message}`);
+        }
+      }
+    })();
+  });
+
+  bb.on('error', (err: Error) => {
+    uploadError = err.message;
+  });
+
+  return new Promise<boolean>((resolve) => {
+    bb.on('finish', () => {
+      if (uploadError && !resolved) {
+        resolved = true;
+        sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
       }
       resolve(true);
     });
@@ -1241,6 +1229,32 @@ export async function handleApiRequest(
       const offset = parseInt(url.searchParams.get('offset') || '0');
       const logs = await listAuditLogs(limit, offset);
       sendJson(res, 200, { logs });
+      return true;
+    }
+
+    // ── System: Check for updates ──
+    if (path === '/api/admin/system/check-update' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      try {
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        execSync('git fetch origin ' + branch, { cwd: process.cwd(), timeout: 15000 }).toString();
+        const local = execSync('git rev-parse HEAD', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const remote = execSync('git rev-parse origin/' + branch, { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const localMsg = execSync('git log --oneline -1', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const remoteMsg = execSync('git log --oneline -1 origin/' + branch, { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const ahead = local !== remote ? execSync('git rev-list HEAD..origin/' + branch + ' --count', { cwd: process.cwd(), timeout: 5000 }).toString().trim() : '0';
+        sendJson(res, 200, {
+          branch,
+          localCommit: localMsg,
+          remoteCommit: remoteMsg,
+          upToDate: local === remote,
+          updatesAvailable: ahead !== '0',
+          commitsAhead: parseInt(ahead) || 0,
+        });
+      } catch (e: any) {
+        sendError(res, 500, `Check failed: ${e.message}`);
+      }
       return true;
     }
 

@@ -1,93 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Terminal, Loader2, Check, AlertCircle, RefreshCw, GitBranch, Clock, Server,
-  Database, HardDrive, Cpu, Zap, ExternalLink, Download, Copy
+  Terminal, Loader2, Check, AlertCircle, RefreshCw, GitBranch, Server,
+  HardDrive, Zap, ExternalLink, Copy, Download, ArrowUpCircle
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import { FormSection, FormActions, SaveButton, DangerButton } from '@/components/Form';
 
 interface Props {
   token: string;
   onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : 'Something went wrong';
+interface UpdateStatus {
+  branch: string;
+  localCommit: string;
+  remoteCommit: string;
+  upToDate: boolean;
+  updatesAvailable: boolean;
+  commitsAhead: number;
+}
+
+interface LogEntry {
+  time: string;
+  text: string;
+  type: 'info' | 'success' | 'error' | 'warn';
 }
 
 export default function AdminSystem({ token, onNotify }: Props) {
   const { colors } = useTheme();
-  const [pulling, setPulling] = useState(false);
-  const [building, setBuilding] = useState(false);
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [checking, setChecking] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [copied, setCopied] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
 
-  const systemInfo = [
-    { label: 'App', value: 'LazyDrop', icon: <Zap className="w-4 h-4" /> },
-    { label: 'Runtime', value: `Node ${typeof process !== 'undefined' ? process.version || '—' : '—'}`, icon: <Server className="w-4 h-4" /> },
-    { label: 'Branch', value: 'dev', icon: <GitBranch className="w-4 h-4" /> },
-    { label: 'Deploy', value: 'Render', icon: <ExternalLink className="w-4 h-4" /> },
-  ];
+  function addLog(text: string, type: LogEntry['type'] = 'info') {
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs((prev) => [...prev, { time, text, type }]);
+  }
 
-  async function handlePull() {
-    sounds.click();
-    setPulling(true);
+  async function checkUpdate() {
+    setChecking(true); setLogs([]);
+    addLog('Checking for updates...');
     try {
-      const res = await fetch('/api/admin/system/pull', {
-        method: 'POST',
+      const res = await fetch('/api/admin/system/check-update', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Pull failed');
-      sounds.success();
-      onNotify('success', data.message || 'Pulled latest changes');
+      if (!res.ok) throw new Error(data.error);
+      setStatus(data);
+      if (data.upToDate) {
+        addLog('Already up to date!', 'success');
+      } else {
+        addLog(`${data.commitsAhead} update(s) available`, 'warn');
+        addLog(`Remote: ${data.remoteCommit}`, 'info');
+      }
     } catch (e: any) {
-      sounds.error();
-      onNotify('error', errMsg(e));
+      addLog(`Check failed: ${e.message}`, 'error');
     } finally {
-      setPulling(false);
+      setChecking(false);
     }
   }
 
-  async function handleRebuild() {
-    sounds.click();
-    setBuilding(true);
-    try {
-      const res = await fetch('/api/admin/system/rebuild', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Build failed');
-      sounds.success();
-      onNotify('success', data.message || 'Rebuild complete');
-    } catch (e: any) {
-      sounds.error();
-      onNotify('error', errMsg(e));
-    } finally {
-      setBuilding(false);
+  useEffect(() => { checkUpdate(); }, []);
+
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }
+  }, [logs]);
 
   async function handleUpdate() {
-    sounds.click();
-    setUpdating(true);
+    setUpdating(true); setLogs([]);
+    addLog('Starting update...');
+    addLog('Pulling latest changes from GitHub...');
+
     try {
       const res = await fetch('/api/admin/system/update', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Update failed');
+
+      if (!res.ok) {
+        addLog(`Update failed: ${data.error}`, 'error');
+        sounds.error();
+        setUpdating(false);
+        return;
+      }
+
+      addLog(data.pull || 'Changes pulled', 'success');
+      addLog('Installing dependencies...');
+      addLog('Building production bundle...');
+      addLog('Build complete!', 'success');
+
+      if (data.restarted) {
+        addLog('Server restarted!', 'success');
+        addLog('Reloading in 3 seconds...', 'info');
+        setTimeout(() => { window.location.reload(); }, 3000);
+      } else {
+        addLog('Restart the server to apply changes', 'warn');
+      }
+
       sounds.success();
-      const msg = data.restarted
-        ? `${data.message} — server restarted`
-        : `${data.message} — restart server to apply`;
-      onNotify('success', msg);
+      onNotify('success', 'Update complete');
     } catch (e: any) {
+      addLog(`Error: ${e.message}`, 'error');
       sounds.error();
-      onNotify('error', errMsg(e));
     } finally {
       setUpdating(false);
     }
@@ -96,29 +116,10 @@ export default function AdminSystem({ token, onNotify }: Props) {
   function handleCopyScript() {
     const script = `curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash`;
     navigator.clipboard.writeText(script).then(() => {
-      setCopied(true);
-      sounds.copy();
+      setCopied(true); sounds.copy();
       setTimeout(() => setCopied(false), 2000);
     });
   }
-
-  const installScript = `# Quick install
-curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash
-
-# Or manual
-git clone -b dev --depth 1 https://github.com/iam169459/lazy-cloud.git
-cd lazydrop
-npm install
-cp .env.example .env   # edit with your DATABASE_URL
-npm run dev`;
-
-  const updateScript = `# From the project root
-./update.sh
-
-# Or manual
-git pull origin dev
-npm install
-npm run build`;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -129,139 +130,133 @@ npm run build`;
           System
         </h2>
         <p className="text-xs sm:text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
-          System information, update, and maintenance
+          System info, update, and maintenance
         </p>
       </div>
 
-      {/* System Info */}
-      <div className="glass-card p-4 animate-fade-up">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {systemInfo.map((item) => (
-            <div key={item.label} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>
-                {item.icon}
+      {/* Update Status Card */}
+      <div className="glass-card p-5 animate-fade-up">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ArrowUpCircle className="w-5 h-5" style={{ color: status?.upToDate ? colors.success : colors.warning }} />
+            <h3 className="text-sm font-semibold">Update Status</h3>
+          </div>
+          <button onClick={checkUpdate} disabled={checking || updating} className="btn btn-secondary text-xs">
+            <RefreshCw className={`w-3.5 h-3.5 ${checking ? 'animate-spin' : ''}`} />
+            Check
+          </button>
+        </div>
+
+        {checking && !status ? (
+          <div className="flex items-center gap-3 py-6">
+            <Loader2 className="w-5 h-5 animate-spin" style={{ color: colors.primary }} />
+            <span className="text-sm" style={{ color: colors.textMuted }}>Checking for updates...</span>
+          </div>
+        ) : status ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+                <p className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: colors.textDim }}>Branch</p>
+                <p className="text-sm font-mono font-semibold" style={{ color: colors.primary }}>{status.branch}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-mono uppercase tracking-wider" style={{ color: colors.textDim }}>{item.label}</p>
-                <p className="text-sm font-semibold">{item.value}</p>
+              <div className="p-3 rounded-xl" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+                <p className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: colors.textDim }}>Status</p>
+                <p className="text-sm font-mono font-semibold" style={{ color: status.upToDate ? colors.success : colors.warning }}>
+                  {status.upToDate ? 'Up to date' : `${status.commitsAhead} behind`}
+                </p>
               </div>
             </div>
-          ))}
-        </div>
+
+            <div className="p-3 rounded-xl" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+              <p className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: colors.textDim }}>Current</p>
+              <p className="text-xs font-mono" style={{ color: colors.textMuted }}>{status.localCommit}</p>
+            </div>
+
+            {!status.upToDate && (
+              <div className="p-3 rounded-xl" style={{ background: `${colors.warning}0d`, border: `1px solid ${colors.warning}26` }}>
+                <p className="text-[10px] font-mono uppercase tracking-wider mb-1" style={{ color: colors.warning }}>Available</p>
+                <p className="text-xs font-mono" style={{ color: colors.text }}>{status.remoteCommit}</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleUpdate}
+              disabled={updating || status.upToDate}
+              className="btn btn-primary w-full text-sm"
+            >
+              {updating ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+              ) : status.upToDate ? (
+                <><Check className="w-4 h-4" /> Up to date</>
+              ) : (
+                <><Zap className="w-4 h-4" /> Update & Restart</>
+              )}
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      {/* Update Actions */}
-      <FormSection title="Update & Deploy" icon={<RefreshCw className="w-4 h-4" />}>
-        {/* One-click Update */}
-        <div className="glass-card p-4 flex flex-col gap-3 mb-4" style={{ border: '1px solid rgba(34,197,94,0.2)' }}>
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4" style={{ color: colors.success }} />
-            <h4 className="text-sm font-semibold">Quick Update</h4>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>Recommended</span>
-          </div>
-          <p className="text-xs font-mono" style={{ color: colors.textDim }}>
-            Pull latest code, install deps, rebuild, and restart — all in one click
-          </p>
-          <SaveButton loading={updating} onClick={handleUpdate}>
-            <Zap className={`w-3.5 h-3.5 ${updating ? 'animate-spin' : ''}`} />
-            {updating ? 'Updating...' : 'Update & Restart'}
-          </SaveButton>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="glass-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <GitBranch className="w-4 h-4" style={{ color: colors.success }} />
-              <h4 className="text-sm font-semibold">Pull Only</h4>
+      {/* Terminal Log */}
+      {logs.length > 0 && (
+        <div className="glass-card overflow-hidden animate-fade-up">
+          <div className="px-4 py-2 flex items-center gap-2" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.cardBg }}>
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#ef4444' }} />
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#f59e0b' }} />
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e' }} />
             </div>
-            <p className="text-xs font-mono" style={{ color: colors.textDim }}>
-              Pull the latest code from GitHub (dev branch)
-            </p>
-            <SaveButton loading={pulling} onClick={handlePull}>
-              <RefreshCw className={`w-3.5 h-3.5 ${pulling ? 'animate-spin' : ''}`} />
-              Pull
-            </SaveButton>
+            <span className="text-[10px] font-mono ml-2" style={{ color: colors.textDim }}>terminal</span>
+            {updating && <Loader2 className="w-3 h-3 ml-auto animate-spin" style={{ color: colors.primary }} />}
           </div>
-
-          <div className="glass-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <HardDrive className="w-4 h-4" style={{ color: colors.warning }} />
-              <h4 className="text-sm font-semibold">Rebuild Only</h4>
-            </div>
-            <p className="text-xs font-mono" style={{ color: colors.textDim }}>
-              Reinstall deps and rebuild production bundle
-            </p>
-            <SaveButton loading={building} onClick={handleRebuild}>
-              <Loader2 className={`w-3.5 h-3.5 ${building ? 'animate-spin' : ''}`} />
-              Rebuild
-            </SaveButton>
+          <div ref={logRef} className="p-4 max-h-64 overflow-y-auto font-mono text-xs leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)' }}>
+            {logs.map((log, i) => (
+              <div key={i} className="flex gap-3">
+                <span style={{ color: colors.textDim }}>{log.time}</span>
+                <span style={{
+                  color: log.type === 'success' ? colors.success
+                    : log.type === 'error' ? colors.danger
+                    : log.type === 'warn' ? colors.warning
+                    : colors.textMuted
+                }}>
+                  {log.type === 'success' ? '✓' : log.type === 'error' ? '✗' : log.type === 'warn' ? '!' : '›'} {log.text}
+                </span>
+              </div>
+            ))}
+            {updating && (
+              <div className="flex gap-3 animate-pulse">
+                <span style={{ color: colors.textDim }}>...</span>
+                <span style={{ color: colors.primary }}>Working</span>
+              </div>
+            )}
           </div>
         </div>
-
-        <div className="flex items-start gap-2 p-3 rounded-xl mt-2" style={{ background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.1)' }}>
-          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.accent }} />
-          <p className="text-xs font-mono" style={{ color: colors.textDim }}>
-            Quick Update does everything: pull + install + build + restart. Use Pull or Rebuild for individual steps.
-          </p>
-        </div>
-      </FormSection>
+      )}
 
       {/* Install Script */}
-      <FormSection title="Installation Script" icon={<Download className="w-4 h-4" />}>
-        <p className="text-xs font-mono mb-3" style={{ color: colors.textDim }}>
-          One-command setup for a fresh server
-        </p>
-
+      <div className="glass-card p-5 animate-fade-up delay-200">
+        <div className="flex items-center gap-2 mb-3">
+          <Download className="w-4 h-4" style={{ color: colors.primary }} />
+          <h3 className="text-sm font-semibold">Fresh Install</h3>
+        </div>
+        <p className="text-xs font-mono mb-3" style={{ color: colors.textDim }}>One-command setup for a new server</p>
         <div className="relative">
           <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, color: colors.text }}>
-            <code>{installScript}</code>
+            <code>curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash</code>
           </pre>
-          <button
-            onClick={handleCopyScript}
-            className="absolute top-2 right-2 p-2 rounded-lg transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', color: copied ? colors.success : colors.textDim }}
-            title="Copy to clipboard"
-          >
+          <button onClick={handleCopyScript} className="absolute top-2 right-2 p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', color: copied ? colors.success : colors.textDim }}>
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
-      </FormSection>
-
-      {/* Update Script */}
-      <FormSection title="Update Script" icon={<RefreshCw className="w-4 h-4" />}>
-        <p className="text-xs font-mono mb-3" style={{ color: colors.textDim }}>
-          Pull latest, install deps, and rebuild
-        </p>
-
-        <div className="relative">
-          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, color: colors.text }}>
-            <code>{updateScript}</code>
-          </pre>
-          <button
-            onClick={() => { navigator.clipboard.writeText(updateScript); sounds.copy(); }}
-            className="absolute top-2 right-2 p-2 rounded-lg transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', color: colors.textDim }}
-            title="Copy to clipboard"
-          >
-            <Copy className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </FormSection>
+      </div>
 
       {/* Links */}
-      <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 animate-fade-up delay-100">
-        <div className="flex items-center gap-2">
-          <ExternalLink className="w-4 h-4" style={{ color: colors.success }} />
-          <span className="text-sm font-semibold">Useful Links</span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <a href="https://github.com/iam169459/lazy-cloud" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
-            GitHub Repo
-          </a>
-          <a href="https://github.com/iam169459/lazy-cloud/issues" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
-            Report Issue
-          </a>
-        </div>
+      <div className="glass-card p-4 flex flex-wrap gap-3 animate-fade-up delay-300">
+        <a href="https://github.com/iam169459/lazy-cloud" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
+          <ExternalLink className="w-3.5 h-3.5" /> GitHub
+        </a>
+        <a href="https://github.com/iam169459/lazy-cloud/issues" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
+          <AlertCircle className="w-3.5 h-3.5" /> Report Issue
+        </a>
       </div>
     </div>
   );

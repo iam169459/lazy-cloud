@@ -81,7 +81,7 @@ export async function createS3Client(provider: StorageProvider): Promise<S3Clien
 export async function uploadToProvider(
   provider: StorageProvider,
   key: string,
-  body: Buffer,
+  body: Buffer | NodeJS.ReadableStream,
   contentType: string
 ): Promise<void> {
   const client = await createS3Client(provider);

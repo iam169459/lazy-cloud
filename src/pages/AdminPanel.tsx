@@ -24,10 +24,9 @@ type Tab = 'dashboard' | 'storage' | 'security' | 'api-keys' | 'audit-log' | 'ad
 const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Files', icon: <FileText className="w-[18px] h-[18px]" /> },
   { id: 'storage', label: 'Storage', icon: <Cloud className="w-[18px] h-[18px]" /> },
-  { id: 'security', label: 'Credentials', icon: <Shield className="w-[18px] h-[18px]" /> },
+  { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
   { id: 'api-keys', label: 'API Keys', icon: <Key className="w-[18px] h-[18px]" /> },
   { id: 'audit-log', label: 'Audit Log', icon: <Activity className="w-[18px] h-[18px]" /> },
-  { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
   { id: 'scan', label: 'Scan', icon: <Scan className="w-[18px] h-[18px]" /> },
   { id: 'system', label: 'System', icon: <Terminal className="w-[18px] h-[18px]" /> },
 ];
@@ -35,10 +34,9 @@ const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
 const pageDescriptions: Record<Tab, string> = {
   dashboard: 'Upload, manage, and share your files.',
   storage: 'Connect and manage S3-compatible storage buckets.',
-  security: 'Update admin credentials and security settings.',
+  advanced: 'Configure themes, credentials, 2FA, and system preferences.',
   'api-keys': 'Manage API keys for programmatic access.',
   'audit-log': 'View admin action audit trail.',
-  advanced: 'Configure themes, file TTL, and system preferences.',
   scan: 'Scan storage buckets for orphaned or mismatched files.',
   system: 'System info, update, and maintenance.',
 };
