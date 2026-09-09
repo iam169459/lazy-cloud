@@ -197,24 +197,9 @@ cmd_install() {
   if [ ! -f .env ]; then
     log "Creating .env..."
 
-    # Prompt for credentials
+    # Prompt for database URL
     echo ""
-    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Admin username [admin]: ")" INPUT_USER
-    ADMIN_USER="${INPUT_USER:-admin}"
-
-    while true; do
-      read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Admin password: ")" INPUT_PASS
-      echo ""
-      [ -n "$INPUT_PASS" ] && break
-      warn "Password cannot be empty"
-    done
-
-    while true; do
-      read -rsp "$(echo -e "${CYAN}[lazydrop]${NC} Confirm password: ")" INPUT_PASS2
-      echo ""
-      [ "$INPUT_PASS" = "$INPUT_PASS2" ] && break
-      warn "Passwords do not match. Try again."
-    done
+    read -rp "$(echo -e "${CYAN}[lazydrop]${NC} Database URL (or press Enter to skip): ")" INPUT_DB
 
     cat > .env <<ENVEOF
 # ═══════════════════════════════════════
@@ -222,25 +207,18 @@ cmd_install() {
 # ═══════════════════════════════════════
 
 # Database (required — get from https://neon.tech)
-DATABASE_URL=postgresql://user:password@host/dbname
+DATABASE_URL=${INPUT_DB:-postgresql://user:password@host/dbname}
 
-# Admin credentials
-ADMIN_USERNAME=${ADMIN_USER}
-ADMIN_PASSWORD=${INPUT_PASS}
-
-# Optional: Supabase
-# SUPABASE_URL=https://your-project.supabase.co
-# SUPABASE_ANON_KEY=your-anon-key
-# SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Optional: Encryption
-# LAZYDROP_ENCRYPTION_KEY=your-encryption-key
-
-# Optional: Upload password
-# LAZYDROP_UPLOAD_PASSWORD=your-upload-password
+# Admin credentials (set via web UI on first visit)
+# ADMIN_USERNAME=
+# ADMIN_PASSWORD=
 ENVEOF
     echo ""
-    ok "Created .env with your credentials"
+    ok "Created .env"
+    echo ""
+    warn "Setup your admin account in the browser:"
+    echo "    Open the admin page and create your username & password"
+    echo ""
   else
     warn ".env already exists, skipping"
   fi
