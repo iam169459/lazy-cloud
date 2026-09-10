@@ -84,15 +84,14 @@ export default function AdminSystem({ token, onNotify }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        addLog(`Update failed: ${data.error}`, 'error');
+        addLog(`Failed: ${data.error || 'Unknown error'}`, 'error');
         sounds.error();
         setUpdating(false);
         return;
       }
 
       addLog(data.pull || 'Changes pulled', 'success');
-      addLog('Installing dependencies...');
-      addLog('Building production bundle...');
+      addLog('Dependencies installed', 'success');
       addLog('Build complete!', 'success');
 
       if (data.restarted) {

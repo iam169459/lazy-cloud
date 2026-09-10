@@ -1277,7 +1277,14 @@ export async function handleApiRequest(
       const { execSync } = await import('child_process');
       try {
         execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
-        execSync('npm run build', { cwd: process.cwd(), timeout: 120000 });
+        try {
+          execSync('npm run build', { cwd: process.cwd(), timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch (buildErr: any) {
+          const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
+          const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
+          sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
+          return true;
+        }
         sendJson(res, 200, { message: 'Rebuild complete — deps installed and bundle built' });
       } catch (e: any) {
         sendError(res, 500, `Rebuild failed: ${e.message}`);
@@ -1292,7 +1299,16 @@ export async function handleApiRequest(
       try {
         const pullResult = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString();
         execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
-        execSync('npm run build', { cwd: process.cwd(), timeout: 120000 });
+
+        let buildOutput = '';
+        try {
+          buildOutput = execSync('npm run build', { cwd: process.cwd(), timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
+        } catch (buildErr: any) {
+          const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
+          const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
+          sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
+          return true;
+        }
 
         // Try to restart systemd service
         let restarted = false;
