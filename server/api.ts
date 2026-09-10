@@ -1261,70 +1261,84 @@ export async function handleApiRequest(
     // ── System: Pull latest ──
     if (path === '/api/admin/system/pull' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { execSync } = await import('child_process');
+      const { execSync, spawn } = await import('child_process');
       try {
-        execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 });
-        sendJson(res, 200, { message: 'Pulled latest changes from dev branch' });
+        const result = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString().trim();
+        sendJson(res, 200, { message: 'Pulled latest changes', pull: result });
       } catch (e: any) {
         sendError(res, 500, `Pull failed: ${e.message}`);
       }
       return true;
     }
 
-    // ── System: Rebuild ──
+    // ── System: Rebuild (kill port 3000 → rebuild → restart) ──
     if (path === '/api/admin/system/rebuild' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { execSync } = await import('child_process');
+      const { execSync, spawn } = await import('child_process');
+      const cwd = process.cwd();
       try {
-        execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
+        execSync('npm install', { cwd, timeout: 120000 });
         try {
-          execSync('npm run build', { cwd: process.cwd(), timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
+          execSync('npm run build', { cwd, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
         } catch (buildErr: any) {
           const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
           const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
           sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
           return true;
         }
-        sendJson(res, 200, { message: 'Rebuild complete — deps installed and bundle built' });
+
+        sendJson(res, 200, { message: 'Rebuild complete — server restarting' });
+
+        // Kill port 3000 and restart
+        const script = `
+          sleep 1 &&
+          (lsof -ti:3000 | xargs kill -9 2>/dev/null || true) &&
+          sleep 1 &&
+          cd "${cwd}" &&
+          nohup node dist-server/production.js > /tmp/lazydrop.log 2>&1 &
+        `;
+        spawn('bash', ['-c', script], { detached: true, stdio: 'ignore', cwd }).unref();
       } catch (e: any) {
         sendError(res, 500, `Rebuild failed: ${e.message}`);
       }
       return true;
     }
 
-    // ── System: Full Update (pull + rebuild + restart) ──
+    // ── System: Full Update (kill process on port 3000 → pull → build → restart) ──
     if (path === '/api/admin/system/update' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const { execSync } = await import('child_process');
+      const { spawn } = await import('child_process');
+      const cwd = process.cwd();
+
+      // Pull first to fail fast if there's a git error
+      let pullResult = '';
       try {
-        const pullResult = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString();
-        execSync('npm install', { cwd: process.cwd(), timeout: 120000 });
-
-        let buildOutput = '';
-        try {
-          buildOutput = execSync('npm run build', { cwd: process.cwd(), timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] }).toString();
-        } catch (buildErr: any) {
-          const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
-          const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
-          sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
-          return true;
-        }
-
-        // Try to restart systemd service
-        let restarted = false;
-        try {
-          execSync('sudo systemctl restart lazydrop', { timeout: 10000 });
-          restarted = true;
-        } catch {}
-
-        sendJson(res, 200, {
-          message: 'Update complete',
-          pull: pullResult.trim(),
-          restarted,
-        });
+        pullResult = execSync('git pull origin dev', { cwd, timeout: 30000 }).toString().trim();
       } catch (e: any) {
-        sendError(res, 500, `Update failed: ${e.message}`);
+        sendError(res, 500, `Pull failed: ${e.message}`);
+        return true;
       }
+
+      // Respond immediately — server will die after this
+      sendJson(res, 200, { message: 'Update started — server will restart in a few seconds', pull: pullResult });
+
+      // Background: install → build → kill port 3000 → start fresh
+      const script = `
+        cd "${cwd}" &&
+        npm install --production=false &&
+        npm run build &&
+        sleep 1 &&
+        (lsof -ti:3000 | xargs kill -9 2>/dev/null || true) &&
+        sleep 1 &&
+        nohup node dist-server/production.js > /tmp/lazydrop.log 2>&1 &
+        echo "Server restarted"
+      `;
+      spawn('bash', ['-c', script], {
+        detached: true,
+        stdio: 'ignore',
+        cwd,
+      }).unref();
       return true;
     }
 

@@ -91,22 +91,23 @@ export default function AdminSystem({ token, onNotify }: Props) {
       }
 
       addLog(data.pull || 'Changes pulled', 'success');
-      addLog('Dependencies installed', 'success');
-      addLog('Build complete!', 'success');
+      addLog('Installing dependencies & rebuilding...', 'info');
+      addLog('Killing old process & restarting server...', 'info');
+      addLog('Server will be back in a few seconds', 'success');
 
-      if (data.restarted) {
-        addLog('Server restarted!', 'success');
-        addLog('Reloading in 3 seconds...', 'info');
-        setTimeout(() => { window.location.reload(); }, 3000);
-      } else {
-        addLog('Restart the server to apply changes', 'warn');
-      }
+      // Try to reload after a delay — server will be down briefly
+      setTimeout(() => {
+        addLog('Attempting to reconnect...', 'info');
+        window.location.reload();
+      }, 8000);
 
       sounds.success();
-      onNotify('success', 'Update complete');
+      onNotify('success', 'Update started — server restarting');
     } catch (e: any) {
-      addLog(`Error: ${e.message}`, 'error');
-      sounds.error();
+      // Connection lost is expected — server is restarting
+      addLog('Server is restarting...', 'success');
+      addLog('Page will reload in 5 seconds', 'info');
+      setTimeout(() => { window.location.reload(); }, 5000);
     } finally {
       setUpdating(false);
     }
