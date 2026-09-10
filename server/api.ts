@@ -744,6 +744,73 @@ export async function handleApiRequest(
       return true;
     }
 
+    // ── Admin: Upload background image/video ──
+    if (path === '/api/admin/background' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { writeFileSync, mkdirSync, existsSync, unlinkSync, copyFileSync } = await import('fs');
+      const { join } = await import('path');
+      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+      const bgDirs = [
+        join(process.cwd(), 'public', 'bg'),
+        join(process.cwd(), 'dist', 'bg'),
+      ];
+      for (const d of bgDirs) { if (!existsSync(d)) mkdirSync(d, { recursive: true }); }
+
+      let saved = false;
+      bb.on('file', (_fieldname, file, info) => {
+        const mime = info.mimeType || '';
+        const isImage = mime.startsWith('image/');
+        const isVideo = mime.startsWith('video/');
+        if (!isImage && !isVideo) { file.resume(); return; }
+        const ext = isVideo ? '.mp4' : '.' + (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const fileName = 'background' + ext;
+        const chunks: Buffer[] = [];
+        file.on('data', (chunk: Buffer) => chunks.push(chunk));
+        file.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          // Remove old backgrounds from all dirs
+          for (const d of bgDirs) {
+            for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
+              try { unlinkSync(join(d, 'background' + e)); } catch {}
+            }
+          }
+          for (const d of bgDirs) {
+            writeFileSync(join(d, fileName), buf);
+          }
+          const bgUrl = `/bg/${fileName}`;
+          const bgType = isVideo ? 'video' : 'image';
+          updateAppSettings({ backgroundUrl: bgUrl, backgroundType: bgType });
+          saved = true;
+        });
+      });
+      bb.on('close', () => {
+        if (saved) sendJson(res, 200, { message: 'Background updated' });
+        else sendError(res, 400, 'No valid image or video uploaded');
+      });
+      req.pipe(bb);
+      return true;
+    }
+
+    // ── Admin: Remove background ──
+    if (path === '/api/admin/background' && req.method === 'DELETE') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { unlinkSync, existsSync } = await import('fs');
+      const { join } = await import('path');
+      const bgDirs = [
+        join(process.cwd(), 'public', 'bg'),
+        join(process.cwd(), 'dist', 'bg'),
+      ];
+      for (const d of bgDirs) {
+        for (const ext of ['.jpg', '.png', '.mp4', '.webm']) {
+          const f = join(d, 'background' + ext);
+          if (existsSync(f)) unlinkSync(f);
+        }
+      }
+      await updateAppSettings({ backgroundUrl: '', backgroundType: '' });
+      sendJson(res, 200, { message: 'Background removed' });
+      return true;
+    }
+
     if (path === '/api/admin/credentials' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const creds = await getAdminCredentials();

@@ -110,6 +110,8 @@ export interface AppSettings {
   enableDownloadCounter: boolean;
   enablePublicUpload: boolean;
   maxStoragePerBucket: string;
+  backgroundUrl: string;
+  backgroundType: 'image' | 'video' | '';
 }
 
 async function request(path: string, options: RequestInit = {}) {
@@ -166,6 +168,15 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(settings),
     }) as Promise<{ settings: AppSettings }>,
+
+  uploadBackground: (file: File, token: string) =>
+    uploadRequest(file, '/api/admin/background', token),
+
+  removeBackground: (token: string) =>
+    request('/api/admin/background', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 
   listFiles: (token: string) =>
     request('/api/admin/files', {

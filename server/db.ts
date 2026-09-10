@@ -280,6 +280,8 @@ export interface AppSettings {
   maxStoragePerBucket: string;
   sessionTimeout: string;
   ipWhitelist: string;
+  backgroundUrl: string;
+  backgroundType: 'image' | 'video' | '';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -293,6 +295,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxStoragePerBucket: '10188208025',
   sessionTimeout: '30',
   ipWhitelist: '',
+  backgroundUrl: '',
+  backgroundType: '',
 };
 
 export async function getAppSettings(): Promise<AppSettings> {

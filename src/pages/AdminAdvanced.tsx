@@ -24,6 +24,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableDownloadCounter: true,
   enablePublicUpload: false,
   maxStoragePerBucket: '10188208025',
+  backgroundUrl: '',
+  backgroundType: '',
 };
 
 type Errors = Partial<Record<keyof AppSettings, string>>;
@@ -260,6 +262,61 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
           <FormField label="Site name" required error={touched.has('siteName') ? errors.siteName : undefined} hint="Shown on the landing page">
             <input type="text" value={settings.siteName} onChange={(e) => update('siteName', e.target.value)} onBlur={() => blur('siteName')} className="input w-full" placeholder="LazyDrop" />
           </FormField>
+        </FormSection>
+
+        {/* Background */}
+        <FormSection title="Background" icon={<Palette className="w-4 h-4" />}>
+          <p className="text-xs mb-3" style={{ color: colors.textDim }}>Set a custom background image or video for the entire app.</p>
+          {settings.backgroundUrl ? (
+            <div className="space-y-3">
+              <div className="rounded-lg overflow-hidden border" style={{ borderColor: colors.border, maxHeight: 160 }}>
+                {settings.backgroundType === 'video' ? (
+                  <video src={settings.backgroundUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                ) : (
+                  <img src={settings.backgroundUrl} alt="Background" className="w-full h-full object-cover" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.removeBackground(token);
+                    setSettings((s) => ({ ...s, backgroundUrl: '', backgroundType: '' }));
+                    sounds.success();
+                    onNotify('success', 'Background removed');
+                  } catch (e: any) { onNotify('error', errMsg(e)); }
+                }}
+                className="btn btn-secondary text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Remove background
+              </button>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center gap-2 p-6 rounded-lg border border-dashed cursor-pointer transition-all hover:border-primary/40" style={{ borderColor: colors.border, color: colors.textDim }}>
+              <Upload className="w-6 h-6" />
+              <span className="text-xs">Click to upload image or video</span>
+              <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>JPG, PNG, MP4, WebM — max 10MB</span>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    await api.uploadBackground(file, token);
+                    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                    const isVideo = file.type.startsWith('video/');
+                    const bgUrl = `/bg/background.${ext}`;
+                    setSettings((s) => ({ ...s, backgroundUrl: bgUrl, backgroundType: isVideo ? 'video' : 'image' }));
+                    sounds.success();
+                    onNotify('success', 'Background uploaded');
+                  } catch (err: any) { onNotify('error', errMsg(err)); }
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
         </FormSection>
 
         {/* Sound */}

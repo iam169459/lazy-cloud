@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { lazy, Suspense, Component, ReactNode } from 'react';
+import { lazy, Suspense, Component, ReactNode, useState, useEffect } from 'react';
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider } from '@/lib/theme';
+import { api, AppSettings } from '@/lib/api';
 
 const Landing = lazy(() => import('@/pages/Landing'));
 const DownloadPage = lazy(() => import('@/pages/Download'));
@@ -14,6 +15,36 @@ function Loader() {
   return (
     <div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg)' }}>
       <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+    </div>
+  );
+}
+
+function Background() {
+  const [bg, setBg] = useState<{ url: string; type: string }>({ url: '', type: '' });
+
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      if (s.backgroundUrl) setBg({ url: s.backgroundUrl, type: s.backgroundType });
+    }).catch(() => {});
+  }, []);
+
+  if (!bg.url) return null;
+
+  return (
+    <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
+      {bg.type === 'video' ? (
+        <video
+          src={bg.url}
+          className="w-full h-full object-cover"
+          muted
+          autoPlay
+          loop
+          playsInline
+        />
+      ) : (
+        <img src={bg.url} alt="" className="w-full h-full object-cover" />
+      )}
+      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
     </div>
   );
 }
@@ -45,6 +76,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
+          <Background />
           <Suspense fallback={<Loader />}>
             <Routes>
               <Route path="/" element={<Landing />} />
