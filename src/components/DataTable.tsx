@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal, CheckSquare, Square, Download, Trash2, Copy } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 
@@ -69,7 +69,6 @@ export default function DataTable<T extends Record<string, any>>({
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const buttonRefs = useRef<Record<string, HTMLButtonElement>>({});
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [selectAllPage, setSelectAllPage] = useState(false);
 
@@ -181,7 +180,7 @@ export default function DataTable<T extends Record<string, any>>({
           {emptyDescription && <p className="text-xs mt-1" style={{ color: colors.textDim }}>{emptyDescription}</p>}
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div>
           <table className="w-full">
             <thead>
               <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid ${colors.border}` }}>
@@ -259,7 +258,6 @@ export default function DataTable<T extends Record<string, any>>({
                       <td className="px-4 py-2.5">
                         <div className="relative flex justify-end">
                           <button
-                            ref={(el) => { if (el) buttonRefs.current[id] = el; }}
                             onClick={() => setOpenMenu(openMenu === id ? null : id)}
                             className="p-2 rounded-lg transition-all hover:scale-105"
                             style={{
@@ -272,25 +270,18 @@ export default function DataTable<T extends Record<string, any>>({
                           >
                             <MoreHorizontal className="w-5 h-5" />
                           </button>
-                          {openMenu === id && (() => {
-                            const btnEl = buttonRefs.current[id];
-                            const rect = btnEl?.getBoundingClientRect();
-                            const top = rect ? rect.bottom + 4 : 0;
-                            const right = rect ? window.innerWidth - rect.right : 0;
-                            return (
-                              <>
-                                <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
-                                <div
-                                  className="fixed w-44 rounded-xl py-1.5 z-[70] animate-scale-in max-h-60 overflow-y-auto"
-                                  style={{
-                                    top,
-                                    right,
-                                    background: colors.cardBg,
-                                    border: `1px solid ${colors.border}`,
-                                    backdropFilter: 'blur(20px)',
-                                    boxShadow: `0 8px 32px ${colors.bg}cc`,
-                                  }}
-                                >
+                          {openMenu === id && (
+                            <>
+                              <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
+                              <div
+                                className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-[70] animate-scale-in max-h-60 overflow-y-auto"
+                                style={{
+                                  background: colors.cardBg,
+                                  border: `1px solid ${colors.border}`,
+                                  backdropFilter: 'blur(20px)',
+                                  boxShadow: `0 8px 32px ${colors.bg}cc`,
+                                }}
+                              >
                                 {actions
                                   .filter((a) => !a.hidden || !a.hidden(row))
                                   .map((action, i) => (
@@ -309,10 +300,9 @@ export default function DataTable<T extends Record<string, any>>({
                                       {action.label}
                                     </button>
                                   ))}
-                                </div>
-                              </>
-                            );
-                          })()}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </td>
                     )}
