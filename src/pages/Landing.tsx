@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layers,
-  Clock, Globe, Zap, ChevronDown, HardDrive, Cloud
+  ArrowRight, Lock, Shield, Upload, Download, Smartphone,
+  Clock, Zap, ChevronDown, Globe
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -10,10 +10,9 @@ import { api, AppSettings } from '@/lib/api';
 
 const faqs = [
   { q: 'How does file sharing work?', a: 'Upload a file, get a unique link. Anyone with the link can download. No accounts needed on the recipient side.' },
-  { q: 'What storage providers are supported?', a: 'Backblaze B2, Cloudflare R2, AWS S3, Google Cloud Storage, IDrive e2, and MinIO — all S3-compatible.' },
-  { q: 'Is there a file size limit?', a: 'No hard limit. Files are streamed directly to your cloud buckets. Practical limits depend on your internet connection.' },
-  { q: 'How does multi-bucket routing work?', a: 'LazyDrop automatically routes files to the bucket with the most free space. Add multiple providers for unlimited pooled storage.' },
-  { q: 'Are files encrypted?', a: 'Yes. All files are encrypted at rest in your cloud buckets, and transferred over HTTPS. LazyDrop never sees your files in plain text.' },
+  { q: 'Is there a file size limit?', a: 'No hard limit. Files are streamed directly. Practical limits depend on your internet connection.' },
+  { q: 'Are files encrypted?', a: 'Yes. All files are encrypted at rest and transferred over HTTPS. Your files stay private.' },
+  { q: 'Do recipients need an account?', a: 'No. Recipients just click the link and download. No signup, no captchas, no waiting.' },
 ];
 
 export default function Landing() {
@@ -34,7 +33,7 @@ export default function Landing() {
         aria-live="polite"
         style={{ background: `${colors.primary}10`, borderBottom: `1px solid ${colors.border}` }}
       >
-        Open source and free forever — no accounts, no tracking, no limits.
+        Fast, private file sharing — no accounts, no tracking, no limits.
       </div>
 
       {/* Site Header */}
@@ -49,7 +48,6 @@ export default function Landing() {
           <div className="hidden md:flex items-center gap-6" role="list">
             <a href="#features" className="text-sm font-medium" style={{ color: colors.textMuted }}>Features</a>
             <a href="#how-it-works" className="text-sm font-medium" style={{ color: colors.textMuted }}>How it works</a>
-            <a href="#providers" className="text-sm font-medium" style={{ color: colors.textMuted }}>Providers</a>
             <a href="#faq" className="text-sm font-medium" style={{ color: colors.textMuted }}>FAQ</a>
           </div>
           <Link to="/admin" className="btn btn-ghost text-sm" onClick={() => sounds.click()} aria-label="Admin login">
@@ -62,14 +60,13 @@ export default function Landing() {
       <main>
         {/* Hero */}
         <section className="max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
-          <div className="badge mx-auto mb-6 animate-fade-up">Multi-provider storage</div>
           <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100">
             Fast, private,
             <br />
             <span className="text-gradient">link-only file sharing</span>
           </h1>
           <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
-            Upload once, share with a link. Files stored across multiple cloud providers for unlimited capacity.
+            Upload once, share with a link. Simple, secure, and instant.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
             <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
@@ -78,35 +75,27 @@ export default function Landing() {
             </Link>
             <a href="#features" className="btn btn-secondary">See features</a>
           </div>
-          <p className="text-xs mt-4 font-mono animate-fade-up delay-400" style={{ color: colors.textDim }}>
-            No signup required — works with any S3-compatible bucket
-          </p>
         </section>
 
         {/* Stats Banner */}
         <section className="max-w-3xl mx-auto px-5 pb-16" aria-label="Stats">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Stat icon={<Globe className="w-4 h-4" />} value="6+" label="Providers" />
             <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
             <Stat icon={<Zap className="w-4 h-4" />} value="<1s" label="Upload" />
             <Stat icon={<Upload className="w-4 h-4" />} value="0" label="Tracking" />
+            <Stat icon={<Globe className="w-4 h-4" />} value="24/7" label="Available" />
           </div>
         </section>
 
-        {/* Features — Primary Feature Section */}
+        {/* Features */}
         <section id="features" className="max-w-5xl mx-auto px-5 pb-20" aria-labelledby="features-heading">
           <SectionHeader
             id="features-heading"
             eyebrow="Features"
             title="Everything you need, nothing you don't"
-            desc="Simple file sharing without the bloat. Connect your own cloud, share files via link, done."
+            desc="Simple file sharing without the bloat."
           />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-10" role="list">
-            <Feature
-              icon={<Database className="w-4 h-4" />}
-              title="Unlimited storage"
-              desc="Multiple S3 buckets pooled into one virtual drive. Add as many as you need."
-            />
             <Feature
               icon={<Shield className="w-4 h-4" />}
               title="Private by design"
@@ -128,70 +117,42 @@ export default function Landing() {
               desc="Upload and download from any device. Works in any modern browser."
             />
             <Feature
-              icon={<Layers className="w-4 h-4" />}
-              title="Multi-bucket routing"
-              desc="Auto-route files to the bucket with the most free space. No manual management."
-            />
-            <Feature
               icon={<Clock className="w-4 h-4" />}
               title="Auto-expire"
               desc="Files auto-delete after configurable TTL. Set it once, forget about it."
             />
             <Feature
-              icon={<HardDrive className="w-4 h-4" />}
-              title="Provider-aware sizing"
-              desc="Automatic capacity detection. Know exactly how much space you have left."
-            />
-            <Feature
               icon={<Zap className="w-4 h-4" />}
               title="Lightning fast"
-              desc="Files served via presigned links. No bottleneck on the LazyDrop server."
+              desc="Files served directly. No bottleneck, no slowdowns."
             />
           </div>
         </section>
 
-        {/* How It Works — Product Tour Section */}
+        {/* How It Works */}
         <section id="how-it-works" className="max-w-4xl mx-auto px-5 pb-20" aria-labelledby="how-heading">
           <SectionHeader
             id="how-heading"
             eyebrow="How it works"
             title="Three steps to share a file"
-            desc="Connect a bucket, upload a file, share the link. That's it."
+            desc="Upload, share, done."
           />
           <div className="grid sm:grid-cols-3 gap-6 mt-10" role="list">
             <Step
               number="01"
-              title="Connect a bucket"
-              desc="Add your S3-compatible storage provider with just a bucket name, access key, and secret key."
+              title="Upload a file"
+              desc="Drag and drop or click to upload. Your file is encrypted and stored securely."
             />
             <Step
               number="02"
-              title="Upload a file"
-              desc="Drag and drop or click to upload. Files are encrypted and stored directly in your bucket."
+              title="Copy the link"
+              desc="A unique download link is generated instantly. Copy it to your clipboard."
             />
             <Step
               number="03"
-              title="Share the link"
-              desc="Copy the generated download link and send it to anyone. They can download instantly."
+              title="Share it"
+              desc="Send the link to anyone. They can download instantly — no account needed."
             />
-          </div>
-        </section>
-
-        {/* Supported Providers — Ecosystem Section */}
-        <section id="providers" className="max-w-4xl mx-auto px-5 pb-20" aria-labelledby="providers-heading">
-          <SectionHeader
-            id="providers-heading"
-            eyebrow="Providers"
-            title="Works with your cloud"
-            desc="Any S3-compatible provider works. Built-in support for 6 major cloud storage providers."
-          />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-10" role="list">
-            <ProviderCard name="Backblaze B2" region="us-west-004" />
-            <ProviderCard name="Cloudflare R2" region="auto" />
-            <ProviderCard name="AWS S3" region="us-east-1" />
-            <ProviderCard name="Google Cloud" region="us-central1" />
-            <ProviderCard name="IDrive e2" region="us-east-1" />
-            <ProviderCard name="MinIO" region="self-hosted" />
           </div>
         </section>
 
@@ -219,7 +180,7 @@ export default function Landing() {
               Ready to share your first file?
             </h2>
             <p className="text-sm max-w-md mx-auto mb-6" style={{ color: colors.textMuted }}>
-              Connect a bucket in under a minute. No accounts, no limits, no tracking.
+              No accounts, no limits, no tracking.
             </p>
             <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
               Open Admin Panel
@@ -295,25 +256,6 @@ function Step({ number, title, desc }: { number: string; title: string; desc: st
   );
 }
 
-function ProviderCard({ name, region }: { name: string; region: string }) {
-  const { colors } = useTheme();
-  return (
-    <div className="card p-4 flex items-center gap-3" role="listitem">
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-        style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}
-        aria-hidden="true"
-      >
-        <Cloud className="w-4 h-4" style={{ color: colors.textMuted }} />
-      </div>
-      <div>
-        <div className="text-sm font-medium">{name}</div>
-        <div className="text-[11px] font-mono" style={{ color: colors.textDim }}>{region}</div>
-      </div>
-    </div>
-  );
-}
-
 function FAQItem({ question, answer }: { question: string; answer: string }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
@@ -327,10 +269,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
   }, []);
 
   return (
-    <div
-      className="card overflow-hidden"
-      role="listitem"
-    >
+    <div className="card overflow-hidden" role="listitem">
       <button
         type="button"
         className="w-full flex items-center justify-between px-5 py-4 text-left cursor-pointer"
@@ -341,10 +280,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
         <span className="text-sm font-medium pr-4">{question}</span>
         <ChevronDown
           className="w-4 h-4 shrink-0 transition-transform duration-200"
-          style={{
-            color: colors.textMuted,
-            transform: open ? 'rotate(180deg)' : 'rotate(0)',
-          }}
+          style={{ color: colors.textMuted, transform: open ? 'rotate(180deg)' : 'rotate(0)' }}
           aria-hidden="true"
         />
       </button>

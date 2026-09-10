@@ -33,11 +33,11 @@ const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const pageDescriptions: Record<Tab, string> = {
   dashboard: 'Upload, manage, and share your files.',
-  storage: 'Connect and manage S3-compatible storage buckets.',
+  storage: 'Manage your storage backends.',
   advanced: 'Configure themes, credentials, 2FA, and system preferences.',
   'api-keys': 'Manage API keys for programmatic access.',
   'audit-log': 'View admin action audit trail.',
-  scan: 'Scan storage buckets for orphaned or mismatched files.',
+  scan: 'Scan storage for orphaned or mismatched files.',
   system: 'System info, update, and maintenance.',
 };
 

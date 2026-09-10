@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  Terminal, Loader2, Check, AlertCircle, RefreshCw, GitBranch, Server,
-  HardDrive, Zap, ExternalLink, Copy, Download, ArrowUpCircle
+  Terminal, Loader2, Check, AlertCircle, RefreshCw, GitBranch,
+  Zap, ArrowUpCircle
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -232,28 +232,8 @@ export default function AdminSystem({ token, onNotify }: Props) {
         </div>
       )}
 
-      {/* Install Script */}
-      <div className="glass-card p-5 animate-fade-up delay-200">
-        <div className="flex items-center gap-2 mb-3">
-          <Download className="w-4 h-4" style={{ color: colors.primary }} />
-          <h3 className="text-sm font-semibold">Fresh Install</h3>
-        </div>
-        <p className="text-xs font-mono mb-3" style={{ color: colors.textDim }}>One-command setup for a new server</p>
-        <div className="relative">
-          <pre className="p-4 rounded-xl text-xs font-mono overflow-x-auto leading-relaxed" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${colors.border}`, color: colors.text }}>
-            <code>curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash</code>
-          </pre>
-          <button onClick={handleCopyScript} className="absolute top-2 right-2 p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.05)', color: copied ? colors.success : colors.textDim }}>
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-          </button>
-        </div>
-      </div>
-
       {/* Links */}
       <div className="glass-card p-4 flex flex-wrap gap-3 animate-fade-up delay-300">
-        <a href="https://github.com/iam169459/lazy-cloud" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
-          <ExternalLink className="w-3.5 h-3.5" /> GitHub
-        </a>
         <a href="https://github.com/iam169459/lazy-cloud/issues" target="_blank" rel="noopener" className="btn btn-secondary text-xs">
           <AlertCircle className="w-3.5 h-3.5" /> Report Issue
         </a>
