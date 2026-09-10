@@ -151,12 +151,14 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       key: 'created_at',
       label: 'Date',
       sortable: true,
+      hideOnMobile: true,
       render: (f) => <span className="text-xs whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(f.created_at)}</span>,
     },
     {
       key: 'download_count',
       label: 'Downloads',
       sortable: true,
+      hideOnMobile: true,
       render: (f) => <span className="text-xs font-mono" style={{ color: colors.textMuted }}>{f.download_count}</span>,
     },
   ];

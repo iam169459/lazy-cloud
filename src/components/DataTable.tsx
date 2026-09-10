@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal, CheckSquare, Square, Download, Trash2, Copy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal, Download, Trash2, Copy } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 
 export interface Column<T> {
@@ -9,6 +9,7 @@ export interface Column<T> {
   width?: string;
   align?: 'left' | 'center' | 'right';
   render?: (row: T) => React.ReactNode;
+  hideOnMobile?: boolean;
 }
 
 export interface Action<T> {
@@ -70,7 +71,6 @@ export default function DataTable<T extends Record<string, any>>({
   const [page, setPage] = useState(0);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
-  const [selectAllPage, setSelectAllPage] = useState(false);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return data;
@@ -107,24 +107,18 @@ export default function DataTable<T extends Record<string, any>>({
   }, []);
 
   const toggleAllPage = useCallback(() => {
-    if (allPageSelected) {
-      setSelectedKeys((prev) => {
-        const next = new Set(prev);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
         paged.forEach((row) => next.delete(keyExtractor(row)));
-        return next;
-      });
-    } else {
-      setSelectedKeys((prev) => {
-        const next = new Set(prev);
+      } else {
         paged.forEach((row) => next.add(keyExtractor(row)));
-        return next;
-      });
-    }
+      }
+      return next;
+    });
   }, [allPageSelected, paged, keyExtractor]);
 
-  const clearSelection = useCallback(() => {
-    setSelectedKeys(new Set());
-  }, []);
+  const clearSelection = useCallback(() => setSelectedKeys(new Set()), []);
 
   const handleBulkAction = useCallback((action: BulkAction<T>) => {
     if (selectedRows.length === 0) return;
@@ -134,17 +128,15 @@ export default function DataTable<T extends Record<string, any>>({
   }, [selectedRows, clearSelection]);
 
   function handleSort(key: string) {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
+    if (sortKey === key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
   }
+
+  const visibleActions = (row: T) => actions?.filter((a) => !a.hidden || !a.hidden(row)) || [];
 
   if (loading) {
     return (
-      <div className="glass-card p-12 text-center">
+      <div className="glass-card p-8 sm:p-12 text-center">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: colors.success, borderTopColor: 'transparent' }} />
         <p className="text-sm" style={{ color: colors.textMuted }}>{loadingText}</p>
       </div>
@@ -153,191 +145,163 @@ export default function DataTable<T extends Record<string, any>>({
 
   return (
     <div className="glass-card">
-      {/* Search Bar */}
+      {/* Search */}
       {searchKeys.length > 0 && (
-        <div className="px-4 py-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
-          <div className="relative flex-1 max-w-xs">
+        <div className="p-3 sm:px-4 sm:py-3 flex items-center gap-3" style={{ borderBottom: `1px solid ${colors.border}` }}>
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
             <input
               type="text"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0); }}
               placeholder={searchPlaceholder}
-              className="input pl-9 py-2 text-xs"
+              className="input pl-9 py-2.5 text-xs"
             />
           </div>
-          <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
+          <span className="text-[10px] font-mono whitespace-nowrap" style={{ color: colors.textDim }}>
+            {filtered.length}
           </span>
         </div>
       )}
 
-      {/* Table */}
       {paged.length === 0 ? (
-        <div className="py-16 text-center">
+        <div className="py-12 sm:py-16 text-center px-4">
           {emptyIcon && <div className="mb-3" style={{ color: colors.textDim }}>{emptyIcon}</div>}
           <p className="text-sm font-medium" style={{ color: colors.textMuted }}>{emptyTitle}</p>
           {emptyDescription && <p className="text-xs mt-1" style={{ color: colors.textDim }}>{emptyDescription}</p>}
         </div>
       ) : (
-        <div>
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid ${colors.border}` }}>
-                {selectable && (
-                  <th className="px-4 py-2.5 w-10">
-                    <label className="inline-flex items-center justify-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={allPageSelected}
-                        onChange={toggleAllPage}
-                        className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }}
-                        aria-label="Select all on page"
-                      />
-                    </label>
-                  </th>
-                )}
-                {columns.map((col) => (
-                  <th
-                    key={col.key}
-                    className="px-4 py-2.5 font-medium"
-                    style={{
-                      width: col.width,
-                      textAlign: col.align || 'left',
-                      cursor: col.sortable ? 'pointer' : 'default',
-                      userSelect: col.sortable ? 'none' : undefined,
-                    }}
-                    onClick={() => col.sortable && handleSort(col.key)}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {col.label}
-                      {col.sortable && sortKey === col.key && (
-                        sortDir === 'asc'
-                          ? <ChevronUp className="w-3 h-3" />
-                          : <ChevronDown className="w-3 h-3" />
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-[10px] font-mono uppercase" style={{ color: colors.textDim, borderBottom: `1px solid ${colors.border}` }}>
+                  {selectable && (
+                    <th className="px-4 py-2.5 w-10">
+                      <label className="inline-flex items-center justify-center cursor-pointer">
+                        <input type="checkbox" checked={allPageSelected} onChange={toggleAllPage} className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }} aria-label="Select all" />
+                      </label>
+                    </th>
+                  )}
+                  {columns.map((col) => (
+                    <th key={col.key} className="px-4 py-2.5 font-medium" style={{ width: col.width, textAlign: col.align || 'left', cursor: col.sortable ? 'pointer' : 'default', userSelect: col.sortable ? 'none' : undefined }} onClick={() => col.sortable && handleSort(col.key)}>
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {col.sortable && sortKey === col.key && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                      </span>
+                    </th>
+                  ))}
+                  {actions && actions.length > 0 && <th className="px-4 py-2.5 w-12" />}
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((row) => {
+                  const id = keyExtractor(row);
+                  const isSelected = selectedKeys.has(id);
+                  return (
+                    <tr key={id} className={`data-table-row transition-colors ${isSelected ? 'bg-primary/5' : ''}`} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                      {selectable && (
+                        <td className="px-4 py-2.5">
+                          <label className="inline-flex items-center justify-center cursor-pointer">
+                            <input type="checkbox" checked={isSelected} onChange={() => toggleRow(id)} className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }} aria-label="Select row" />
+                          </label>
+                        </td>
                       )}
-                    </span>
-                  </th>
-                ))}
-                {actions && actions.length > 0 && <th className="px-4 py-2.5 w-12" />}
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map((row) => {
-                const id = keyExtractor(row);
-                const isSelected = selectedKeys.has(id);
-                return (
-                  <tr
-                    key={id}
-                    className={`data-table-row transition-colors ${isSelected ? 'bg-primary/5' : ''}`}
-                    style={{ borderBottom: `1px solid ${colors.border}` }}
-                  >
-                    {selectable && (
-                      <td className="px-4 py-2.5">
-                        <label className="inline-flex items-center justify-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleRow(id)}
-                            className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }}
-                            aria-label="Select row"
-                          />
-                        </label>
-                      </td>
-                    )}
-                    {columns.map((col) => (
-                      <td
-                        key={col.key}
-                        className="px-4 py-2.5 text-xs"
-                        style={{ textAlign: col.align || 'left' }}
-                      >
-                        {col.render ? col.render(row) : String(row[col.key] ?? '')}
-                      </td>
-                    ))}
-                    {actions && actions.length > 0 && (
-                      <td className="px-4 py-2.5">
-                        <div className="relative flex justify-end">
-                          <button
-                            onClick={() => setOpenMenu(openMenu === id ? null : id)}
-                            className="p-2 rounded-lg transition-all hover:scale-105"
-                            style={{
-                              color: openMenu === id ? colors.primary : colors.textMuted,
-                              background: openMenu === id ? colors.primaryGlow : 'transparent',
-                            }}
-                            onMouseEnter={(e) => { if (openMenu !== id) (e.currentTarget as HTMLElement).style.background = colors.bgHover; }}
-                            onMouseLeave={(e) => { if (openMenu !== id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                            aria-label="Row actions"
-                          >
-                            <MoreHorizontal className="w-5 h-5" />
-                          </button>
-                          {openMenu === id && (
-                            <>
-                              <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
-                              <div
-                                className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-[70] animate-scale-in max-h-60 overflow-y-auto"
-                                style={{
-                                  background: colors.cardBg,
-                                  border: `1px solid ${colors.border}`,
-                                  backdropFilter: 'blur(20px)',
-                                  boxShadow: `0 8px 32px ${colors.bg}cc`,
-                                }}
-                              >
-                                {actions
-                                  .filter((a) => !a.hidden || !a.hidden(row))
-                                  .map((action, i) => (
-                                    <button
-                                      key={i}
-                                      onClick={() => { action.onClick(row); setOpenMenu(null); }}
-                                      disabled={action.disabled?.(row)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors text-left disabled:opacity-40"
-                                      style={{
-                                        color: action.variant === 'danger' ? colors.danger : colors.text,
-                                      }}
-                                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = action.variant === 'danger' ? `${colors.danger}14` : colors.cardBg; }}
-                                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                                    >
-                                      {action.icon}
-                                      {action.label}
+                      {columns.map((col) => (
+                        <td key={col.key} className="px-4 py-2.5 text-xs" style={{ textAlign: col.align || 'left' }}>
+                          {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                        </td>
+                      ))}
+                      {actions && actions.length > 0 && (
+                        <td className="px-4 py-2.5">
+                          <div className="relative flex justify-end">
+                            <button onClick={() => setOpenMenu(openMenu === id ? null : id)} className="p-2 rounded-lg transition-all hover:scale-105" style={{ color: openMenu === id ? colors.primary : colors.textMuted, background: openMenu === id ? colors.primaryGlow : 'transparent' }} aria-label="Row actions">
+                              <MoreHorizontal className="w-5 h-5" />
+                            </button>
+                            {openMenu === id && (
+                              <>
+                                <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
+                                <div className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-[70] animate-scale-in max-h-60 overflow-y-auto" style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, backdropFilter: 'blur(20px)', boxShadow: `0 8px 32px ${colors.bg}cc` }}>
+                                  {visibleActions(row).map((action, i) => (
+                                    <button key={i} onClick={() => { action.onClick(row); setOpenMenu(null); }} disabled={action.disabled?.(row)} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors text-left disabled:opacity-40" style={{ color: action.variant === 'danger' ? colors.danger : colors.text }}>
+                                      {action.icon}{action.label}
                                     </button>
                                   ))}
-                              </div>
-                            </>
-                          )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden divide-y" style={{ borderColor: colors.border }}>
+            {paged.map((row) => {
+              const id = keyExtractor(row);
+              const isSelected = selectedKeys.has(id);
+              const rowActions = visibleActions(row);
+              return (
+                <div key={id} className="p-3" style={{ background: isSelected ? `${colors.primary}08` : undefined }}>
+                  {selectable && (
+                    <label className="inline-flex items-center gap-2 mb-2 cursor-pointer">
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleRow(id)} className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }} />
+                      <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>Select</span>
+                    </label>
+                  )}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      {columns.filter((c) => !c.hideOnMobile).map((col) => (
+                        <div key={col.key} className="mb-1">
+                          <span className="text-[10px] font-mono uppercase block" style={{ color: colors.textDim }}>{col.label}</span>
+                          <div className="text-xs">
+                            {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                          </div>
                         </div>
-                      </td>
+                      ))}
+                    </div>
+                    {rowActions.length > 0 && (
+                      <div className="relative shrink-0">
+                        <button onClick={() => setOpenMenu(openMenu === id ? null : id)} className="p-2 rounded-lg" style={{ color: colors.textMuted, background: openMenu === id ? colors.primaryGlow : 'transparent' }} aria-label="Actions">
+                          <MoreHorizontal className="w-5 h-5" />
+                        </button>
+                        {openMenu === id && (
+                          <>
+                            <div className="fixed inset-0 z-[60]" onClick={() => setOpenMenu(null)} />
+                            <div className="absolute right-0 top-full mt-1 w-44 rounded-xl py-1.5 z-[70] animate-scale-in" style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, backdropFilter: 'blur(20px)', boxShadow: `0 8px 32px ${colors.bg}cc` }}>
+                              {rowActions.map((action, i) => (
+                                <button key={i} onClick={() => { action.onClick(row); setOpenMenu(null); }} disabled={action.disabled?.(row)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-medium transition-colors text-left disabled:opacity-40" style={{ color: action.variant === 'danger' ? colors.danger : colors.text }}>
+                                  {action.icon}{action.label}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      {/* Bulk Actions Toolbar */}
+      {/* Bulk Actions */}
       {selectable && selectedKeys.size > 0 && bulkActions && bulkActions.length > 0 && (
-        <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap" style={{ borderTop: `1px solid ${colors.border}`, background: `${colors.success}0d` }}>
-          <span className="text-xs font-mono" style={{ color: colors.textMuted }}>
-            {selectedKeys.size} selected
-          </span>
-          <button onClick={clearSelection} className="text-xs px-2 py-1 rounded" style={{ color: colors.textMuted, background: 'transparent', border: '1px solid var(--border)' }}>
-            Clear
-          </button>
+        <div className="px-3 py-2.5 sm:px-4 flex items-center gap-2 flex-wrap" style={{ borderTop: `1px solid ${colors.border}`, background: `${colors.success}0d` }}>
+          <span className="text-xs font-mono" style={{ color: colors.textMuted }}>{selectedKeys.size} selected</span>
+          <button onClick={clearSelection} className="text-xs px-2 py-1 rounded" style={{ color: colors.textMuted, border: `1px solid ${colors.border}` }}>Clear</button>
           <div className="flex items-center gap-2 ml-auto">
             {bulkActions.map((action, i) => (
-              <button
-                key={i}
-                onClick={() => handleBulkAction(action)}
-                disabled={action.disabled && action.disabled(selectedRows)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors disabled:opacity-40"
-                style={{
-                  background: action.variant === 'danger' ? `${colors.danger}1a` : colors.cardBg,
-                  color: action.variant === 'danger' ? colors.danger : colors.text,
-                  border: '1px solid transparent',
-                }}
-              >
-                {action.icon}
-                {action.label}
+              <button key={i} onClick={() => handleBulkAction(action)} disabled={action.disabled && action.disabled(selectedRows)} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded transition-colors disabled:opacity-40 min-h-[44px]" style={{ background: action.variant === 'danger' ? `${colors.danger}1a` : colors.cardBg, color: action.variant === 'danger' ? colors.danger : colors.text }}>
+                {action.icon}{action.label}
               </button>
             ))}
           </div>
@@ -346,52 +310,25 @@ export default function DataTable<T extends Record<string, any>>({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderTop: `1px solid ${colors.border}` }}>
-          <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>
-            Page {safePage + 1} of {totalPages}
-          </span>
+        <div className="px-3 py-2.5 sm:px-4 flex items-center justify-between" style={{ borderTop: `1px solid ${colors.border}` }}>
+          <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>{safePage + 1}/{totalPages}</span>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(Math.max(0, safePage - 1))}
-              disabled={safePage === 0}
-              className="p-1.5 rounded-md transition-colors disabled:opacity-30"
-              style={{ color: colors.textMuted }}
-              aria-label="Previous page"
-            >
+            <button onClick={() => setPage(Math.max(0, safePage - 1))} disabled={safePage === 0} className="p-2 rounded-md transition-colors disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center" style={{ color: colors.textMuted }} aria-label="Previous">
               <ChevronLeft className="w-4 h-4" />
             </button>
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
               let pageNum: number;
-              if (totalPages <= 5) {
-                pageNum = i;
-              } else if (safePage < 2) {
-                pageNum = i;
-              } else if (safePage > totalPages - 3) {
-                pageNum = totalPages - 5 + i;
-              } else {
-                pageNum = safePage - 2 + i;
-              }
+              if (totalPages <= 5) pageNum = i;
+              else if (safePage < 2) pageNum = i;
+              else if (safePage > totalPages - 3) pageNum = totalPages - 5 + i;
+              else pageNum = safePage - 2 + i;
               return (
-                <button
-                  key={pageNum}
-                  onClick={() => setPage(pageNum)}
-                  className="w-7 h-7 rounded-md text-[11px] font-mono transition-colors"
-                  style={{
-                    background: safePage === pageNum ? `${colors.success}1f` : 'transparent',
-                    color: safePage === pageNum ? colors.success : colors.textDim,
-                  }}
-                >
+                <button key={pageNum} onClick={() => setPage(pageNum)} className="w-9 h-9 rounded-md text-[11px] font-mono transition-colors flex items-center justify-center" style={{ background: safePage === pageNum ? `${colors.success}1f` : 'transparent', color: safePage === pageNum ? colors.success : colors.textDim }}>
                   {pageNum + 1}
                 </button>
               );
             })}
-            <button
-              onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
-              disabled={safePage >= totalPages - 1}
-              className="p-1.5 rounded-md transition-colors disabled:opacity-30"
-              style={{ color: colors.textMuted }}
-              aria-label="Next page"
-            >
+            <button onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))} disabled={safePage >= totalPages - 1} className="p-2 rounded-md transition-colors disabled:opacity-30 min-h-[44px] min-w-[44px] flex items-center justify-center" style={{ color: colors.textMuted }} aria-label="Next">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
