@@ -363,7 +363,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
           <div className="flex flex-col items-center gap-2">
             <Upload className="w-6 h-6" style={{ color: colors.success }} />
             <p className="text-sm font-medium">Drop a file or click to upload</p>
-            <p className="text-xs font-mono" style={{ color: colors.textDim }}>Auto-routed to next available bucket</p>
+            <p className="text-xs font-mono" style={{ color: colors.textDim }}>Supports any file type</p>
           </div>
         )}
       </div>

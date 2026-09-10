@@ -126,7 +126,7 @@ export default function AdminPanel() {
         </div>
 
         {/* Primary Nav */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <nav className="flex-1 px-2 py-3">
           {!collapsed && (
             <div className="text-[10px] font-mono uppercase tracking-wider px-2 mb-2" style={{ color: colors.textDim }}>
               Navigation
