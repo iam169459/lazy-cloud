@@ -259,17 +259,22 @@ export default function DataTable<T extends Record<string, any>>({
                         <div className="relative flex justify-end">
                           <button
                             onClick={() => setOpenMenu(openMenu === id ? null : id)}
-                            className="p-1.5 rounded-md transition-colors"
-                            style={{ color: colors.textDim }}
+                            className="p-2 rounded-lg transition-all hover:scale-105"
+                            style={{
+                              color: openMenu === id ? colors.primary : colors.textMuted,
+                              background: openMenu === id ? colors.primaryGlow : 'transparent',
+                            }}
+                            onMouseEnter={(e) => { if (openMenu !== id) (e.currentTarget as HTMLElement).style.background = colors.bgHover; }}
+                            onMouseLeave={(e) => { if (openMenu !== id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                             aria-label="Row actions"
                           >
-                            <MoreHorizontal className="w-4 h-4" />
+                            <MoreHorizontal className="w-5 h-5" />
                           </button>
                           {openMenu === id && (
                             <>
                               <div className="fixed inset-0 z-50" onClick={() => setOpenMenu(null)} />
                               <div
-                                className="absolute right-0 bottom-full mb-1 w-44 rounded-xl py-1.5 z-50 animate-scale-in"
+                                className="absolute right-0 bottom-full mb-1 w-44 rounded-xl py-1.5 z-50 animate-scale-in max-h-60 overflow-y-auto"
                                 style={{
                                   background: colors.cardBg,
                                   border: `1px solid ${colors.border}`,
