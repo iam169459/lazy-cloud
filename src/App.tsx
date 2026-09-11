@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { lazy, Suspense, Component, ReactNode, useState, useEffect } from 'react';
 import { AuthProvider } from '@/lib/auth';
+import { UserAuthProvider } from '@/lib/userAuth';
 import { ThemeProvider } from '@/lib/theme';
 import { api, AppSettings } from '@/lib/api';
 
@@ -10,6 +11,8 @@ const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
 const SharePage = lazy(() => import('@/pages/SharePage'));
 const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
 const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
+const UserLogin = lazy(() => import('@/pages/UserLogin'));
+const UserDashboard = lazy(() => import('@/pages/UserDashboard'));
 
 function Loader() {
   return (
@@ -74,6 +77,7 @@ function App() {
   return (
     <ErrorBoundary>
     <ThemeProvider>
+      <UserAuthProvider>
       <AuthProvider>
         <BrowserRouter>
           <Background />
@@ -83,12 +87,16 @@ function App() {
               <Route path="/file/:fileId" element={<DownloadPage />} />
               <Route path="/preview/:id" element={<PreviewPage />} />
               <Route path="/s/:id" element={<SharePage />} />
+              <Route path="/login" element={<UserLogin />} />
+              <Route path="/register" element={<UserLogin />} />
+              <Route path="/dashboard" element={<UserDashboard />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>
           </Suspense>
         </BrowserRouter>
       </AuthProvider>
+      </UserAuthProvider>
     </ThemeProvider>
     </ErrorBoundary>
   );

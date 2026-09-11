@@ -1,9 +1,39 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { timingSafeEqual, randomBytes, scryptSync } from 'crypto';
+import { timingSafeEqual, randomBytes, scryptSync, createHmac } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'lazydrop-jwt-secret-change-in-production';
+
+function jwtSign(payload: any): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url');
+  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${sig}`;
+}
+
+function jwtVerify(token: string): any | null {
+  try {
+    const [header, body, sig] = token.split('.');
+    const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+    if (sig !== expected) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+async function checkUserAuth(req: IncomingMessage): Promise<{ id: string; role: string } | null> {
+  const auth = req.headers.authorization;
+  if (!auth) return null;
+  const token = auth.replace('Bearer ', '');
+  // Check JWT first
+  const payload = jwtVerify(token);
+  if (payload?.userId) return { id: payload.userId, role: payload.role || 'user' };
+  return null;
+}
 
 let dbInitialized = false;
 
@@ -1506,6 +1536,242 @@ export async function handleApiRequest(
 
       await disableTotp();
       sendJson(res, 200, { success: true, message: '2FA disabled' });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── USER ROUTES ──
+    // ═══════════════════════════════════════════
+
+    // ── User: Register ──
+    if (path === '/api/user/register' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const username = sanitize(body.username);
+      const email = sanitize(body.email);
+      const password = body.password;
+      if (!username || username.length < 3) { sendError(res, 400, 'Username must be at least 3 characters'); return true; }
+      if (!password || password.length < 6) { sendError(res, 400, 'Password must be at least 6 characters'); return true; }
+      const existing = await getUserByUsername(username);
+      if (existing) { sendError(res, 409, 'Username already taken'); return true; }
+      const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
+      const user = await createUser(username, email, hash);
+      const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
+      sendJson(res, 201, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+      return true;
+    }
+
+    // ── User: Login ──
+    if (path === '/api/user/login' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const username = sanitize(body.username);
+      const password = body.password;
+      if (!username || !password) { sendError(res, 400, 'Username and password required'); return true; }
+      const user = await getUserByUsername(username);
+      if (!user) { sendError(res, 401, 'Invalid credentials'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+      const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
+      if (hash !== user.password_hash) { sendError(res, 401, 'Invalid credentials'); return true; }
+      await updateUser(user.id, { last_login: new Date().toISOString() });
+      const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
+      sendJson(res, 200, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+      return true;
+    }
+
+    // ── User: Profile ──
+    if (path === '/api/user/profile' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      sendJson(res, 200, { id: user.id, username: user.username, email: user.email, role: user.role, storage_used: user.storage_used, storage_limit: user.storage_limit, created_at: user.created_at, last_login: user.last_login });
+      return true;
+    }
+
+    // ── User: Update profile ──
+    if (path === '/api/user/profile' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const patch: any = {};
+      if (body.email !== undefined) patch.email = sanitize(body.email);
+      if (body.currentPassword && body.newPassword) {
+        const user = await getUserById(userAuth.id);
+        if (!user) { sendError(res, 404, 'User not found'); return true; }
+        const currentHash = scryptSync(body.currentPassword, 'lazydrop-user', 64).toString('hex');
+        if (currentHash !== user.password_hash) { sendError(res, 400, 'Current password is incorrect'); return true; }
+        if (body.newPassword.length < 6) { sendError(res, 400, 'New password must be at least 6 characters'); return true; }
+        patch.password_hash = scryptSync(body.newPassword, 'lazydrop-user', 64).toString('hex');
+      }
+      const updated = await updateUser(userAuth.id, patch);
+      if (updated) sendJson(res, 200, { success: true, user: { id: updated.id, username: updated.username, email: updated.email, role: updated.role } });
+      else sendError(res, 404, 'User not found');
+      return true;
+    }
+
+    // ── User: Dashboard stats ──
+    if (path === '/api/user/stats' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileCount = await countUserFiles(userAuth.id);
+      const shares = await listUserShares(userAuth.id);
+      const user = await getUserById(userAuth.id);
+      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || 10737418240 });
+      return true;
+    }
+
+    // ── User: List files ──
+    if (path === '/api/user/files' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const files = await listUserFiles(userAuth.id);
+      sendJson(res, 200, files);
+      return true;
+    }
+
+    // ── User: Upload file ──
+    if (path === '/api/user/upload' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+      const settings = await getAppSettings();
+      const maxFile = Number(settings.maxFileSize);
+      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: maxFile, files: 1 } });
+      let fileUploaded = false;
+      bb.on('file', async (_fieldname, file, info) => {
+        const { originalFilename, mimeType } = info;
+        const provider = await findProviderForSize(Number(info.fileSize) || 0);
+        if (!provider) { sendError(res, 503, 'No storage available'); file.resume(); return; }
+        const id = generateId();
+        const fileKey = `${id}/${originalFilename || 'upload'}`;
+        try {
+          const result = await uploadToProvider(provider, file, fileKey);
+          const record = await createFileRecord({
+            id, original_name: originalFilename || 'upload', file_size: Number(info.fileSize) || 0,
+            mime_type: mimeType || 'application/octet-stream', r2_key: fileKey, provider_id: provider.id,
+            user_id: userAuth.id, download_count: 0, encrypted: false, enc_iv: null, enc_auth_tag: null,
+          });
+          await updateProviderBytes(provider.id, Number(info.fileSize) || 0);
+          await updateUserStorageUsed(userAuth.id);
+          sendJson(res, 200, { success: true, file: record });
+          fileUploaded = true;
+        } catch (err: any) {
+          sendError(res, 500, err.message || 'Upload failed');
+        }
+      });
+      bb.on('close', () => { if (!fileUploaded) return; });
+      req.pipe(bb);
+      return true;
+    }
+
+    // ── User: Delete file ──
+    if (path === '/api/user/files/' && req.method === 'DELETE') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
+      if (file.provider_id) {
+        try { await deleteFromProvider(file.provider_id, file.r2_key); } catch {}
+        await updateProviderBytes(file.provider_id, -file.file_size);
+      }
+      await deleteFileRecord(fileId);
+      await updateUserStorageUsed(userAuth.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── User: Create share ──
+    if (path === '/api/user/shares' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
+      let passwordHash: string | null = null;
+      if (body.password) passwordHash = scryptSync(body.password, 'lazydrop-share', 64).toString('hex');
+      const share = await createShare({ file_id: fileId, password_hash: passwordHash, expires_at: body.expiresInDays ? new Date(Date.now() + body.expiresInDays * 86400000).toISOString() : null, download_limit: body.downloadLimit || null, download_count: 0 });
+      sendJson(res, 201, { success: true, share });
+      return true;
+    }
+
+    // ── User: List shares ──
+    if (path === '/api/user/shares' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const shares = await listUserShares(userAuth.id);
+      sendJson(res, 200, shares);
+      return true;
+    }
+
+    // ── User: Delete share ──
+    if (path === '/api/user/shares/' && req.method === 'DELETE') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const shareId = body.shareId;
+      if (!shareId) { sendError(res, 400, 'shareId required'); return true; }
+      const share = await getShareById(shareId);
+      if (!share) { sendError(res, 404, 'Share not found'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file || file.user_id !== userAuth.id) { sendError(res, 403, 'Not your share'); return true; }
+      await deleteShare(shareId);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── ADMIN: USER MANAGEMENT ──
+    // ═══════════════════════════════════════════
+
+    // ── Admin: List users ──
+    if (path === '/api/admin/users' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const users = await listUsers();
+      sendJson(res, 200, users.map(u => ({ id: u.id, username: u.username, email: u.email, role: u.role, storage_used: u.storage_used, storage_limit: u.storage_limit, is_active: u.is_active, created_at: u.created_at, last_login: u.last_login })));
+      return true;
+    }
+
+    // ── Admin: Update user ──
+    if (path === '/api/admin/users/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const userId = body.userId;
+      if (!userId) { sendError(res, 400, 'userId required'); return true; }
+      const patch: any = {};
+      if (body.role !== undefined) patch.role = body.role;
+      if (body.is_active !== undefined) patch.is_active = body.is_active;
+      if (body.storage_limit !== undefined) patch.storage_limit = Number(body.storage_limit);
+      if (body.email !== undefined) patch.email = sanitize(body.email);
+      const updated = await updateUser(userId, patch);
+      if (updated) sendJson(res, 200, { success: true, user: { id: updated.id, username: updated.username, email: updated.email, role: updated.role, is_active: updated.is_active, storage_limit: updated.storage_limit } });
+      else sendError(res, 404, 'User not found');
+      return true;
+    }
+
+    // ── Admin: Delete user ──
+    if (path === '/api/admin/users/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const userId = body.userId;
+      if (!userId) { sendError(res, 400, 'userId required'); return true; }
+      await deleteUser(userId);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── Admin: User count ──
+    if (path === '/api/admin/users/count' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const count = await countUsers();
+      sendJson(res, 200, { count });
       return true;
     }
 

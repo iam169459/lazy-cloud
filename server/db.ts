@@ -37,11 +37,27 @@ export interface FileRecord {
   mime_type: string;
   r2_key: string;
   provider_id: string;
+  user_id: string | null;
   download_count: number;
   created_at: string;
   encrypted: boolean;
   enc_iv: string | null;
   enc_auth_tag: string | null;
+}
+
+export interface UserRecord {
+  id: string;
+  username: string;
+  email: string | null;
+  password_hash: string;
+  role: string;
+  storage_used: number;
+  storage_limit: number;
+  is_active: boolean;
+  totp_secret: string | null;
+  totp_enabled: boolean;
+  created_at: string;
+  last_login: string | null;
 }
 
 export async function initDatabase() {
@@ -178,6 +194,30 @@ export async function initDatabase() {
   await sql`CREATE INDEX IF NOT EXISTS idx_files_created_at ON files (created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_files_provider_id ON files (provider_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_storage_providers_active ON storage_providers (is_active)`;
+
+  // --- Multi-user tables ---
+  await sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      storage_used BIGINT DEFAULT 0,
+      storage_limit BIGINT DEFAULT 10737418240,
+      is_active BOOLEAN DEFAULT true,
+      totp_secret TEXT,
+      totp_enabled BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_login TIMESTAMP
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`;
+
+  // Add user_id to files for ownership
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS user_id TEXT`;
+  await sql`ALTER TABLE files ADD CONSTRAINT IF NOT EXISTS files_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id)`;
 }
 
 export interface AdminCredentials {
@@ -604,5 +644,92 @@ export async function listAuditLogs(limit: number = 100, offset: number = 0): Pr
 export async function cleanupExpiredFiles(): Promise<void> {
   const sql = getSql();
   await sql`DELETE FROM shares WHERE expires_at IS NOT NULL AND expires_at < CURRENT_TIMESTAMP`;
+}
+
+// ── User functions ──
+
+export async function createUser(username: string, email: string, passwordHash: string, role: string = 'user'): Promise<UserRecord> {
+  const sql = getSql();
+  const id = randomUUID();
+  const rows = await sql`
+    INSERT INTO users (id, username, email, password_hash, role)
+    VALUES (${id}, ${username}, ${email || null}, ${passwordHash}, ${role})
+    RETURNING *
+  ` as unknown[];
+  return rows[0] as UserRecord;
+}
+
+export async function getUserByUsername(username: string): Promise<UserRecord | null> {
+  const sql = getSql();
+  const rows = await sql`SELECT * FROM users WHERE username = ${username}` as unknown[];
+  return (rows[0] as UserRecord) || null;
+}
+
+export async function getUserById(id: string): Promise<UserRecord | null> {
+  const sql = getSql();
+  const rows = await sql`SELECT * FROM users WHERE id = ${id}` as unknown[];
+  return (rows[0] as UserRecord) || null;
+}
+
+export async function listUsers(limit: number = 100, offset: number = 0): Promise<UserRecord[]> {
+  const sql = getSql();
+  return (await sql`SELECT * FROM users ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`) as unknown[] as UserRecord[];
+}
+
+export async function updateUser(id: string, patch: Partial<Pick<UserRecord, 'username' | 'email' | 'role' | 'is_active' | 'storage_limit' | 'totp_secret' | 'totp_enabled' | 'password_hash' | 'last_login'>>): Promise<UserRecord | null> {
+  const sql = getSql();
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) { fields.push(k); values.push(v); }
+  }
+  if (fields.length === 0) return getUserById(id);
+  // Build dynamic update
+  const setClauses = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+  const result = await sql.unsafe(
+    `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING *`,
+    [id, ...values]
+  );
+  return (result as unknown[])[0] as UserRecord || null;
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const sql = getSql();
+  await sql`DELETE FROM users WHERE id = ${id}`;
+}
+
+export async function updateUserStorageUsed(userId: string): Promise<void> {
+  const sql = getSql();
+  const rows = await sql`SELECT COALESCE(SUM(file_size), 0)::BIGINT AS total FROM files WHERE user_id = ${userId}` as unknown[];
+  const total = Number((rows[0] as any).total);
+  await sql`UPDATE users SET storage_used = ${total} WHERE id = ${userId}`;
+}
+
+export async function countUsers(): Promise<number> {
+  const sql = getSql();
+  const rows = await sql`SELECT COUNT(*)::INT AS count FROM users` as unknown[];
+  return (rows[0] as any).count;
+}
+
+export async function listUserFiles(userId: string, limit: number = 100, offset: number = 0): Promise<FileRecord[]> {
+  const sql = getSql();
+  return (await sql`SELECT * FROM files WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`) as unknown[] as FileRecord[];
+}
+
+export async function countUserFiles(userId: string): Promise<number> {
+  const sql = getSql();
+  const rows = await sql`SELECT COUNT(*)::INT AS count FROM files WHERE user_id = ${userId}` as unknown[];
+  return (rows[0] as any).count;
+}
+
+export async function listUserShares(userId: string): Promise<(ShareRecord & { file_name: string })[]> {
+  const sql = getSql();
+  return (await sql`
+    SELECT s.*, f.original_name AS file_name
+    FROM shares s
+    JOIN files f ON f.id = s.file_id
+    WHERE f.user_id = ${userId}
+    ORDER BY s.created_at DESC
+  `) as unknown[] as (ShareRecord & { file_name: string })[];
 }
 

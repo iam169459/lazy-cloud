@@ -50,10 +50,15 @@ export default function Landing() {
             <a href="#how-it-works" className="text-sm font-medium" style={{ color: colors.textMuted }}>How it works</a>
             <a href="#faq" className="text-sm font-medium" style={{ color: colors.textMuted }}>FAQ</a>
           </div>
-          <Link to="/admin" className="btn btn-ghost text-sm" onClick={() => sounds.click()} aria-label="Admin login">
-            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-            Admin
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
+              Sign in
+            </Link>
+            <Link to="/register" className="btn btn-primary text-sm" onClick={() => sounds.click()}>
+              Get started
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -69,8 +74,8 @@ export default function Landing() {
             Upload once, share with a link. Simple, secure, and instant.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
-            <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
-              Get started
+            <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()}>
+              Create account
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
             <a href="#features" className="btn btn-secondary">See features</a>

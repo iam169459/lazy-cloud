@@ -375,6 +375,101 @@ export const api = {
         missingFiles: { id: string; name: string; reason: string }[];
       };
     }>,
+
+  // ── User Auth ──
+  userRegister: (username: string, email: string, password: string) =>
+    request('/api/user/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password }),
+    }) as Promise<{ success: boolean; token: string; user: { id: string; username: string; email: string; role: string } }>,
+
+  userLogin: (username: string, password: string) =>
+    request('/api/user/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }) as Promise<{ success: boolean; token: string; user: { id: string; username: string; email: string; role: string } }>,
+
+  // ── User Profile ──
+  getUserProfile: (token: string) =>
+    request('/api/user/profile', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ id: string; username: string; email: string; role: string; storage_used: number; storage_limit: number; created_at: string; last_login: string }>,
+
+  updateUserProfile: (token: string, data: { email?: string; currentPassword?: string; newPassword?: string }) =>
+    request('/api/user/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }),
+
+  // ── User Dashboard ──
+  getUserStats: (token: string) =>
+    request('/api/user/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ fileCount: number; shareCount: number; storageUsed: number; storageLimit: number }>,
+
+  // ── User Files ──
+  getUserFiles: (token: string) =>
+    request('/api/user/files', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<FileWithProvider[]>,
+
+  userUpload: (file: File, token: string, onProgress?: (pct: number) => void) =>
+    uploadRequest(file, '/api/user/upload', token, onProgress),
+
+  deleteUserFile: (fileId: string, token: string) =>
+    request('/api/user/files/', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fileId }),
+    }),
+
+  // ── User Shares ──
+  getUserShares: (token: string) =>
+    request('/api/user/shares', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<(ShareRecord & { file_name: string })[]>,
+
+  createUserShare: (token: string, fileId: string, options?: { password?: string; expiresInDays?: number; downloadLimit?: number }) =>
+    request('/api/user/shares', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fileId, ...options }),
+    }),
+
+  deleteUserShare: (shareId: string, token: string) =>
+    request('/api/user/shares/', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ shareId }),
+    }),
+
+  // ── Admin: User Management ──
+  adminListUsers: (token: string) =>
+    request('/api/admin/users', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ id: string; username: string; email: string; role: string; storage_used: number; storage_limit: number; is_active: boolean; created_at: string; last_login: string }[]>,
+
+  adminUpdateUser: (token: string, data: { userId: string; role?: string; is_active?: boolean; storage_limit?: number; email?: string }) =>
+    request('/api/admin/users/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(data),
+    }),
+
+  adminDeleteUser: (token: string, userId: string) =>
+    request('/api/admin/users/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId }),
+    }),
+
+  adminUserCount: (token: string) =>
+    request('/api/admin/users/count', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ count: number }>,
 };
 
 function uploadRequest(

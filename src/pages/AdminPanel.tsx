@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
-  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal, Key, Activity
+  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal, Key, Activity, Users
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -18,11 +18,13 @@ const AdminScan = lazy(() => import('./AdminScan'));
 const AdminSystem = lazy(() => import('./AdminSystem'));
 const AdminApiKeys = lazy(() => import('./AdminApiKeys'));
 const AdminAuditLog = lazy(() => import('./AdminAuditLog'));
+const AdminUsers = lazy(() => import('./AdminUsers'));
 
-type Tab = 'dashboard' | 'storage' | 'security' | 'api-keys' | 'audit-log' | 'advanced' | 'scan' | 'system';
+type Tab = 'dashboard' | 'storage' | 'security' | 'api-keys' | 'audit-log' | 'advanced' | 'scan' | 'system' | 'users';
 
 const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Files', icon: <FileText className="w-[18px] h-[18px]" /> },
+  { id: 'users', label: 'Users', icon: <Users className="w-[18px] h-[18px]" /> },
   { id: 'storage', label: 'Storage', icon: <Cloud className="w-[18px] h-[18px]" /> },
   { id: 'advanced', label: 'Settings', icon: <Sliders className="w-[18px] h-[18px]" /> },
   { id: 'api-keys', label: 'API Keys', icon: <Key className="w-[18px] h-[18px]" /> },
@@ -33,6 +35,7 @@ const navItems: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const pageDescriptions: Record<Tab, string> = {
   dashboard: 'Upload, manage, and share your files.',
+  users: 'Manage registered users and permissions.',
   storage: 'Manage your storage backends.',
   advanced: 'Configure themes, credentials, 2FA, and system preferences.',
   'api-keys': 'Manage API keys for programmatic access.',
@@ -285,6 +288,7 @@ export default function AdminPanel() {
             ) : <div key={tab} className="tab-content">
             <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.primary }} /></div>}>
             {tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
+            : tab === 'users' ? <AdminUsers token={token!} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'security' ? <AdminSecurity token={token!} onNotify={notify} onCredentialsChanged={() => { logout(); nav('/admin/login'); }} />
             : tab === 'api-keys' ? <AdminApiKeys token={token!} onNotify={notify} />
