@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Pre-bundled by build.sh so Vercel's nft includes the full server graph.
-// @ts-expect-error - pre-bundled JS has no type declarations
 import { handleApiRequest } from '../dist-server/api-handler.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

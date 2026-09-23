@@ -216,7 +216,11 @@ export async function initDatabase() {
 
   // Add user_id to files for ownership
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS user_id TEXT`;
-  await sql`ALTER TABLE files ADD CONSTRAINT IF NOT EXISTS files_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`;
+  try {
+    await sql`ALTER TABLE files ADD CONSTRAINT files_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`;
+  } catch {
+    // constraint already exists
+  }
   await sql`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id)`;
 }
 
