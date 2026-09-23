@@ -168,6 +168,10 @@ export async function initDatabase() {
   // Email column (idempotent)
   await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS email TEXT`;
 
+  // TOTP columns on admin_settings (migration for existing DBs)
+  await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS totp_secret TEXT`;
+  await sql`ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT false`;
+
   // Add created_at to storage_providers if missing (migration for existing DBs)
   await sql`ALTER TABLE storage_providers ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
 
@@ -213,6 +217,14 @@ export async function initDatabase() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_used BIGINT DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_limit BIGINT DEFAULT 10737418240`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'`;
 
   // Add user_id to files for ownership
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS user_id TEXT`;
