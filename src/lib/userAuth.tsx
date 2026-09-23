@@ -33,6 +33,12 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', res.status, text.slice(0, 200));
+        return { success: false, error: `Server error (${res.status}): ${text.slice(0, 100)}` };
+      }
       const data = await res.json();
       if (data.success) {
         localStorage.setItem(TOKEN_KEY, data.token);
@@ -54,6 +60,12 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', res.status, text.slice(0, 200));
+        return { success: false, error: `Server error (${res.status}): ${text.slice(0, 100)}` };
+      }
       const data = await res.json();
       if (data.success) {
         localStorage.setItem(TOKEN_KEY, data.token);

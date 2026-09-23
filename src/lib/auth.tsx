@@ -27,6 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass, totp }),
       });
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        console.error('Non-JSON response:', res.status, text.slice(0, 200));
+        return { success: false };
+      }
       const data = await res.json();
       if (data.requiresTotp) {
         return { success: false, requiresTotp: true };
