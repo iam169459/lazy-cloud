@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, AlertCircle, Zap, Package } from 'lucide-react';
+import { Download, FileText, Calendar, HardDrive, FileType, ArrowLeft, Loader2, AlertCircle, Zap, Package, Eye, Maximize2 } from 'lucide-react';
 import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -26,11 +26,13 @@ export default function DownloadPage() {
     finally { setDownloading(false); }
   }
 
+  const canPreview = (mimeType: string) => mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf';
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center grid-bg" style={{ color: colors.text }}>
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#818cf8' }} />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
           <p className="text-xs font-mono" style={{ color: colors.textDim }}>LOCATING_FILE...</p>
         </div>
       </div>
@@ -41,7 +43,7 @@ export default function DownloadPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-5 grid-bg" style={{ color: colors.text }}>
         <div className="flex flex-col items-center animate-scale-up">
-          <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-4" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+          <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-4" style={{ background: `${colors.danger}15`, color: colors.danger }}>
             <AlertCircle className="w-8 h-8" />
           </div>
           <h1 className="text-xl font-bold mb-2">File not found</h1>
@@ -62,7 +64,7 @@ export default function DownloadPage() {
         <div className="w-full max-w-md">
           <div className="card p-6 sm:p-8 animate-scale-up">
             <div className="flex justify-center mb-5">
-              <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+              <div className="w-16 h-16 rounded-xl flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }}>
                 <FileText className="w-8 h-8" />
               </div>
             </div>
@@ -76,6 +78,17 @@ export default function DownloadPage() {
             <button onClick={handleDownload} disabled={downloading} className="btn btn-primary w-full">
               {downloading ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing...</> : <><Download className="w-4 h-4" /> Download file</>}
             </button>
+            {file && canPreview(file.mime_type) && (
+              <Link
+                to={`/preview/${file.id}`}
+                className="btn btn-secondary w-full flex items-center justify-center gap-2"
+                onClick={() => sounds.click()}
+              >
+                <Eye className="w-4 h-4" />
+                <span>Preview</span>
+                <Maximize2 className="w-3.5 h-3.5" />
+              </Link>
+            )}
             <div className="flex items-center justify-center gap-1.5 mt-4 text-xs" style={{ color: colors.textDim }}>
               <Package className="w-3 h-3" />
               Downloaded {file.download_count} time{file.download_count !== 1 ? 's' : ''}
@@ -83,7 +96,7 @@ export default function DownloadPage() {
           </div>
           <div className="text-center mt-6">
             <Link to="/" className="text-xs flex items-center justify-center gap-1.5" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
-              <Zap className="w-3 h-3" style={{ color: '#818cf8' }} /> LazyDrop
+              <Zap className="w-3 h-3" style={{ color: colors.primary }} /> LazyDrop
             </Link>
           </div>
         </div>
@@ -93,9 +106,10 @@ export default function DownloadPage() {
 }
 
 function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  const { colors } = useTheme();
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
-      <div className="flex items-center gap-2 text-xs" style={{ color: '#94a3b8' }}>{icon}{label}</div>
+    <div className="flex items-center justify-between py-2.5 px-3 rounded-lg" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+      <div className="flex items-center gap-2 text-xs" style={{ color: colors.textMuted }}>{icon}{label}</div>
       <span className="text-xs font-medium font-mono truncate max-w-[60%] text-right">{value}</span>
     </div>
   );

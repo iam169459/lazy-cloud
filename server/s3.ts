@@ -81,7 +81,7 @@ export async function createS3Client(provider: StorageProvider): Promise<S3Clien
 export async function uploadToProvider(
   provider: StorageProvider,
   key: string,
-  body: Buffer,
+  body: Buffer | NodeJS.ReadableStream,
   contentType: string
 ): Promise<void> {
   const client = await createS3Client(provider);
@@ -129,11 +129,15 @@ export async function downloadFromProvider(
     );
     const body = response.Body;
     if (!body) return null;
-    const chunks: Buffer[] = [];
-    for await (const chunk of body) {
-      chunks.push(Buffer.from(chunk));
+    const chunks: Uint8Array[] = [];
+    const stream = body.transformToWebStream();
+    const reader = stream.getReader();
+    let result = await reader.read();
+    while (!result.done) {
+      chunks.push(result.value);
+      result = await reader.read();
     }
-    return Buffer.concat(chunks);
+    return Buffer.concat(chunks.map(c => Buffer.from(c)));
   } catch {
     return null;
   }
@@ -202,4 +206,31 @@ export function clearRegionCache(providerId?: string) {
   } else {
     regionCache.clear();
   }
+}
+
+export async function getBucketSize(provider: StorageProvider): Promise<{ usedBytes: number; objectCount: number }> {
+  const client = await createS3Client(provider);
+  let usedBytes = 0;
+  let objectCount = 0;
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: provider.bucket_name,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (response.Contents) {
+      for (const obj of response.Contents) {
+        usedBytes += obj.Size || 0;
+        objectCount++;
+      }
+    }
+
+    continuationToken = response.NextContinuationToken;
+  } while (continuationToken);
+
+  return { usedBytes, objectCount };
 }

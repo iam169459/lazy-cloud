@@ -1,9 +1,39 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import { timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { timingSafeEqual, randomBytes, scryptSync, createHmac } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, getAppSettings, updateAppSettings, listExpiredFiles } from './db';
-import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects } from './s3';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares } from './db';
+import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'lazydrop-jwt-secret-change-in-production';
+
+function jwtSign(payload: any): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url');
+  const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  return `${header}.${body}.${sig}`;
+}
+
+function jwtVerify(token: string): any | null {
+  try {
+    const [header, body, sig] = token.split('.');
+    const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+    if (sig !== expected) return null;
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch { return null; }
+}
+
+async function checkUserAuth(req: IncomingMessage): Promise<{ id: string; role: string } | null> {
+  const auth = req.headers.authorization;
+  if (!auth) return null;
+  const token = auth.replace('Bearer ', '');
+  // Check JWT first
+  const payload = jwtVerify(token);
+  if (payload?.userId) return { id: payload.userId, role: payload.role || 'user' };
+  return null;
+}
 
 let dbInitialized = false;
 
@@ -62,6 +92,64 @@ function sanitize(str: unknown): string {
   return str.replace(/[<>'"&;]/g, '').trim().slice(0, 500);
 }
 
+// ── Rate Limiting ──
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 60; // 60 requests per minute
+
+function getClientIp(req: IncomingMessage): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return (Array.isArray(forwarded) ? forwarded[0] : forwarded.split(',')[0]).trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function checkRateLimit(ip: string, maxRequests = RATE_LIMIT_MAX_REQUESTS, windowMs = RATE_LIMIT_WINDOW): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: maxRequests - 1, resetAt: now + windowMs };
+  }
+  
+  if (entry.count >= maxRequests) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+  
+  entry.count++;
+  return { allowed: true, remaining: maxRequests - entry.count, resetAt: entry.resetAt };
+}
+
+function applyRateLimit(req: IncomingMessage, res: ServerResponse, maxRequests = RATE_LIMIT_MAX_REQUESTS, windowMs = RATE_LIMIT_WINDOW): boolean {
+  const ip = getClientIp(req);
+  const { allowed, remaining, resetAt } = checkRateLimit(ip, maxRequests, windowMs);
+  
+  res.setHeader('X-RateLimit-Limit', maxRequests.toString());
+  res.setHeader('X-RateLimit-Remaining', remaining.toString());
+  res.setHeader('X-RateLimit-Reset', Math.ceil(resetAt / 1000).toString());
+  
+  if (!allowed) {
+    const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
+    res.setHeader('Retry-After', retryAfter.toString());
+    sendJson(res, 429, { error: 'Too many requests', retryAfter });
+    return false;
+  }
+  return true;
+}
+
+// Clean up old entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitStore.entries()) {
+    if (now > entry.resetAt) rateLimitStore.delete(ip);
+  }
+}, 5 * 60 * 1000);
+
 /**
  * Delete files older than settings.autoDeleteDays (when auto-delete is on).
  * Runs on a timer in the Vite plugin and is safe to call repeatedly.
@@ -107,9 +195,8 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
 
   let fileName = '';
   let mimeType = '';
-  const chunks: Buffer[] = [];
-  let fileSize = 0;
   let uploadError: string | null = null;
+  let resolved = false;
 
   bb.on('file', (_fieldname, file, info) => {
     fileName = info.filename || 'unnamed';
@@ -120,12 +207,56 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
       file.resume();
     });
 
-    file.on('data', (chunk: Buffer) => {
-      if (!uploadError) {
-        chunks.push(chunk);
-        fileSize += chunk.length;
+    // Stream directly to S3 — no in-memory buffering
+    (async () => {
+      try {
+        const allowed = (settings.allowedTypes || '*')
+          .split(',')
+          .map((t: string) => t.trim().toLowerCase())
+          .filter(Boolean);
+        if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+          uploadError = `File type ${mimeType || 'unknown'} is not allowed.`;
+          file.resume();
+          return;
+        }
+
+        const providers = await listProviders();
+        const providerUsed = providers[0];
+        if (!providerUsed) {
+          uploadError = 'No storage providers configured. Go to Storage Settings and add a bucket first.';
+          file.resume();
+          return;
+        }
+
+        const fileId = generateId();
+        const fileKey = `${fileId}/${fileName}`;
+
+        // Stream directly to S3
+        await uploadToProvider(providerUsed, fileKey, file, mimeType);
+
+        if (!uploadError && !resolved) {
+          resolved = true;
+          // File record created with size 0 — will be updated by background scan
+          await createFileRecord({
+            id: fileId,
+            original_name: fileName,
+            file_size: 0,
+            mime_type: mimeType,
+            r2_key: fileKey,
+            provider_id: providerUsed.id,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
+          });
+          sendJson(res, 200, { id: fileId, name: fileName, size: 0 });
+        }
+      } catch (e: any) {
+        if (!resolved) {
+          resolved = true;
+          sendError(res, 500, `Upload to storage failed: ${e.message}`);
+        }
       }
-    });
+    })();
   });
 
   bb.on('error', (err: Error) => {
@@ -133,62 +264,10 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
   });
 
   return new Promise<boolean>((resolve) => {
-    bb.on('finish', async () => {
-      if (uploadError) {
+    bb.on('finish', () => {
+      if (uploadError && !resolved) {
+        resolved = true;
         sendError(res, uploadError.includes('too large') ? 413 : 400, uploadError);
-        return resolve(true);
-      }
-      if (!fileName || chunks.length === 0) {
-        sendError(res, 400, 'No file uploaded');
-        return resolve(true);
-      }
-
-      const fileBuffer = Buffer.concat(chunks);
-      chunks.length = 0;
-
-      const allowed = (settings.allowedTypes || '*')
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
-        sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
-        return resolve(true);
-      }
-
-      const providerUsed = await findProviderForSize(fileSize);
-      if (!providerUsed) {
-        const allProviders = await listProviders();
-        if (allProviders.length === 0) {
-          sendError(res, 507, 'No storage providers configured. Go to Storage Settings and add a bucket first.');
-        } else {
-          sendError(res, 507, 'No storage provider with enough space. Free up space or add another bucket in Storage Settings.');
-        }
-        return resolve(true);
-      }
-
-      const fileId = generateId();
-      const fileKey = `${fileId}/${fileName}`;
-
-      try {
-        await uploadToProvider(providerUsed, fileKey, fileBuffer, mimeType);
-        try {
-          await createFileRecord({
-            id: fileId,
-            original_name: fileName,
-            file_size: fileSize,
-            mime_type: mimeType,
-            r2_key: fileKey,
-            provider_id: providerUsed.id,
-          });
-          await updateProviderBytes(providerUsed.id, fileSize);
-        } catch (dbErr: any) {
-          await deleteFromProvider(providerUsed, fileKey).catch(() => {});
-          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
-          return resolve(true);
-        }
-        sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
-      } catch (e: any) {
-        sendError(res, 500, `Upload to storage failed: ${e.message}`);
       }
       resolve(true);
     });
@@ -307,10 +386,17 @@ async function checkAuth(req: IncomingMessage): Promise<boolean> {
   if (token === DEFAULT_PASS) return true;
   try {
     const creds = await getAdminCredentials();
-    return token === creds.password;
-  } catch {
-    return false;
-  }
+    if (token === creds.password) return true;
+  } catch {}
+  try {
+    const apiKey = await getApiKeyByHash(token);
+    if (apiKey) {
+      if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) return false;
+      await updateApiKeyLastUsed(apiKey.id);
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 export async function handleApiRequest(
@@ -319,6 +405,69 @@ export async function handleApiRequest(
   path: string
 ): Promise<boolean> {
   await ensureDb();
+
+  // Health check endpoint
+  if (path === '/api/health') {
+    sendJson(res, 200, { status: 'ok', timestamp: new Date().toISOString() });
+    return true;
+  }
+
+  // Check if admin setup is needed
+  if (path === '/api/admin/needs-setup') {
+    const needsSetup = !(await isAdminSetup());
+    sendJson(res, 200, { needsSetup });
+    return true;
+  }
+
+  // First-run setup: set admin credentials
+  if (path === '/api/admin/setup' && req.method === 'POST') {
+    const alreadySetup = await isAdminSetup();
+    if (alreadySetup) {
+      sendError(res, 400, 'Admin already configured');
+      return true;
+    }
+    const body = await parseJsonBody(req);
+    const username = sanitize(body.username);
+    const password = sanitize(body.password);
+    const email = sanitize(body.email) || '';
+    if (!username || !password) {
+      sendError(res, 400, 'Username and password are required');
+      return true;
+    }
+    if (username.length < 3) {
+      sendError(res, 400, 'Username must be at least 3 characters');
+      return true;
+    }
+    if (password.length < 6) {
+      sendError(res, 400, 'Password must be at least 6 characters');
+      return true;
+    }
+    // Save to database
+    await updateAdminCredentials(username, password, email);
+    // Save to .env file
+    try {
+      const { writeFileSync, readFileSync, existsSync } = await import('fs');
+      const envPath = '.env';
+      let envContent = existsSync(envPath) ? readFileSync(envPath, 'utf8') : '';
+      // Update or add ADMIN_USERNAME
+      if (envContent.includes('ADMIN_USERNAME=')) {
+        envContent = envContent.replace(/ADMIN_USERNAME=.*/, `ADMIN_USERNAME=${username}`);
+      } else {
+        envContent += `\nADMIN_USERNAME=${username}`;
+      }
+      // Update or add ADMIN_PASSWORD
+      if (envContent.includes('ADMIN_PASSWORD=')) {
+        envContent = envContent.replace(/ADMIN_PASSWORD=.*/, `ADMIN_PASSWORD=${password}`);
+      } else {
+        envContent += `\nADMIN_PASSWORD=${password}`;
+      }
+      writeFileSync(envPath, envContent.trim() + '\n');
+    } catch (e: any) {
+      console.warn('[lazydrop] Could not write to .env:', e.message);
+    }
+    sendJson(res, 200, { success: true, message: 'Admin credentials configured. Please log in.' });
+    return true;
+  }
 
   try {
     if (path === '/api/file' && req.method === 'GET') {
@@ -338,6 +487,7 @@ export async function handleApiRequest(
     }
 
     if (path === '/api/download' && req.method === 'GET') {
+      if (!applyRateLimit(req, res, 30, 60000)) return true; // 30 downloads per minute
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
@@ -357,40 +507,57 @@ export async function handleApiRequest(
     }
 
     if (path === '/api/admin/login' && req.method === 'POST') {
+      if (!applyRateLimit(req, res, 5, 300000)) return true; // 5 login attempts per 5 minutes
       const body = await parseJsonBody(req);
-      const DEFAULT_USER = process.env.ADMIN_USERNAME || 'admin';
-      const DEFAULT_PASS = process.env.ADMIN_PASSWORD || 'lazydrop-admin-2024';
 
       const inputUser = sanitize(body.username);
       const inputPass = sanitize(body.password);
+      const inputTotp = sanitize(body.totp);
 
       if (!inputUser || !inputPass) {
         sendError(res, 400, 'Username and password are required');
         return true;
       }
 
-      let valid = false;
-      let token = DEFAULT_PASS;
+      const creds = await getAdminCredentials();
+      if (!creds) {
+        sendError(res, 400, 'Admin not configured. Please run setup first.');
+        return true;
+      }
 
-      if (safeCompare(inputUser, DEFAULT_USER) && safeCompare(inputPass, DEFAULT_PASS)) {
+      let valid = false;
+      let token = creds.password;
+
+      if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
         valid = true;
-      } else {
-        try {
-          const creds = await getAdminCredentials();
-          if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
-            valid = true;
-            token = creds.password;
-          }
-        } catch {
-          // DB not available, only defaults work
+      }
+
+      if (!valid) {
+        sendError(res, 401, 'Invalid username or password');
+        return true;
+      }
+
+      // Check if 2FA is enabled
+      if (creds.totp_enabled) {
+        if (!inputTotp || inputTotp.length !== 6) {
+          sendJson(res, 200, { success: false, requiresTotp: true, message: 'Enter your 6-digit authenticator code' });
+          return true;
+        }
+        const { authenticator } = await import('otplib');
+        const { getTotpSecret } = await import('./db.js');
+        const secret = await getTotpSecret();
+        if (!secret) {
+          sendError(res, 500, '2FA misconfigured');
+          return true;
+        }
+        const totpValid = authenticator.verify({ token: inputTotp, secret });
+        if (!totpValid) {
+          sendError(res, 401, 'Invalid authenticator code');
+          return true;
         }
       }
 
-      if (valid) {
-        sendJson(res, 200, { success: true, token });
-      } else {
-        sendError(res, 401, 'Invalid username or password');
-      }
+      sendJson(res, 200, { success: true, token });
       return true;
     }
 
@@ -403,10 +570,12 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/upload' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 10, 60000)) return true; // 10 uploads per minute
       return handleUpload(req, res);
     }
 
     if (path === '/api/upload' && req.method === 'POST') {
+      if (!applyRateLimit(req, res, 5, 60000)) return true; // 5 public uploads per minute
       const settings = await getAppSettings();
       if (!settings.enablePublicUpload) {
         sendError(res, 403, 'Public uploads are disabled');
@@ -417,11 +586,13 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/upload/encrypted' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 10, 60000)) return true;
       return handleEncryptedUpload(req, res);
     }
 
     if (path === '/api/download/encrypted' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 30, 60000)) return true;
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
@@ -561,6 +732,35 @@ export async function handleApiRequest(
       return true;
     }
 
+    if (path === '/api/admin/providers/size' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      if (!id) { sendError(res, 400, 'Missing provider id'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === id);
+      if (!provider) { sendError(res, 404, 'Provider not found'); return true; }
+      try {
+        const sizeInfo = await getBucketSize(provider);
+        sendJson(res, 200, { success: true, ...sizeInfo });
+      } catch (e: any) {
+        sendJson(res, 200, { success: false, error: e.message });
+      }
+      return true;
+    }
+
+    if (path === '/api/admin/providers/update-bytes' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const id: string = body.id;
+      const bytes: number = body.bytes;
+      if (!id || bytes === undefined) { sendError(res, 400, 'Missing provider id or bytes'); return true; }
+      const sql = getDb();
+      await sql`UPDATE storage_providers SET current_bytes = ${bytes} WHERE id = ${id}`;
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
     if (path === '/api/settings' && req.method === 'GET') {
       sendJson(res, 200, await getAppSettings());
       return true;
@@ -571,6 +771,73 @@ export async function handleApiRequest(
       const body = await parseJsonBody(req);
       const settings = await updateAppSettings(body);
       sendJson(res, 200, { settings });
+      return true;
+    }
+
+    // ── Admin: Upload background image/video ──
+    if (path === '/api/admin/background' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { writeFileSync, mkdirSync, existsSync, unlinkSync, copyFileSync } = await import('fs');
+      const { join } = await import('path');
+      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+      const bgDirs = [
+        join(process.cwd(), 'public', 'bg'),
+        join(process.cwd(), 'dist', 'bg'),
+      ];
+      for (const d of bgDirs) { if (!existsSync(d)) mkdirSync(d, { recursive: true }); }
+
+      let saved = false;
+      bb.on('file', (_fieldname, file, info) => {
+        const mime = info.mimeType || '';
+        const isImage = mime.startsWith('image/');
+        const isVideo = mime.startsWith('video/');
+        if (!isImage && !isVideo) { file.resume(); return; }
+        const ext = isVideo ? '.mp4' : '.' + (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        const fileName = 'background' + ext;
+        const chunks: Buffer[] = [];
+        file.on('data', (chunk: Buffer) => chunks.push(chunk));
+        file.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          // Remove old backgrounds from all dirs
+          for (const d of bgDirs) {
+            for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
+              try { unlinkSync(join(d, 'background' + e)); } catch {}
+            }
+          }
+          for (const d of bgDirs) {
+            writeFileSync(join(d, fileName), buf);
+          }
+          const bgUrl = `/bg/${fileName}`;
+          const bgType = isVideo ? 'video' : 'image';
+          updateAppSettings({ backgroundUrl: bgUrl, backgroundType: bgType });
+          saved = true;
+        });
+      });
+      bb.on('close', () => {
+        if (saved) sendJson(res, 200, { message: 'Background updated' });
+        else sendError(res, 400, 'No valid image or video uploaded');
+      });
+      req.pipe(bb);
+      return true;
+    }
+
+    // ── Admin: Remove background ──
+    if (path === '/api/admin/background' && req.method === 'DELETE') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { unlinkSync, existsSync } = await import('fs');
+      const { join } = await import('path');
+      const bgDirs = [
+        join(process.cwd(), 'public', 'bg'),
+        join(process.cwd(), 'dist', 'bg'),
+      ];
+      for (const d of bgDirs) {
+        for (const ext of ['.jpg', '.png', '.mp4', '.webm']) {
+          const f = join(d, 'background' + ext);
+          if (existsSync(f)) unlinkSync(f);
+        }
+      }
+      await updateAppSettings({ backgroundUrl: '', backgroundType: '' });
+      sendJson(res, 200, { message: 'Background removed' });
       return true;
     }
 
@@ -779,6 +1046,9 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: item.key,
             provider_id: item.provider_id,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
           });
           if (item.size > 0) {
             await updateProviderBytes(item.provider_id, item.size).catch(() => {});
@@ -835,6 +1105,9 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: key,
             provider_id: providerId,
+            encrypted: false,
+            enc_iv: null,
+            enc_auth_tag: null,
           });
           if (size > 0) {
             await updateProviderBytes(providerId, size).catch(() => {});
@@ -851,6 +1124,654 @@ export async function handleApiRequest(
       const fixed = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success).length;
       sendJson(res, 200, { fixed, failed, results });
+      return true;
+    }
+
+    // ── Preview ──
+    if (path === '/api/preview' && req.method === 'GET') {
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+
+      try {
+        const fileBuffer = await downloadFromProvider(provider, file.r2_key);
+        if (!fileBuffer) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+
+        let contentBuffer = fileBuffer;
+        let contentType = file.mime_type || 'application/octet-stream';
+
+        if (file.encrypted) {
+          try {
+            contentBuffer = decryptFile(fileBuffer, file.enc_iv!, file.enc_auth_tag!);
+          } catch {
+            sendError(res, 500, 'Failed to decrypt file for preview');
+            return true;
+          }
+        }
+
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, '').split('-');
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : contentBuffer.length - 1;
+          const chunkSize = (end - start) + 1;
+          const chunk = contentBuffer.subarray(start, end + 1);
+          res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${contentBuffer.length}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunkSize,
+            'Content-Type': contentType,
+            'Cache-Control': 'public, max-age=3600',
+          });
+          res.end(chunk);
+          return true;
+        }
+
+        res.writeHead(200, {
+          'Content-Length': contentBuffer.length,
+          'Content-Type': contentType,
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'public, max-age=3600',
+        });
+        res.end(contentBuffer);
+        return true;
+      } catch (e: any) {
+        sendError(res, 500, `Preview failed: ${e.message}`);
+        return true;
+      }
+    }
+
+    // ── Shares ──
+    if (path === '/api/share' && req.method === 'GET') {
+      const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      const share = await getShareById(shareId);
+      if (!share) { sendError(res, 404, 'Share not found'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (share.expires_at && new Date(share.expires_at) < new Date()) { sendError(res, 410, 'Share has expired'); return true; }
+      if (share.download_limit && share.download_count >= share.download_limit) { sendError(res, 410, 'Download limit reached'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      sendJson(res, 200, {
+        shareId: share.id,
+        file: {
+          id: file.id,
+          name: file.original_name,
+          size: file.file_size,
+          mimeType: file.mime_type,
+          createdAt: file.created_at,
+        },
+        requiresPassword: !!share.password_hash,
+        expiresAt: share.expires_at,
+        downloadLimit: share.download_limit,
+        downloadsRemaining: share.download_limit ? share.download_limit - share.download_count : null,
+      });
+      return true;
+    }
+
+    if (path === '/api/share/download' && req.method === 'GET') {
+      const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
+      const password = new URL(req.url || '', 'http://localhost').searchParams.get('password');
+      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      const share = await validateShare(shareId, password ?? undefined);
+      if (!share) { sendError(res, 403, share ? 'Share expired or limit reached' : 'Invalid share or password'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      await incrementDownloadCount(file.id);
+      await incrementShareDownloadCount(shareId);
+      if (file.encrypted) {
+        try {
+          const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
+          if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
+          const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
+          const blob = new Blob([decrypted]);
+          const url = URL.createObjectURL(blob);
+          sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
+        } catch (e: any) {
+          sendError(res, 500, `Decryption failed: ${e.message}`);
+        }
+        return true;
+      }
+      const url = await getPresignedDownloadUrl(provider, file.r2_key, file.original_name, file.mime_type || 'application/octet-stream');
+      sendJson(res, 200, { url });
+      return true;
+    }
+
+    if (path === '/api/admin/shares' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const { fileId, password, expiresInDays, downloadLimit } = body;
+      if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+      const share = await createShare({ file_id: fileId, password_hash: password || null, expires_at: expiresAt, download_limit: downloadLimit || null });
+      const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+      sendJson(res, 200, {
+        share,
+        shareUrl: `${baseUrl}/s/${share.id}`,
+      });
+      return true;
+    }
+
+    if (path === '/api/admin/shares' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('fileId');
+      if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
+      const shares = await getSharesByFileId(fileId);
+      sendJson(res, 200, { shares });
+      return true;
+    }
+
+    if (path === '/api/admin/shares/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      await deleteShare(body.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── API Keys ──
+    if (path === '/api/admin/api-keys' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const keys = await listApiKeys();
+      const safeKeys = keys.map(k => ({
+        id: k.id,
+        name: k.name,
+        permissions: k.permissions,
+        last_used_at: k.last_used_at,
+        expires_at: k.expires_at,
+        created_at: k.created_at,
+      }));
+      sendJson(res, 200, { keys: safeKeys });
+      return true;
+    }
+
+    if (path === '/api/admin/api-keys' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const { name, permissions, expiresInDays } = body;
+      if (!name) { sendError(res, 400, 'Name is required'); return true; }
+      const perms = permissions || 'read';
+      const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+      const rawKey = `ld_${randomBytes(32).toString('hex')}`;
+      const keyHash = scryptSync(rawKey, 'lazydrop-apikey', 64).toString('hex');
+      const result = await createApiKey({ name, key_hash: keyHash, permissions: perms, expires_at: expiresAt });
+      sendJson(res, 200, { key: result });
+      return true;
+    }
+
+    if (path === '/api/admin/api-keys/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      await deleteApiKey(body.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── Audit Log ──
+    if (path === '/api/admin/audit-log' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const url = new URL(req.url || '', 'http://localhost');
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const logs = await listAuditLogs(limit, offset);
+      sendJson(res, 200, { logs });
+      return true;
+    }
+
+    // ── System: Check for updates ──
+    if (path === '/api/admin/system/check-update' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      try {
+        const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        execSync('git fetch origin ' + branch, { cwd: process.cwd(), timeout: 15000 }).toString();
+        const local = execSync('git rev-parse HEAD', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const remote = execSync('git rev-parse origin/' + branch, { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const localMsg = execSync('git log --oneline -1', { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const remoteMsg = execSync('git log --oneline -1 origin/' + branch, { cwd: process.cwd(), timeout: 5000 }).toString().trim();
+        const ahead = local !== remote ? execSync('git rev-list HEAD..origin/' + branch + ' --count', { cwd: process.cwd(), timeout: 5000 }).toString().trim() : '0';
+        sendJson(res, 200, {
+          branch,
+          localCommit: localMsg,
+          remoteCommit: remoteMsg,
+          upToDate: local === remote,
+          updatesAvailable: ahead !== '0',
+          commitsAhead: parseInt(ahead) || 0,
+        });
+      } catch (e: any) {
+        sendError(res, 500, `Check failed: ${e.message}`);
+      }
+      return true;
+    }
+
+    // ── System: Pull latest ──
+    if (path === '/api/admin/system/pull' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync, spawn } = await import('child_process');
+      try {
+        const result = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString().trim();
+        sendJson(res, 200, { message: 'Pulled latest changes', pull: result });
+      } catch (e: any) {
+        sendError(res, 500, `Pull failed: ${e.message}`);
+      }
+      return true;
+    }
+
+    // ── System: Rebuild (kill port 3000 → rebuild → restart) ──
+    if (path === '/api/admin/system/rebuild' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync, spawn } = await import('child_process');
+      const cwd = process.cwd();
+      try {
+        execSync('npm install', { cwd, timeout: 120000 });
+        try {
+          execSync('npm run build', { cwd, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
+        } catch (buildErr: any) {
+          const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
+          const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
+          sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
+          return true;
+        }
+
+        sendJson(res, 200, { message: 'Rebuild complete — server restarting' });
+
+        // Kill port 3000 and restart
+        const script = `
+          sleep 1 &&
+          (lsof -ti:3000 | xargs kill -9 2>/dev/null || true) &&
+          sleep 1 &&
+          cd "${cwd}" &&
+          nohup node dist-server/production.js > /tmp/lazydrop.log 2>&1 &
+        `;
+        spawn('bash', ['-c', script], { detached: true, stdio: 'ignore', cwd }).unref();
+      } catch (e: any) {
+        sendError(res, 500, `Rebuild failed: ${e.message}`);
+      }
+      return true;
+    }
+
+    // ── System: Full Update (kill process on port 3000 → pull → build → restart) ──
+    if (path === '/api/admin/system/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { execSync } = await import('child_process');
+      const { spawn } = await import('child_process');
+      const cwd = process.cwd();
+
+      // Pull first to fail fast if there's a git error
+      let pullResult = '';
+      try {
+        pullResult = execSync('git pull origin dev', { cwd, timeout: 30000 }).toString().trim();
+      } catch (e: any) {
+        sendError(res, 500, `Pull failed: ${e.message}`);
+        return true;
+      }
+
+      // Respond immediately — server will die after this
+      sendJson(res, 200, { message: 'Update started — server will restart in a few seconds', pull: pullResult });
+
+      // Background: install → build → kill port 3000 → start fresh
+      const script = `
+        cd "${cwd}" &&
+        npm install --production=false &&
+        npm run build &&
+        sleep 1 &&
+        (lsof -ti:3000 | xargs kill -9 2>/dev/null || true) &&
+        sleep 1 &&
+        nohup node dist-server/production.js > /tmp/lazydrop.log 2>&1 &
+        echo "Server restarted"
+      `;
+      spawn('bash', ['-c', script], {
+        detached: true,
+        stdio: 'ignore',
+        cwd,
+      }).unref();
+      return true;
+    }
+
+    // ── 2FA: Check status ──
+    if (path === '/api/admin/2fa/status' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { getTotpEnabled } = await import('./db.js');
+      const enabled = await getTotpEnabled();
+      sendJson(res, 200, { enabled });
+      return true;
+    }
+
+    // ── 2FA: Setup (generate secret + QR) ──
+    if (path === '/api/admin/2fa/setup' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const QRCode = await import('qrcode');
+      const { getAdminCredentials, setTotpSecret, getTotpEnabled } = await import('./db.js');
+
+      if (await getTotpEnabled()) {
+        sendError(res, 400, '2FA is already enabled. Disable it first.');
+        return true;
+      }
+
+      const creds = await getAdminCredentials();
+      if (!creds) { sendError(res, 400, 'No admin credentials'); return true; }
+
+      const secret = authenticator.generateSecret();
+      const otpauth = authenticator.keyuri(creds.username, 'LazyDrop', secret);
+      const qrDataUrl = await QRCode.toDataURL(otpauth);
+
+      // Save secret (not enabled yet — waiting for verification)
+      await setTotpSecret(secret);
+
+      sendJson(res, 200, { secret, qr: qrDataUrl });
+      return true;
+    }
+
+    // ── 2FA: Verify & Enable ──
+    if (path === '/api/admin/2fa/verify' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const { getTotpSecret, enableTotp } = await import('./db.js');
+      const body = await parseJsonBody(req);
+      const code = sanitize(body.code);
+
+      if (!code || code.length !== 6) {
+        sendError(res, 400, 'Enter the 6-digit code from your authenticator app');
+        return true;
+      }
+
+      const secret = await getTotpSecret();
+      if (!secret) {
+        sendError(res, 400, 'No pending 2FA setup. Run setup first.');
+        return true;
+      }
+
+      const valid = authenticator.verify({ token: code, secret });
+      if (!valid) {
+        sendError(res, 400, 'Invalid code. Check your authenticator app.');
+        return true;
+      }
+
+      await enableTotp(secret);
+      sendJson(res, 200, { success: true, message: '2FA enabled successfully' });
+      return true;
+    }
+
+    // ── 2FA: Disable ──
+    if (path === '/api/admin/2fa/disable' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const { authenticator } = await import('otplib');
+      const { getTotpSecret, getTotpEnabled, disableTotp } = await import('./db.js');
+      const body = await parseJsonBody(req);
+      const code = sanitize(body.code);
+
+      if (!(await getTotpEnabled())) {
+        sendError(res, 400, '2FA is not enabled');
+        return true;
+      }
+
+      if (!code || code.length !== 6) {
+        sendError(res, 400, 'Enter your 6-digit code to confirm disable');
+        return true;
+      }
+
+      const secret = await getTotpSecret();
+      if (!secret) {
+        sendError(res, 500, 'No TOTP secret found');
+        return true;
+      }
+
+      const valid = authenticator.verify({ token: code, secret });
+      if (!valid) {
+        sendError(res, 400, 'Invalid code');
+        return true;
+      }
+
+      await disableTotp();
+      sendJson(res, 200, { success: true, message: '2FA disabled' });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── USER ROUTES ──
+    // ═══════════════════════════════════════════
+
+    // ── User: Register ──
+    if (path === '/api/user/register' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const username = sanitize(body.username);
+      const email = sanitize(body.email);
+      const password = body.password;
+      if (!username || username.length < 3) { sendError(res, 400, 'Username must be at least 3 characters'); return true; }
+      if (!password || password.length < 6) { sendError(res, 400, 'Password must be at least 6 characters'); return true; }
+      const existing = await getUserByUsername(username);
+      if (existing) { sendError(res, 409, 'Username already taken'); return true; }
+      const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
+      const user = await createUser(username, email, hash);
+      const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
+      sendJson(res, 201, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+      return true;
+    }
+
+    // ── User: Login ──
+    if (path === '/api/user/login' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const username = sanitize(body.username);
+      const password = body.password;
+      if (!username || !password) { sendError(res, 400, 'Username and password required'); return true; }
+      const user = await getUserByUsername(username);
+      if (!user) { sendError(res, 401, 'Invalid credentials'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+      const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
+      if (hash !== user.password_hash) { sendError(res, 401, 'Invalid credentials'); return true; }
+      await updateUser(user.id, { last_login: new Date().toISOString() });
+      const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
+      sendJson(res, 200, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
+      return true;
+    }
+
+    // ── User: Profile ──
+    if (path === '/api/user/profile' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      sendJson(res, 200, { id: user.id, username: user.username, email: user.email, role: user.role, storage_used: user.storage_used, storage_limit: user.storage_limit, created_at: user.created_at, last_login: user.last_login });
+      return true;
+    }
+
+    // ── User: Update profile ──
+    if (path === '/api/user/profile' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const patch: any = {};
+      if (body.email !== undefined) patch.email = sanitize(body.email);
+      if (body.currentPassword && body.newPassword) {
+        const user = await getUserById(userAuth.id);
+        if (!user) { sendError(res, 404, 'User not found'); return true; }
+        const currentHash = scryptSync(body.currentPassword, 'lazydrop-user', 64).toString('hex');
+        if (currentHash !== user.password_hash) { sendError(res, 400, 'Current password is incorrect'); return true; }
+        if (body.newPassword.length < 6) { sendError(res, 400, 'New password must be at least 6 characters'); return true; }
+        patch.password_hash = scryptSync(body.newPassword, 'lazydrop-user', 64).toString('hex');
+      }
+      const updated = await updateUser(userAuth.id, patch);
+      if (updated) sendJson(res, 200, { success: true, user: { id: updated.id, username: updated.username, email: updated.email, role: updated.role } });
+      else sendError(res, 404, 'User not found');
+      return true;
+    }
+
+    // ── User: Dashboard stats ──
+    if (path === '/api/user/stats' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const fileCount = await countUserFiles(userAuth.id);
+      const shares = await listUserShares(userAuth.id);
+      const user = await getUserById(userAuth.id);
+      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || 10737418240 });
+      return true;
+    }
+
+    // ── User: List files ──
+    if (path === '/api/user/files' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const files = await listUserFiles(userAuth.id);
+      sendJson(res, 200, files);
+      return true;
+    }
+
+    // ── User: Upload file ──
+    if (path === '/api/user/upload' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+      const settings = await getAppSettings();
+      const maxFile = Number(settings.maxFileSize);
+      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: maxFile, files: 1 } });
+      let fileUploaded = false;
+      bb.on('file', async (_fieldname, file, info) => {
+        const { originalFilename, mimeType } = info;
+        const provider = await findProviderForSize(Number(info.fileSize) || 0);
+        if (!provider) { sendError(res, 503, 'No storage available'); file.resume(); return; }
+        const id = generateId();
+        const fileKey = `${id}/${originalFilename || 'upload'}`;
+        try {
+          const result = await uploadToProvider(provider, file, fileKey);
+          const record = await createFileRecord({
+            id, original_name: originalFilename || 'upload', file_size: Number(info.fileSize) || 0,
+            mime_type: mimeType || 'application/octet-stream', r2_key: fileKey, provider_id: provider.id,
+            user_id: userAuth.id, download_count: 0, encrypted: false, enc_iv: null, enc_auth_tag: null,
+          });
+          await updateProviderBytes(provider.id, Number(info.fileSize) || 0);
+          await updateUserStorageUsed(userAuth.id);
+          sendJson(res, 200, { success: true, file: record });
+          fileUploaded = true;
+        } catch (err: any) {
+          sendError(res, 500, err.message || 'Upload failed');
+        }
+      });
+      bb.on('close', () => { if (!fileUploaded) return; });
+      req.pipe(bb);
+      return true;
+    }
+
+    // ── User: Delete file ──
+    if (path === '/api/user/files/' && req.method === 'DELETE') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
+      if (file.provider_id) {
+        try { await deleteFromProvider(file.provider_id, file.r2_key); } catch {}
+        await updateProviderBytes(file.provider_id, -file.file_size);
+      }
+      await deleteFileRecord(fileId);
+      await updateUserStorageUsed(userAuth.id);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── User: Create share ──
+    if (path === '/api/user/shares' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
+      let passwordHash: string | null = null;
+      if (body.password) passwordHash = scryptSync(body.password, 'lazydrop-share', 64).toString('hex');
+      const share = await createShare({ file_id: fileId, password_hash: passwordHash, expires_at: body.expiresInDays ? new Date(Date.now() + body.expiresInDays * 86400000).toISOString() : null, download_limit: body.downloadLimit || null, download_count: 0 });
+      sendJson(res, 201, { success: true, share });
+      return true;
+    }
+
+    // ── User: List shares ──
+    if (path === '/api/user/shares' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const shares = await listUserShares(userAuth.id);
+      sendJson(res, 200, shares);
+      return true;
+    }
+
+    // ── User: Delete share ──
+    if (path === '/api/user/shares/' && req.method === 'DELETE') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const shareId = body.shareId;
+      if (!shareId) { sendError(res, 400, 'shareId required'); return true; }
+      const share = await getShareById(shareId);
+      if (!share) { sendError(res, 404, 'Share not found'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file || file.user_id !== userAuth.id) { sendError(res, 403, 'Not your share'); return true; }
+      await deleteShare(shareId);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── ADMIN: USER MANAGEMENT ──
+    // ═══════════════════════════════════════════
+
+    // ── Admin: List users ──
+    if (path === '/api/admin/users' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const users = await listUsers();
+      sendJson(res, 200, users.map(u => ({ id: u.id, username: u.username, email: u.email, role: u.role, storage_used: u.storage_used, storage_limit: u.storage_limit, is_active: u.is_active, created_at: u.created_at, last_login: u.last_login })));
+      return true;
+    }
+
+    // ── Admin: Update user ──
+    if (path === '/api/admin/users/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const userId = body.userId;
+      if (!userId) { sendError(res, 400, 'userId required'); return true; }
+      const patch: any = {};
+      if (body.role !== undefined) patch.role = body.role;
+      if (body.is_active !== undefined) patch.is_active = body.is_active;
+      if (body.storage_limit !== undefined) patch.storage_limit = Number(body.storage_limit);
+      if (body.email !== undefined) patch.email = sanitize(body.email);
+      const updated = await updateUser(userId, patch);
+      if (updated) sendJson(res, 200, { success: true, user: { id: updated.id, username: updated.username, email: updated.email, role: updated.role, is_active: updated.is_active, storage_limit: updated.storage_limit } });
+      else sendError(res, 404, 'User not found');
+      return true;
+    }
+
+    // ── Admin: Delete user ──
+    if (path === '/api/admin/users/delete' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const userId = body.userId;
+      if (!userId) { sendError(res, 400, 'userId required'); return true; }
+      await deleteUser(userId);
+      sendJson(res, 200, { success: true });
+      return true;
+    }
+
+    // ── Admin: User count ──
+    if (path === '/api/admin/users/count' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const count = await countUsers();
+      sendJson(res, 200, { count });
       return true;
     }
 

@@ -1,10 +1,19 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layers, Clock, Globe, Zap } from 'lucide-react';
+import {
+  ArrowRight, Lock, Shield, Upload, Download, Smartphone,
+  Clock, Zap, ChevronDown, Globe
+} from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
-import LandingRocket from '@/components/LandingRocket';
+
+const faqs = [
+  { q: 'How does file sharing work?', a: 'Upload a file, get a unique link. Anyone with the link can download. No accounts needed on the recipient side.' },
+  { q: 'Is there a file size limit?', a: 'No hard limit. Files are streamed directly. Practical limits depend on your internet connection.' },
+  { q: 'Are files encrypted?', a: 'Yes. All files are encrypted at rest and transferred over HTTPS. Your files stay private.' },
+  { q: 'Do recipients need an account?', a: 'No. Recipients just click the link and download. No signup, no captchas, no waiting.' },
+];
 
 export default function Landing() {
   const { colors } = useTheme();
@@ -16,193 +25,277 @@ export default function Landing() {
   const name = settings?.siteName || 'LazyDrop';
 
   return (
-    <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
-      {/* Nav */}
-      <nav className="sticky top-0 z-30 backdrop-blur-md border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
-        <div className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
+    <div className="min-h-screen" style={{ color: colors.text }}>
+      {/* Announcement Bar */}
+      <div
+        className="text-xs text-center py-2 font-medium"
+        role="status"
+        aria-live="polite"
+        style={{ background: `${colors.primary}10`, borderBottom: `1px solid ${colors.border}` }}
+      >
+        Fast, private file sharing — no accounts, no tracking, no limits.
+      </div>
+
+      {/* Site Header */}
+      <nav aria-label="Main navigation" className="sticky top-0 z-30" style={{ background: `${colors.bg}cc`, borderBottom: `1px solid ${colors.border}`, backdropFilter: 'blur(16px)' }}>
+        <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-3.5">
+          <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()} aria-label={`${name} — home`}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }} aria-hidden="true">
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-gradient">{name}</span>
+            <span className="text-lg font-semibold tracking-tight">{name}</span>
           </Link>
-          <Link to="/admin" className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm transition-all" style={{ color: colors.textMuted, border: `1px solid ${colors.border}` }} onClick={() => sounds.click()}>
-            <Lock className="w-3.5 h-3.5" />
-            Admin
-          </Link>
+          <div className="hidden md:flex items-center gap-6" role="list">
+            <a href="#features" className="text-sm font-medium" style={{ color: colors.textMuted }}>Features</a>
+            <a href="#how-it-works" className="text-sm font-medium" style={{ color: colors.textMuted }}>How it works</a>
+            <a href="#faq" className="text-sm font-medium" style={{ color: colors.textMuted }}>FAQ</a>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
+              Sign in
+            </Link>
+            <Link to="/register" className="btn btn-primary text-sm" onClick={() => sounds.click()}>
+              Get started
+              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="max-w-3xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20">
-        <div className="badge mx-auto mb-6 animate-fade-up">Multi-provider storage</div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-5 animate-fade-up delay-100">
-          Fast, private,
-          <br />
-          <span className="text-gradient">link-only file sharing</span>
-        </h1>
-        <p className="text-base sm:text-lg max-w-lg mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
-          Upload once, share with a link. Files stored across multiple cloud providers for unlimited capacity.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
-          <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
-            Go to Admin Panel
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <a href="#features" className="btn btn-secondary">Learn more</a>
-        </div>
-      </section>
-
-      {/* Quick Upload */}
-      {settings?.enablePublicUpload && (
-        <section className="max-w-xl mx-auto px-5 pb-14">
-          <QuickUpload />
+      <main>
+        {/* Hero */}
+        <section className="max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
+          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100">
+            Fast, private,
+            <br />
+            <span className="text-gradient">link-only file sharing</span>
+          </h1>
+          <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
+            Upload once, share with a link. Simple, secure, and instant.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
+            <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()}>
+              Create account
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+            <a href="#features" className="btn btn-secondary">See features</a>
+          </div>
         </section>
-      )}
 
-      {/* Rocket */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
-        <div className="relative h-64 sm:h-72 rounded-xl overflow-hidden card">
-          <LandingRocket />
-        </div>
-        <p className="text-center text-xs mt-3" style={{ color: colors.textDim }}>Secure delivery cycle — files launch, transfer, and return</p>
-      </section>
+        {/* Stats Banner */}
+        <section className="max-w-3xl mx-auto px-5 pb-16" aria-label="Stats">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
+            <Stat icon={<Zap className="w-4 h-4" />} value="<1s" label="Upload" />
+            <Stat icon={<Upload className="w-4 h-4" />} value="0" label="Tracking" />
+            <Stat icon={<Globe className="w-4 h-4" />} value="24/7" label="Available" />
+          </div>
+        </section>
 
-      {/* Stats */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat icon={<Globe className="w-4 h-4" />} value="6+" label="Providers" />
-          <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
-          <Stat icon={<Zap className="w-4 h-4" />} value="<1s" label="Upload" />
-          <Stat icon={<Upload className="w-4 h-4" />} value="0" label="Tracking" />
-        </div>
-      </section>
+        {/* Features */}
+        <section id="features" className="max-w-5xl mx-auto px-5 pb-20" aria-labelledby="features-heading">
+          <SectionHeader
+            id="features-heading"
+            eyebrow="Features"
+            title="Everything you need, nothing you don't"
+            desc="Simple file sharing without the bloat."
+          />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-10" role="list">
+            <Feature
+              icon={<Shield className="w-4 h-4" />}
+              title="Private by design"
+              desc="No public directory. Files only accessible via unique, unguessable links."
+            />
+            <Feature
+              icon={<Upload className="w-4 h-4" />}
+              title="Drag & drop"
+              desc="Drag files onto the upload zone or click to browse. Done in one step."
+            />
+            <Feature
+              icon={<Download className="w-4 h-4" />}
+              title="Instant downloads"
+              desc="Direct download link. No signup, no waiting, no captchas."
+            />
+            <Feature
+              icon={<Smartphone className="w-4 h-4" />}
+              title="Mobile friendly"
+              desc="Upload and download from any device. Works in any modern browser."
+            />
+            <Feature
+              icon={<Clock className="w-4 h-4" />}
+              title="Auto-expire"
+              desc="Files auto-delete after configurable TTL. Set it once, forget about it."
+            />
+            <Feature
+              icon={<Zap className="w-4 h-4" />}
+              title="Lightning fast"
+              desc="Files served directly. No bottleneck, no slowdowns."
+            />
+          </div>
+        </section>
 
-      {/* Features */}
-      <section id="features" className="max-w-4xl mx-auto px-5 pb-16">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Feature icon={<Database className="w-4 h-4" />} title="Unlimited storage" desc="Multiple S3 buckets pooled into one virtual drive." />
-          <Feature icon={<Shield className="w-4 h-4" />} title="Private by design" desc="No public directory. Only accessible via unique link." />
-          <Feature icon={<Upload className="w-4 h-4" />} title="Drag & drop" desc="Simply drag files onto the upload zone. Done." />
-          <Feature icon={<Download className="w-4 h-4" />} title="Instant downloads" desc="Direct download link. No signup, no waiting." />
-          <Feature icon={<Smartphone className="w-4 h-4" />} title="Mobile friendly" desc="Upload and download from any device." />
-          <Feature icon={<Layers className="w-4 h-4" />} title="Multi-bucket routing" desc="Auto-route to the bucket with most free space." />
-          <Feature icon={<Clock className="w-4 h-4" />} title="Auto-expire" desc="Files auto-delete after configurable days." />
-          <Feature icon={<Globe className="w-4 h-4" />} title="6 cloud providers" desc="Backblaze, R2, AWS, GCP, IDrive, MinIO." />
-          <Feature icon={<Zap className="w-4 h-4" />} title="Lightning fast" desc="Files served via presigned links. No bottleneck." />
-        </div>
-      </section>
+        {/* How It Works */}
+        <section id="how-it-works" className="max-w-4xl mx-auto px-5 pb-20" aria-labelledby="how-heading">
+          <SectionHeader
+            id="how-heading"
+            eyebrow="How it works"
+            title="Three steps to share a file"
+            desc="Upload, share, done."
+          />
+          <div className="grid sm:grid-cols-3 gap-6 mt-10" role="list">
+            <Step
+              number="01"
+              title="Upload a file"
+              desc="Drag and drop or click to upload. Your file is encrypted and stored securely."
+            />
+            <Step
+              number="02"
+              title="Copy the link"
+              desc="A unique download link is generated instantly. Copy it to your clipboard."
+            />
+            <Step
+              number="03"
+              title="Share it"
+              desc="Send the link to anyone. They can download instantly — no account needed."
+            />
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="max-w-2xl mx-auto px-5 pb-20" aria-labelledby="faq-heading">
+          <SectionHeader
+            id="faq-heading"
+            eyebrow="FAQ"
+            title="Frequently asked questions"
+          />
+          <div className="mt-10 flex flex-col gap-2" role="list">
+            {faqs.map((f, i) => (
+              <FAQItem key={i} question={f.q} answer={f.a} />
+            ))}
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="max-w-3xl mx-auto px-5 pb-20" aria-label="Call to action">
+          <div
+            className="card p-10 sm:p-14 text-center rounded-xl"
+            style={{ background: `${colors.primary}08`, border: `1px solid ${colors.primary}20` }}
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+              Ready to share your first file?
+            </h2>
+            <p className="text-sm max-w-md mx-auto mb-6" style={{ color: colors.textMuted }}>
+              No accounts, no limits, no tracking.
+            </p>
+            <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
+              Open Admin Panel
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+      </main>
 
       {/* Footer */}
-      <footer className="border-t py-8 text-center" style={{ borderColor: colors.border }}>
+      <footer className="py-8 text-center" style={{ borderTop: `1px solid ${colors.border}` }}>
         <p className="text-sm" style={{ color: colors.textDim }}>{name} — link-only file sharing</p>
       </footer>
     </div>
   );
 }
 
+/* ──────────────────── Sub-components ──────────────────── */
+
+function SectionHeader({ id, eyebrow, title, desc }: { id: string; eyebrow: string; title: string; desc?: string }) {
+  const { colors } = useTheme();
+  return (
+    <div className="text-center">
+      <p className="text-[10px] font-mono uppercase tracking-wider mb-2" style={{ color: colors.primary }}>
+        {eyebrow}
+      </p>
+      <h2 id={id} className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">{title}</h2>
+      {desc && <p className="text-sm max-w-md mx-auto" style={{ color: colors.textMuted }}>{desc}</p>}
+    </div>
+  );
+}
+
 function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
+  const { colors } = useTheme();
   return (
     <div className="card p-4 text-center">
-      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }} aria-hidden="true">
         {icon}
       </div>
       <div className="text-xl font-bold">{value}</div>
-      <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>{label}</div>
+      <div className="text-xs mt-0.5" style={{ color: colors.textDim }}>{label}</div>
     </div>
   );
 }
 
 function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+  const { colors } = useTheme();
   return (
-    <div className="card p-5">
-      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+    <div className="card p-5" role="listitem">
+      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }} aria-hidden="true">
         {icon}
       </div>
       <h3 className="text-sm font-semibold mb-1">{title}</h3>
-      <p className="text-xs leading-relaxed" style={{ color: '#94a3b8' }}>{desc}</p>
+      <p className="text-xs leading-relaxed" style={{ color: colors.textMuted }}>{desc}</p>
     </div>
   );
 }
 
-function QuickUpload() {
+function Step({ number, title, desc }: { number: string; title: string; desc: string }) {
   const { colors } = useTheme();
-  const [dragOver, setDragOver] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [fileId, setFileId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="flex flex-col gap-3" role="listitem">
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono"
+        style={{ background: `${colors.primary}12`, color: colors.primary }}
+        aria-hidden="true"
+      >
+        {number}
+      </div>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="text-xs leading-relaxed" style={{ color: colors.textMuted }}>{desc}</p>
+    </div>
+  );
+}
 
-  const handleFiles = useCallback(async (list: FileList) => {
-    if (!list.length || uploading) return;
-    setUploading(true); setProgress(0); setError(null); setFileId(null);
-    sounds.upload();
-    try {
-      const res = await api.uploadPublic(list[0], (p) => setProgress(p));
-      sounds.store(); setFileId(res.id);
-    } catch (e: unknown) {
-      sounds.error(); setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setUploading(false); if (inputRef.current) inputRef.current.value = '';
+function FAQItem({ question, answer }: { question: string; answer: string }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setOpen((prev) => !prev);
+      sounds.click();
     }
-  }, [uploading]);
-
-  function copyLink() {
-    if (!fileId) return;
-    navigator.clipboard.writeText(`${window.location.origin}/file/${fileId}`);
-    sounds.copy(); setCopied(true); setTimeout(() => setCopied(false), 2000);
-  }
-
-  const link = fileId ? `${window.location.origin}/file/${fileId}` : '';
+  }, []);
 
   return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-      onClick={() => !uploading && inputRef.current?.click()}
-      className="card p-6 text-center cursor-pointer transition-all"
-      style={{ borderColor: dragOver ? '#6366f1' : undefined }}
-    >
-      <input ref={inputRef} type="file" className="hidden" onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-      {uploading ? (
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
-          <div className="w-full max-w-xs">
-            <div className="flex justify-between text-xs mb-1 font-mono" style={{ color: colors.textMuted }}>
-              <span style={{ color: '#818cf8' }}>UPLOADING</span><span>{progress}%</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #6366f1, #8b5cf6)' }} />
-            </div>
+    <div className="card overflow-hidden" role="listitem">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-5 py-4 text-left cursor-pointer"
+        aria-expanded={open}
+        onClick={() => { setOpen(!open); sounds.click(); }}
+        onKeyDown={handleKeyDown}
+      >
+        <span className="text-sm font-medium pr-4">{question}</span>
+        <ChevronDown
+          className="w-4 h-4 shrink-0 transition-transform duration-200"
+          style={{ color: colors.textMuted, transform: open ? 'rotate(180deg)' : 'rotate(0)' }}
+          aria-hidden="true"
+        />
+      </button>
+      <div className={`faq-content ${open ? 'open' : ''}`}>
+        <div>
+          <div className="px-5 pb-4 text-sm leading-relaxed" style={{ color: colors.textMuted }} role="region">
+            {answer}
           </div>
         </div>
-      ) : fileId ? (
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <p className="text-sm font-medium">File uploaded</p>
-          <div className="flex items-center gap-2 w-full max-w-sm">
-            <input readOnly value={link} className="input text-xs font-mono" onFocus={(e) => e.target.select()} />
-            <button onClick={(e) => { e.stopPropagation(); copyLink(); }} className="btn btn-primary text-xs px-4 flex-shrink-0" style={{ minHeight: 44 }}>
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-          <button onClick={() => { setFileId(null); sounds.click(); }} className="text-xs underline" style={{ color: colors.textDim }}>Upload another</button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2">
-          <Upload className="w-6 h-6" style={{ color: '#818cf8' }} />
-          <div>
-            <p className="text-sm font-medium">Drop a file or click to upload</p>
-            <p className="text-xs mt-0.5 font-mono" style={{ color: colors.textDim }}>PUBLIC — no account needed</p>
-          </div>
-          {error && <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

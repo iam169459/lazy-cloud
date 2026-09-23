@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: lazydrop
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: LAZYDROP_ADMIN_USER
+        sync: false
+      - key: LAZYDROP_ADMIN_PASS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: LAZYDROP_UPLOAD_PASSWORD
+        sync: false
+      - key: LAZYDROP_ENCRYPTION_KEY
+        sync: false
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /api/health
+    autoDeploy: true
+    branch: dev

@@ -1,297 +1,498 @@
 import { useState, useEffect } from 'react';
-import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, Upload, Shield, RotateCcw } from 'lucide-react';
+import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, Upload, Shield, RotateCcw, User, KeyRound, Lock, Fingerprint, Smartphone, Check, AlertCircle, Copy, X } from 'lucide-react';
 import { useTheme, ThemeId, themes } from '@/lib/theme';
+import { useAuth } from '@/lib/auth';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
+import { FormSection, FormField, FormRow, Toggle, FormActions, SaveButton, CancelButton, DangerButton } from '@/components/Form';
 
 interface Props {
- token: string;
- onNotify: (type: 'success' | 'error', msg: string) => void;
+  token: string;
+  onNotify: (type: 'success' | 'error', msg: string) => void;
 }
 
 function errMsg(e: unknown): string {
- return e instanceof Error ? e.message : 'Something went wrong';
+  return e instanceof Error ? e.message : 'Something went wrong';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
- siteName: 'LazyDrop',
- maxFileSize: '10737418240',
- allowedTypes: '*',
- autoDelete: false,
- autoDeleteDays: '30',
- enableDownloadCounter: true,
- enablePublicUpload: false,
- maxStoragePerBucket: '10188208025',
+  siteName: 'LazyDrop',
+  maxFileSize: '10737418240',
+  allowedTypes: '*',
+  autoDelete: false,
+  autoDeleteDays: '30',
+  enableDownloadCounter: true,
+  enablePublicUpload: false,
+  maxStoragePerBucket: '10188208025',
+  backgroundUrl: '',
+  backgroundType: '',
 };
 
+type Errors = Partial<Record<keyof AppSettings, string>>;
+
+function validate(settings: AppSettings): Errors {
+  const e: Errors = {};
+  if (!settings.siteName.trim()) e.siteName = 'Site name is required';
+  const maxFile = Number(settings.maxFileSize);
+  if (isNaN(maxFile) || maxFile < 0) e.maxFileSize = 'Must be a non-negative number';
+  if (!settings.allowedTypes.trim()) e.allowedTypes = 'At least one type is required';
+  if (settings.autoDelete) {
+    const days = Number(settings.autoDeleteDays);
+    if (isNaN(days) || days < 1) e.autoDeleteDays = 'Must be at least 1 day';
+  }
+  const maxStorage = Number(settings.maxStoragePerBucket);
+  if (isNaN(maxStorage) || maxStorage < 0) e.maxStoragePerBucket = 'Must be a non-negative number';
+  return e;
+}
+
 export default function AdminAdvanced({ token, onNotify }: Props) {
- const { theme, setTheme, colors } = useTheme();
- const [saving, setSaving] = useState(false);
- const [loading, setLoading] = useState(true);
- const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
- const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const { theme, setTheme, colors } = useTheme();
+  const { username: currentUsername } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(sounds.isEnabled());
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [errors, setErrors] = useState<Errors>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
- useEffect(() => {
- (async () => {
- try {
- let loaded = await api.getSettings();
+  // Credentials state
+  const [formUsername, setFormUsername] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [credSaving, setCredSaving] = useState(false);
+  const [credErrors, setCredErrors] = useState<{ username?: string; password?: string }>({});
+  const [credTouched, setCredTouched] = useState<Set<string>>(new Set());
 
- // One-time migration from the old localStorage-only settings
- const legacy = localStorage.getItem('lazydrop-settings');
- if (legacy) {
- try {
- const parsed = JSON.parse(legacy);
- loaded = { ...loaded, ...parsed };
- await api.updateSettings(loaded, token);
- localStorage.removeItem('lazydrop-settings');
- } catch {
- // ignore broken legacy data
- }
- }
+  // 2FA state
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpStep, setTotpStep] = useState<'idle' | 'setup' | 'verify-disable'>('idle');
+  const [totpQr, setTotpQr] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpCopied, setTotpCopied] = useState(false);
 
- setSettings(loaded);
- } catch (e: unknown) {
- onNotify('error', errMsg(e));
- } finally {
- setLoading(false);
- }
- })();
- }, [token, onNotify]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const [loaded, twoFa, creds] = await Promise.all([
+          api.getSettings(),
+          fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+          api.getCredentials(token),
+        ]);
+        const legacy = localStorage.getItem('lazydrop-settings');
+        if (legacy) {
+          try {
+            const parsed = JSON.parse(legacy);
+            const merged = { ...loaded, ...parsed };
+            await api.updateSettings(merged, token);
+            localStorage.removeItem('lazydrop-settings');
+            setSettings(merged);
+          } catch { setSettings(loaded); }
+        } else { setSettings(loaded); }
+        setTotpEnabled(twoFa.enabled);
+        setFormUsername(creds.username);
+      } catch (e: unknown) {
+        onNotify('error', errMsg(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [token, onNotify]);
 
- function handleSave() {
- sounds.click();
- setSaving(true);
- sounds.setEnabled(soundEnabled);
- api.updateSettings(settings, token)
- .then(() => {
- sounds.success();
- onNotify('success', 'Settings saved — new limits are enforced on uploads');
- })
- .catch((e: unknown) => {
- sounds.error();
- onNotify('error', errMsg(e));
- })
- .finally(() => setSaving(false));
- }
+  function update<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    setSettings((prev) => ({ ...prev, [key]: value }));
+    setTouched((prev) => new Set(prev).add(key));
+  }
 
- function handleReset() {
- if (!confirm('Reset all settings to defaults?')) return;
- sounds.click();
- setSaving(true);
- api.updateSettings(DEFAULT_SETTINGS, token)
- .then(() => {
- setSettings(DEFAULT_SETTINGS);
- sounds.success();
- onNotify('success', 'Settings reset to defaults');
- })
- .catch((e: unknown) => {
- sounds.error();
- onNotify('error', errMsg(e));
- })
- .finally(() => setSaving(false));
- }
+  function blur(key: keyof AppSettings) {
+    setTouched((prev) => new Set(prev).add(key));
+    setErrors(validate(settings));
+  }
 
- function handleClearLocal() {
- if (!confirm('Clear local sound preference and theme? Server settings are kept.')) return;
- sounds.delete();
- localStorage.removeItem('lazydrop-sound-enabled');
- localStorage.removeItem('lazydrop-theme');
- setSoundEnabled(true);
- sounds.setEnabled(true);
- onNotify('success', 'Local preferences cleared');
- }
+  function handleSave() {
+    const e = validate(settings);
+    setErrors(e);
+    setTouched(new Set(Object.keys(settings) as (keyof AppSettings)[]));
+    if (Object.keys(e).length > 0) { sounds.error(); onNotify('error', 'Fix errors before saving'); return; }
+    sounds.click(); setSaving(true); sounds.setEnabled(soundEnabled);
+    api.updateSettings(settings, token)
+      .then(() => { sounds.success(); onNotify('success', 'Settings saved'); })
+      .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
+      .finally(() => setSaving(false));
+  }
 
- if (loading) {
- return (
- <div className="flex flex-col items-center justify-center py-20 gap-4">
- <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
- <p className="text-sm font-mono animate-pulse" style={{ color: colors.textMuted }}>LOADING_SETTINGS...</p>
- </div>
- );
- }
+  function handleReset() {
+    if (!confirm('Reset all settings to defaults?')) return;
+    sounds.click(); setSaving(true);
+    api.updateSettings(DEFAULT_SETTINGS, token)
+      .then(() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); sounds.success(); onNotify('success', 'Settings reset'); })
+      .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
+      .finally(() => setSaving(false));
+  }
 
- return (
- <div className="space-y-6">
- <div className="animate-fade-up">
- <h2 className="font-semibold flex items-center gap-2">
- <Settings className="w-4 h-4" style={{ color: colors.primary }} />
- <span className="text-gradient">Advanced Settings</span>
- </h2>
- <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
- Saved to the server and enforced on every upload and download
- </p>
- </div>
+  function handleClearLocal() {
+    if (!confirm('Clear local preferences?')) return;
+    sounds.delete();
+    localStorage.removeItem('lazydrop-sound-enabled');
+    localStorage.removeItem('lazydrop-theme');
+    setSoundEnabled(true); sounds.setEnabled(true);
+    onNotify('success', 'Local preferences cleared');
+  }
 
- <div className="grid md:grid-cols-2 gap-6">
- {/* Appearance */}
- <SettingsCard title="Appearance" icon={<Palette className="w-4 h-4" />}>
- <SettingsRow label="Theme" desc="Choose your visual style">
- <div className="grid grid-cols-3 gap-2">
- {(Object.keys(themes) as ThemeId[]).map((t) => (
- <button
- key={t}
- onClick={() => { setTheme(t); sounds.click(); }}
- className="px-3 py-2 rounded-lg text-xs font-medium border transition-all"
- style={{
- background: theme === t ? `${colors.primary}15` : 'transparent',
- borderColor: theme === t ? `${colors.primary}40` : colors.border,
- color: theme === t ? colors.primary : colors.textDim,
- }}
- >
- {t.charAt(0).toUpperCase() + t.slice(1)}
- </button>
- ))}
- </div>
- </SettingsRow>
- <SettingsRow label="Site name" desc="Shown on the landing page and browser title">
- <input
- type="text"
- value={settings.siteName}
- onChange={(e) => setSettings({ ...settings, siteName: e.target.value })}
- className="input w-36"
- />
- </SettingsRow>
- </SettingsCard>
+  // ── Credentials Functions ──
+  function validateCred(): { username?: string; password?: string } {
+    const e: { username?: string; password?: string } = {};
+    if (!formUsername.trim()) e.username = 'Username required';
+    else if (formUsername.trim().length < 2) e.username = 'At least 2 characters';
+    if (!formPassword) e.password = 'Password required';
+    else if (formPassword.length < 4) e.password = 'At least 4 characters';
+    return e;
+  }
 
- {/* Sound */}
- <SettingsCard title="Sound Effects" icon={soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}>
- <SettingsRow label="Enable sounds" desc="Play sounds on interactions">
- <Toggle
- checked={soundEnabled}
- onChange={(v) => setSoundEnabled(v)}
- />
- </SettingsRow>
- </SettingsCard>
+  async function handleSaveCreds(e: React.FormEvent) {
+    e.preventDefault();
+    const v = validateCred(); setCredErrors(v); setCredTouched(new Set(['username', 'password']));
+    if (v.username || v.password) { sounds.error(); onNotify('error', 'Fix errors'); return; }
+    sounds.click(); setCredSaving(true);
+    try {
+      await api.updateCredentials(formUsername.trim(), formPassword, token);
+      sounds.success(); onNotify('success', 'Credentials updated. Please log in again.');
+      setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
+    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    finally { setCredSaving(false); }
+  }
 
- {/* File Settings */}
- <SettingsCard title="File Management" icon={<Download className="w-4 h-4" />}>
- <SettingsRow label="Max file size" desc="Maximum upload size in bytes (0 = unlimited)">
- <input
- type="number"
- value={settings.maxFileSize}
- onChange={(e) => setSettings({ ...settings, maxFileSize: e.target.value })}
- className="input w-32"
- />
- </SettingsRow>
- <SettingsRow label="Allowed file types" desc="Comma-separated MIME types or * for all">
- <input
- type="text"
- value={settings.allowedTypes}
- onChange={(e) => setSettings({ ...settings, allowedTypes: e.target.value })}
- className="input w-full"
- placeholder="*"
- />
- </SettingsRow>
- <SettingsRow label="Download counter" desc="Track download counts">
- <Toggle
- checked={settings.enableDownloadCounter}
- onChange={(v) => setSettings({ ...settings, enableDownloadCounter: v })}
- />
- </SettingsRow>
- </SettingsCard>
+  // ── 2FA Functions ──
+  async function handleSetup2fa() {
+    setTotpLoading(true); sounds.click();
+    try {
+      const res = await fetch('/api/admin/2fa/setup', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTotpQr(data.qr); setTotpSecret(data.secret); setTotpStep('setup'); setTotpCode('');
+    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    finally { setTotpLoading(false); }
+  }
 
- {/* Auto Cleanup */}
- <SettingsCard title="Auto Cleanup" icon={<Trash2 className="w-4 h-4" />}>
- <SettingsRow label="Auto-delete old files" desc="Remove files after X days">
- <Toggle
- checked={settings.autoDelete}
- onChange={(v) => setSettings({ ...settings, autoDelete: v })}
- />
- </SettingsRow>
- {settings.autoDelete && (
- <SettingsRow label="Days before deletion" desc="Files older than this are deleted (checked hourly)">
- <input
- type="number"
- value={settings.autoDeleteDays}
- onChange={(e) => setSettings({ ...settings, autoDeleteDays: e.target.value })}
- className="input w-20"
- />
- </SettingsRow>
- )}
- </SettingsCard>
+  async function handleVerify2fa() {
+    if (totpCode.length !== 6) { onNotify('error', 'Enter 6-digit code'); return; }
+    setTotpLoading(true); sounds.click();
+    try {
+      const res = await fetch('/api/admin/2fa/verify', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: totpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTotpEnabled(true); setTotpStep('idle'); setTotpCode('');
+      sounds.success(); onNotify('success', '2FA enabled!');
+    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    finally { setTotpLoading(false); }
+  }
 
- {/* Storage Limits */}
- <SettingsCard title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
- <SettingsRow label="Max bytes per bucket" desc="Default limit used for new buckets">
- <input
- type="number"
- value={settings.maxStoragePerBucket}
- onChange={(e) => setSettings({ ...settings, maxStoragePerBucket: e.target.value })}
- className="input w-32"
- />
- </SettingsRow>
- </SettingsCard>
+  async function handleDisable2fa() {
+    if (totpCode.length !== 6) { onNotify('error', 'Enter 6-digit code'); return; }
+    setTotpLoading(true); sounds.click();
+    try {
+      const res = await fetch('/api/admin/2fa/disable', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: totpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setTotpEnabled(false); setTotpStep('idle'); setTotpCode('');
+      sounds.success(); onNotify('success', '2FA disabled');
+    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    finally { setTotpLoading(false); }
+  }
 
- {/* Security */}
- <SettingsCard title="Security" icon={<Shield className="w-4 h-4" />}>
- <SettingsRow label="Public upload" desc="Allow anyone to upload from the landing page">
- <Toggle
- checked={settings.enablePublicUpload}
- onChange={(v) => setSettings({ ...settings, enablePublicUpload: v })}
- />
- </SettingsRow>
- </SettingsCard>
- </div>
+  function copySecret() {
+    navigator.clipboard.writeText(totpSecret);
+    setTotpCopied(true); sounds.copy();
+    setTimeout(() => setTotpCopied(false), 2000);
+  }
 
- {/* Actions */}
- <div className="flex flex-wrap gap-3 animate-fade-up delay-300">
- <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm btn btn-primary disabled:opacity-60" style={{ background: colors.gradient, color: colors.bg }}>
- {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
- Save Settings
- </button>
- <button onClick={handleReset} disabled={saving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: colors.border, color: colors.textMuted }}>
- <RotateCcw className="w-4 h-4" />
- Reset to Defaults
- </button>
- <button onClick={handleClearLocal} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border text-sm transition-all" style={{ borderColor: `${colors.danger}30`, color: colors.danger }}>
- <Trash2 className="w-4 h-4" />
- Clear Local Data
- </button>
- </div>
- </div>
- );
-}
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
+        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING...</p>
+      </div>
+    );
+  }
 
-function SettingsCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
- const { colors } = useTheme();
- return (
- <div className="card rounded-2xl p-5">
- <div className="flex items-center gap-2 mb-4">
- <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${colors.primary}10`, color: colors.primary }}>
- {icon}
- </div>
- <h3 className="text-sm font-semibold" style={{ color: colors.text }}>{title}</h3>
- </div>
- <div className="space-y-4">{children}</div>
- </div>
- );
-}
+  return (
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="animate-fade-up">
+        <h2 className="font-semibold flex items-center gap-2" style={{ fontFamily: "'Fira Code', monospace" }}>
+          <Settings className="w-4 h-4" style={{ color: colors.success }} />
+          Settings
+        </h2>
+        <p className="text-sm mt-1 font-mono" style={{ color: colors.textDim }}>
+          Configuration, credentials, and security
+        </p>
+      </div>
 
-function SettingsRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
- const { colors } = useTheme();
- return (
- <div className="flex items-center justify-between gap-4">
- <div className="flex-1 min-w-0">
- <p className="text-sm" style={{ color: colors.text }}>{label}</p>
- <p className="text-[11px] font-mono" style={{ color: colors.textDim }}>{desc}</p>
- </div>
- <div className="flex-shrink-0">{children}</div>
- </div>
- );
-}
+      {/* Settings Grid */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Appearance */}
+        <FormSection title="Appearance" icon={<Palette className="w-4 h-4" />}>
+          <FormRow label="Theme" desc="Choose your visual style">
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(themes) as ThemeId[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => { setTheme(t); sounds.click(); }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 cursor-pointer"
+                  style={{
+                    background: theme === t ? `${colors.primary}1f` : 'transparent',
+                    borderColor: theme === t ? `${colors.primary}66` : colors.border,
+                    color: theme === t ? colors.primary : colors.textDim,
+                  }}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+          </FormRow>
+          <FormField label="Site name" required error={touched.has('siteName') ? errors.siteName : undefined} hint="Shown on the landing page">
+            <input type="text" value={settings.siteName} onChange={(e) => update('siteName', e.target.value)} onBlur={() => blur('siteName')} className="input w-full" placeholder="LazyDrop" />
+          </FormField>
+        </FormSection>
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
- const { colors } = useTheme();
- return (
- <button
- onClick={() => { onChange(!checked); sounds.toggle(); }}
- className="relative w-12 h-6 rounded-full transition-all duration-300 flex-shrink-0"
- style={{ background: checked ? colors.gradient : `${colors.text}15` }}
- >
- <span
- className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-300"
- style={{ background: colors.bg, transform: checked ? 'translateX(24px)' : 'translateX(0)' }}
- />
- </button>
- );
+        {/* Background */}
+        <FormSection title="Background" icon={<Palette className="w-4 h-4" />}>
+          <p className="text-xs mb-3" style={{ color: colors.textDim }}>Set a custom background image or video for the entire app.</p>
+          {settings.backgroundUrl ? (
+            <div className="space-y-3">
+              <div className="rounded-lg overflow-hidden border" style={{ borderColor: colors.border, maxHeight: 160 }}>
+                {settings.backgroundType === 'video' ? (
+                  <video src={settings.backgroundUrl} className="w-full h-full object-cover" muted autoPlay loop playsInline />
+                ) : (
+                  <img src={settings.backgroundUrl} alt="Background" className="w-full h-full object-cover" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.removeBackground(token);
+                    setSettings((s) => ({ ...s, backgroundUrl: '', backgroundType: '' }));
+                    sounds.success();
+                    onNotify('success', 'Background removed');
+                  } catch (e: any) { onNotify('error', errMsg(e)); }
+                }}
+                className="btn btn-secondary text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Remove background
+              </button>
+            </div>
+          ) : (
+            <label className="flex flex-col items-center gap-2 p-6 rounded-lg border border-dashed cursor-pointer transition-all hover:border-primary/40" style={{ borderColor: colors.border, color: colors.textDim }}>
+              <Upload className="w-6 h-6" />
+              <span className="text-xs">Click to upload image or video</span>
+              <span className="text-[10px] font-mono" style={{ color: colors.textDim }}>JPG, PNG, MP4, WebM — max 10MB</span>
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    await api.uploadBackground(file, token);
+                    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                    const isVideo = file.type.startsWith('video/');
+                    const bgUrl = `/bg/background.${ext}`;
+                    setSettings((s) => ({ ...s, backgroundUrl: bgUrl, backgroundType: isVideo ? 'video' : 'image' }));
+                    sounds.success();
+                    onNotify('success', 'Background uploaded');
+                  } catch (err: any) { onNotify('error', errMsg(err)); }
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
+        </FormSection>
+
+        {/* Sound */}
+        <FormSection title="Sound Effects" icon={soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}>
+          <FormRow label="Enable sounds" desc="Play sounds on interactions">
+            <Toggle checked={soundEnabled} onChange={setSoundEnabled} label="Enable sounds" />
+          </FormRow>
+        </FormSection>
+
+        {/* File Settings */}
+        <FormSection title="File Management" icon={<Download className="w-4 h-4" />}>
+          <FormField label="Max file size" required error={touched.has('maxFileSize') ? errors.maxFileSize : undefined} hint="Max upload size in bytes">
+            <input type="number" value={settings.maxFileSize} onChange={(e) => update('maxFileSize', e.target.value)} onBlur={() => blur('maxFileSize')} className="input w-32" min="0" />
+          </FormField>
+          <FormField label="Allowed file types" required error={touched.has('allowedTypes') ? errors.allowedTypes : undefined} hint="MIME types or * for all">
+            <input type="text" value={settings.allowedTypes} onChange={(e) => update('allowedTypes', e.target.value)} onBlur={() => blur('allowedTypes')} className="input w-full" placeholder="*" />
+          </FormField>
+          <FormRow label="Download counter" desc="Track download counts">
+            <Toggle checked={settings.enableDownloadCounter} onChange={(v) => update('enableDownloadCounter', v)} label="Download counter" />
+          </FormRow>
+        </FormSection>
+
+        {/* Auto Cleanup */}
+        <FormSection title="Auto Cleanup" icon={<Trash2 className="w-4 h-4" />}>
+          <FormRow label="Auto-delete old files" desc="Remove files after X days">
+            <Toggle checked={settings.autoDelete} onChange={(v) => { update('autoDelete', v); setErrors({}); }} label="Auto-delete" />
+          </FormRow>
+          {settings.autoDelete && (
+            <FormField label="Days before deletion" required error={touched.has('autoDeleteDays') ? errors.autoDeleteDays : undefined}>
+              <input type="number" value={settings.autoDeleteDays} onChange={(e) => update('autoDeleteDays', e.target.value)} onBlur={() => blur('autoDeleteDays')} className="input w-20" min="1" />
+            </FormField>
+          )}
+        </FormSection>
+
+        {/* Storage Limits */}
+        <FormSection title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
+          <FormField label="Max bytes per bucket" required error={touched.has('maxStoragePerBucket') ? errors.maxStoragePerBucket : undefined} hint="Default for new buckets">
+            <input type="number" value={settings.maxStoragePerBucket} onChange={(e) => update('maxStoragePerBucket', e.target.value)} onBlur={() => blur('maxStoragePerBucket')} className="input w-32" min="0" />
+          </FormField>
+        </FormSection>
+
+        {/* Security */}
+        <FormSection title="Public Access" icon={<Shield className="w-4 h-4" />}>
+          <FormRow label="Public upload" desc="Allow anyone to upload from landing page">
+            <Toggle checked={settings.enablePublicUpload} onChange={(v) => update('enablePublicUpload', v)} label="Public upload" />
+          </FormRow>
+        </FormSection>
+      </div>
+
+      {/* Settings CTA */}
+      <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-up delay-100">
+        <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+          {JSON.stringify(settings) !== JSON.stringify(DEFAULT_SETTINGS) ? 'Unsaved changes' : 'All saved'}
+        </p>
+        <FormActions>
+          <SaveButton loading={saving} onClick={handleSave}>
+            <Save className="w-3.5 h-3.5" />
+            Save Settings
+          </SaveButton>
+          <CancelButton onClick={() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); }}>
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </CancelButton>
+        </FormActions>
+      </div>
+
+      {/* ─── CREDENTIALS SECTION ─── */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <FormSection title="Admin Credentials" icon={<KeyRound className="w-4 h-4" />}>
+          <div>
+            <label className="block text-[11px] font-mono uppercase tracking-wider mb-1.5" style={{ color: colors.textDim }}>Current username</label>
+            <div className="px-4 py-3 rounded-xl border text-sm font-mono flex items-center gap-2" style={{ background: colors.cardBg, borderColor: colors.border, color: colors.textDim }}>
+              <Fingerprint className="w-4 h-4 flex-shrink-0" style={{ color: `${colors.primary}80` }} />
+              <span className="truncate">{currentUsername || 'admin'}</span>
+            </div>
+          </div>
+          <FormField label="New username" required error={credTouched.has('username') ? credErrors.username : undefined}>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><User className="w-4 h-4" /></span>
+              <input type="text" value={formUsername} onChange={(e) => { setFormUsername(e.target.value); setCredTouched((p) => new Set(p).add('username')); }} onBlur={() => { setCredTouched((p) => new Set(p).add('username')); setCredErrors(validateCred()); }} className="input pl-10" autoComplete="username" />
+            </div>
+          </FormField>
+          <FormField label="New password" required error={credTouched.has('password') ? credErrors.password : undefined} hint="You will be logged out after saving">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: colors.textDim }}><Lock className="w-4 h-4" /></span>
+              <input type="password" value={formPassword} onChange={(e) => { setFormPassword(e.target.value); setCredTouched((p) => new Set(p).add('password')); }} onBlur={() => { setCredTouched((p) => new Set(p).add('password')); setCredErrors(validateCred()); }} className="input pl-10" autoComplete="new-password" placeholder="Enter new password" />
+            </div>
+          </FormField>
+          <FormActions>
+            <SaveButton loading={credSaving} onClick={handleSaveCreds}>
+              <Save className="w-3.5 h-3.5" />
+              Save Credentials
+            </SaveButton>
+          </FormActions>
+        </FormSection>
+
+        {/* ─── 2FA SECTION ─── */}
+        <div className="glass-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Smartphone className="w-4 h-4" style={{ color: colors.primary }} />
+            <h3 className="text-sm font-semibold">Two-Factor Auth (TOTP)</h3>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{
+              background: totpEnabled ? `${colors.success}1a` : `${colors.warning}1a`,
+              color: totpEnabled ? colors.success : colors.warning,
+            }}>
+              {totpEnabled ? 'ON' : 'OFF'}
+            </span>
+          </div>
+          <p className="text-xs mb-4" style={{ color: colors.textDim }}>Extra security with Google Authenticator, Authy, etc.</p>
+
+          {totpStep === 'idle' && (
+            <div className="flex flex-col gap-3">
+              {!totpEnabled ? (
+                <button onClick={handleSetup2fa} disabled={totpLoading} className="btn btn-primary text-xs w-fit">
+                  {totpLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Smartphone className="w-3.5 h-3.5" />}
+                  Enable 2FA
+                </button>
+              ) : (
+                <button onClick={() => { setTotpStep('verify-disable'); setTotpCode(''); }} className="btn text-xs w-fit" style={{ background: `${colors.danger}1a`, color: colors.danger, border: `1px solid ${colors.danger}33` }}>
+                  Disable 2FA
+                </button>
+              )}
+            </div>
+          )}
+
+          {totpStep === 'setup' && (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                {totpQr && <img src={totpQr} alt="QR" className="w-40 h-40 rounded-xl" style={{ border: `1px solid ${colors.border}` }} />}
+                <div className="space-y-3 flex-1">
+                  <p className="text-xs" style={{ color: colors.textDim }}>1. Scan QR with your authenticator app</p>
+                  <p className="text-xs" style={{ color: colors.textDim }}>2. Or enter secret manually:</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-3 py-2 rounded-lg text-xs font-mono break-all" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>{totpSecret}</code>
+                    <button onClick={copySecret} className="p-2 rounded-lg" style={{ color: colors.textDim }}>
+                      {totpCopied ? <Check className="w-4 h-4" style={{ color: colors.success }} /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs" style={{ color: colors.textDim }}>3. Enter 6-digit code:</p>
+                  <div className="flex gap-2">
+                    <input type="text" value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" maxLength={6} className="input font-mono text-center tracking-[0.3em] w-28" autoFocus />
+                    <button onClick={handleVerify2fa} disabled={totpLoading || totpCode.length !== 6} className="btn btn-primary text-xs">
+                      {totpLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Verify'}
+                    </button>
+                    <button onClick={() => { setTotpStep('idle'); setTotpCode(''); }} className="btn text-xs" style={{ color: colors.textDim }}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {totpStep === 'verify-disable' && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 p-3 rounded-xl" style={{ background: `${colors.danger}0d`, border: `1px solid ${colors.danger}26` }}>
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: colors.danger }} />
+                <p className="text-xs" style={{ color: colors.danger }}>Enter your code to confirm disabling 2FA.</p>
+              </div>
+              <div className="flex gap-2">
+                <input type="text" value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" maxLength={6} className="input font-mono text-center tracking-[0.3em] w-28" autoFocus />
+                <button onClick={handleDisable2fa} disabled={totpLoading || totpCode.length !== 6} className="btn text-xs" style={{ background: `${colors.danger}1a`, color: colors.danger, border: `1px solid ${colors.danger}33` }}>
+                  {totpLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Confirm Disable'}
+                </button>
+                <button onClick={() => { setTotpStep('idle'); setTotpCode(''); }} className="btn text-xs" style={{ color: colors.textDim }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Clear Local Data */}
+      <div className="flex justify-end">
+        <DangerButton onClick={handleClearLocal}>
+          <Trash2 className="w-3.5 h-3.5" />
+          Clear Local Data
+        </DangerButton>
+      </div>
+    </div>
+  );
 }

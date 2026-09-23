@@ -3,7 +3,7 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 interface AuthState {
   token: string | null;
   username: string | null;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (username: string, password: string, totp?: string) => Promise<{ success: boolean; requiresTotp?: boolean }>;
   logout: () => void;
 }
 
@@ -20,26 +20,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem(USERNAME_KEY);
   });
 
-  async function login(user: string, pass: string): Promise<boolean> {
+  async function login(user: string, pass: string, totp?: string): Promise<{ success: boolean; requiresTotp?: boolean }> {
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass }),
+        body: JSON.stringify({ username: user, password: pass, totp }),
       });
-      if (!res.ok) return false;
       const data = await res.json();
+      if (data.requiresTotp) {
+        return { success: false, requiresTotp: true };
+      }
       if (data.success) {
         const sessionToken = data.token || pass;
         localStorage.setItem(STORAGE_KEY, sessionToken);
         localStorage.setItem(USERNAME_KEY, user);
         setToken(sessionToken);
         setUsername(user);
-        return true;
+        return { success: true };
       }
-      return false;
+      return { success: false };
     } catch {
-      return false;
+      return { success: false };
     }
   }
 
