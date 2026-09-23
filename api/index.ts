@@ -1,4 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Pre-bundled by build.sh so Vercel's nft includes the full server graph.
+// @ts-expect-error - pre-bundled JS has no type declarations
+import { handleApiRequest } from '../dist-server/api-handler.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Security headers
@@ -20,7 +23,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { handleApiRequest } = await import('../server/api');
     const path = req.url?.split('?')[0] || '';
     const handled = await handleApiRequest(req as any, res as any, path);
     if (!handled && !res.headersSent) {
