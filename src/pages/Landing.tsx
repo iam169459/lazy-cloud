@@ -4,7 +4,6 @@ import { ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layer
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
-import LandingRocket from '@/components/LandingRocket';
 
 export default function Landing() {
   const { colors } = useTheme();
@@ -18,7 +17,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen grid-bg" style={{ color: colors.text }}>
       {/* Nav */}
-      <nav className="sticky top-0 z-30 backdrop-blur-md border-b" style={{ background: `${colors.bg}cc`, borderColor: colors.border }}>
+      <nav className="sticky top-0 z-30 backdrop-blur-md border-b" style={{ background: `${colors.bg}e6`, borderColor: colors.border, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
         <div className="max-w-5xl mx-auto flex items-center justify-between px-5 py-4">
           <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>
@@ -34,17 +33,17 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-3xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20">
+      <section className="max-w-3xl mx-auto text-center px-5 pt-24 pb-20 sm:pt-32 sm:pb-24">
         <div className="badge mx-auto mb-6 animate-fade-up">Multi-provider storage</div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-5 animate-fade-up delay-100">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-3.5 animate-fade-up delay-100">
           Fast, private,
           <br />
           <span className="text-gradient">link-only file sharing</span>
         </h1>
-        <p className="text-base sm:text-lg max-w-lg mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
+        <p className="text-base sm:text-lg max-w-lg mx-auto mb-10 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
           Upload once, share with a link. Files stored across multiple cloud providers for unlimited capacity.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up delay-300">
           <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
             Go to Admin Panel
             <ArrowRight className="w-4 h-4" />
@@ -60,17 +59,9 @@ export default function Landing() {
         </section>
       )}
 
-      {/* Rocket */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
-        <div className="relative h-64 sm:h-72 rounded-xl overflow-hidden card">
-          <LandingRocket />
-        </div>
-        <p className="text-center text-xs mt-3" style={{ color: colors.textDim }}>Secure delivery cycle — files launch, transfer, and return</p>
-      </section>
-
       {/* Stats */}
-      <section className="max-w-3xl mx-auto px-5 pb-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="max-w-3xl mx-auto px-5 pb-20">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Stat icon={<Globe className="w-4 h-4" />} value="6+" label="Providers" />
           <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
           <Stat icon={<Zap className="w-4 h-4" />} value="<1s" label="Upload" />
@@ -79,8 +70,8 @@ export default function Landing() {
       </section>
 
       {/* Features */}
-      <section id="features" className="max-w-4xl mx-auto px-5 pb-16">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <section id="features" className="max-w-4xl mx-auto px-5 pb-24">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Feature icon={<Database className="w-4 h-4" />} title="Unlimited storage" desc="Multiple S3 buckets pooled into one virtual drive." />
           <Feature icon={<Shield className="w-4 h-4" />} title="Private by design" desc="No public directory. Only accessible via unique link." />
           <Feature icon={<Upload className="w-4 h-4" />} title="Drag & drop" desc="Simply drag files onto the upload zone. Done." />
@@ -103,23 +94,23 @@ export default function Landing() {
 
 function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
   return (
-    <div className="card p-4 text-center">
-      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+    <div className="card p-5 text-center">
+      <div className="w-10 h-10 rounded-lg mx-auto mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
         {icon}
       </div>
-      <div className="text-xl font-bold">{value}</div>
-      <div className="text-xs mt-0.5" style={{ color: '#64748b' }}>{label}</div>
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="text-xs mt-1" style={{ color: '#64748b' }}>{label}</div>
     </div>
   );
 }
 
 function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <div className="card p-5">
-      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8' }}>
+    <div className="card p-6">
+      <div className="w-9 h-9 rounded-lg mb-4 flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
         {icon}
       </div>
-      <h3 className="text-sm font-semibold mb-1">{title}</h3>
+      <h3 className="text-sm font-semibold mb-2">{title}</h3>
       <p className="text-xs leading-relaxed" style={{ color: '#94a3b8' }}>{desc}</p>
     </div>
   );
