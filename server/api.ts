@@ -60,7 +60,9 @@ function parseJsonBody(req: IncomingMessage): Promise<any> {
 }
 
 function sendJson(res: ServerResponse, status: number, data: any) {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  if (res.headersSent) return;
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(data));
 }
 
@@ -143,12 +145,13 @@ function applyRateLimit(req: IncomingMessage, res: ServerResponse, maxRequests =
 }
 
 // Clean up old entries periodically
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [ip, entry] of rateLimitStore.entries()) {
     if (now > entry.resetAt) rateLimitStore.delete(ip);
   }
 }, 5 * 60 * 1000);
+cleanupInterval.unref?.();
 
 /**
  * Delete files older than settings.autoDeleteDays (when auto-delete is on).
@@ -404,7 +407,12 @@ export async function handleApiRequest(
   res: ServerResponse,
   path: string
 ): Promise<boolean> {
-  await ensureDb();
+  try {
+    await ensureDb();
+  } catch (e: any) {
+    sendError(res, 500, `Database error: ${e.message}`);
+    return true;
+  }
 
   // Health check endpoint
   if (path === '/api/health') {
