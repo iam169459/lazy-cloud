@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
@@ -8,7 +8,10 @@ import { sounds } from '@/lib/sounds';
 export default function UserLogin() {
   const { colors } = useTheme();
   const { login, register } = useUserAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const location = useLocation();
+  const [mode, setMode] = useState<'login' | 'register'>(() =>
+    location.pathname === '/register' ? 'register' : 'login'
+  );
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
