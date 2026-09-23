@@ -4,7 +4,6 @@ import { ArrowRight, Lock, Database, Shield, Upload, Download, Smartphone, Layer
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
-import LandingRocket from '@/components/LandingRocket';
 
 export default function Landing() {
   const { colors } = useTheme();
@@ -36,7 +35,7 @@ export default function Landing() {
       {/* Hero */}
       <section className="max-w-3xl mx-auto text-center px-5 pt-24 pb-20 sm:pt-32 sm:pb-24">
         <div className="badge mx-auto mb-6 animate-fade-up">Multi-provider storage</div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-6 animate-fade-up delay-100">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight mb-3.5 animate-fade-up delay-100">
           Fast, private,
           <br />
           <span className="text-gradient">link-only file sharing</span>
@@ -59,14 +58,6 @@ export default function Landing() {
           <QuickUpload />
         </section>
       )}
-
-      {/* Rocket */}
-      <section className="max-w-3xl mx-auto px-5 pb-20">
-        <div className="relative h-64 sm:h-72 rounded-xl overflow-hidden card" style={{ boxShadow: '0 8px 24px rgba(99,102,241,0.15), 0 4px 12px rgba(0,0,0,0.25)' }}>
-          <LandingRocket />
-        </div>
-        <p className="text-center text-xs mt-4" style={{ color: colors.textDim }}>Secure delivery cycle — files launch, transfer, and return</p>
-      </section>
 
       {/* Stats */}
       <section className="max-w-3xl mx-auto px-5 pb-20">
