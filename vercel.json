@@ -5,8 +5,7 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
-    { "handle": "filesystem" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/index.ts": {
