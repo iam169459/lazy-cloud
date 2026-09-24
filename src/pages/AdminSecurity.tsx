@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, Loader2, Save, User, KeyRound, Lock, Fingerprint, X, Smartphone, Check, AlertCircle, Copy } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, readJson } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -34,7 +34,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
   useEffect(() => {
     Promise.all([
       api.getCredentials(token),
-      fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+      fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(readJson),
     ])
       .then(([creds, twoFa]) => { setFormUsername(creds.username); setTotpEnabled(twoFa.enabled); })
       .catch((e) => onNotify('error', e.message))
@@ -94,8 +94,8 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA setup failed');
       setTotpQr(data.qr);
       setTotpSecret(data.secret);
       setTotpStep('setup');
@@ -114,8 +114,8 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA verification failed');
       setTotpEnabled(true); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA enabled!');
     } catch (e: any) {
@@ -132,8 +132,8 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA disable failed');
       setTotpEnabled(false); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA disabled');
     } catch (e: any) {

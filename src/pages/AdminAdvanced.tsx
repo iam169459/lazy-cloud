@@ -3,7 +3,7 @@ import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, U
 import { useTheme, ThemeId, themes } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { sounds } from '@/lib/sounds';
-import { api, AppSettings } from '@/lib/api';
+import { api, AppSettings, readJson } from '@/lib/api';
 import { FormSection, FormField, FormRow, Toggle, FormActions, SaveButton, CancelButton, DangerButton } from '@/components/Form';
 
 interface Props {
@@ -76,7 +76,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       try {
         const [loaded, twoFa, creds] = await Promise.all([
           api.getSettings(),
-          fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
+          fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(readJson),
           api.getCredentials(token),
         ]);
         const legacy = localStorage.getItem('lazydrop-settings');
@@ -167,8 +167,8 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
     setTotpLoading(true); sounds.click();
     try {
       const res = await fetch('/api/admin/2fa/setup', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA setup failed');
       setTotpQr(data.qr); setTotpSecret(data.secret); setTotpStep('setup'); setTotpCode('');
     } catch (e: any) { sounds.error(); onNotify('error', e.message); }
     finally { setTotpLoading(false); }
@@ -183,8 +183,8 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA verification failed');
       setTotpEnabled(true); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA enabled!');
     } catch (e: any) { sounds.error(); onNotify('error', e.message); }
@@ -200,8 +200,8 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || '2FA disable failed');
       setTotpEnabled(false); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA disabled');
     } catch (e: any) { sounds.error(); onNotify('error', e.message); }

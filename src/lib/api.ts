@@ -126,6 +126,22 @@ export interface AppSettings {
   backgroundType: 'image' | 'video' | '';
 }
 
+export async function readJson<T = any>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text().catch(() => '');
+    const snippet = text.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(
+      `Expected JSON but got HTTP ${res.status} ${contentType || 'unknown'}${snippet ? `: ${snippet}` : ''}`
+    );
+  }
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new Error(`Invalid JSON response (HTTP ${res.status})`);
+  }
+}
+
 async function request(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
     ...options,
@@ -133,9 +149,9 @@ async function request(path: string, options: RequestInit = {}) {
       ...options.headers,
     },
   });
-  const data = await res.json();
+  const data = await readJson(res);
   if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
+    throw new Error(data?.error || 'Request failed');
   }
   return data;
 }

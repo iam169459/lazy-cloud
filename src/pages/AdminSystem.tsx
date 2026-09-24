@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { readJson } from '@/lib/api';
 
 interface Props {
   token: string;
@@ -47,8 +48,8 @@ export default function AdminSystem({ token, onNotify }: Props) {
       const res = await fetch('/api/admin/system/check-update', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await readJson(res);
+      if (!res.ok) throw new Error(data.error || 'Check failed');
       setStatus(data);
       if (data.upToDate) {
         addLog('Already up to date!', 'success');
@@ -81,7 +82,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      const data = await readJson(res);
 
       if (!res.ok) {
         addLog(`Failed: ${data.error || 'Unknown error'}`, 'error');

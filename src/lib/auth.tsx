@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
+import { readJson } from './api';
 
 interface AuthState {
   token: string | null;
@@ -27,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass, totp }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (data.requiresTotp) {
         return { success: false, requiresTotp: true };
       }

@@ -4,6 +4,7 @@ import { Lock, ArrowLeft, Loader2, Zap, User, Check, Mail, Smartphone } from 'lu
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { readJson } from '@/lib/api';
 
 const MAX = 5, LOCK = 30_000;
 
@@ -33,7 +34,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     fetch('/api/admin/needs-setup')
-      .then(r => r.json())
+      .then(readJson)
       .then(d => { setNeedsSetup(d.needsSetup); if (d.needsSetup) setSetupMode(true); })
       .catch(() => setNeedsSetup(false));
   }, []);
@@ -69,7 +70,7 @@ export default function AdminLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass, email: setupEmail }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (res.ok) {
         sounds.success();
         setSetupSuccess(true);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { loginWithBiometrics, getBiometricsSupport, BiometricsSupport } from './biometrics';
+import { readJson } from './api';
 
 interface UserInfo {
   id: string;
@@ -46,7 +47,7 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (data.success) {
         persistSession(data.token, data.user);
         setToken(data.token);
@@ -66,7 +67,7 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (data.success) {
         persistSession(data.token, data.user);
         setToken(data.token);
