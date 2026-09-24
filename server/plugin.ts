@@ -115,8 +115,8 @@ export function lazyDropApiPlugin(): Plugin {
             return;
           }
 
-          // Stricter rate limit on login endpoint
-          if (url.startsWith('/api/admin/login') && req.method === 'POST') {
+          // Stricter rate limit on login endpoints
+          if ((url.startsWith('/api/admin/login') || url.startsWith('/api/bio/login')) && req.method === 'POST') {
             if (!checkLoginRateLimit(ip)) {
               res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '300' });
               res.end(JSON.stringify({ error: 'Too many login attempts. Please try again in 5 minutes.' }));

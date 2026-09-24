@@ -214,6 +214,24 @@ export async function initDatabase() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS webauthn_credentials (
+      credential_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      public_key TEXT NOT NULL,
+      counter BIGINT DEFAULT 0,
+      transports TEXT DEFAULT '[]',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_used_at TIMESTAMP
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user_id ON webauthn_credentials (user_id)`;
+  try {
+    await sql`ALTER TABLE webauthn_credentials ADD CONSTRAINT webauthn_credentials_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`;
+  } catch (e: any) {
+    // FK already exists
+  }
+
   // Add user_id to files for ownership
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS user_id TEXT`;
   await sql`ALTER TABLE files ADD CONSTRAINT IF NOT EXISTS files_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`;
@@ -710,6 +728,110 @@ export async function countUsers(): Promise<number> {
   const sql = getSql();
   const rows = await sql`SELECT COUNT(*)::INT AS count FROM users` as unknown[];
   return (rows[0] as any).count;
+}
+
+// ── WebAuthn / Passkey functions ──
+
+export interface UserCredential {
+  userId: string;
+  credentialId: string;
+  credentialPublicKey: string;
+  counter: number;
+  transports: string[];
+}
+
+export async function createWebAuthnCredential(cred: UserCredential): Promise<UserCredential> {
+  const sql = getSql();
+  await sql`
+    INSERT INTO webauthn_credentials (credential_id, user_id, public_key, counter, transports)
+    VALUES (${cred.credentialId}, ${cred.userId}, ${cred.credentialPublicKey}, ${cred.counter}, ${JSON.stringify(cred.transports || [])})
+    ON CONFLICT (credential_id) DO UPDATE SET
+      user_id = EXCLUDED.user_id,
+      public_key = EXCLUDED.public_key,
+      counter = EXCLUDED.counter,
+      transports = EXCLUDED.transports
+  `;
+  return cred;
+}
+
+export async function getWebAuthnCredentialByCredentialId(credentialId: string): Promise<UserCredential | null> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT user_id, credential_id, public_key, counter, transports
+    FROM webauthn_credentials
+    WHERE credential_id = ${credentialId}
+  ` as unknown[];
+  const row = rows[0] as any;
+  if (!row) return null;
+  return {
+    userId: row.user_id,
+    credentialId: row.credential_id,
+    credentialPublicKey: row.public_key,
+    counter: Number(row.counter) || 0,
+    transports: safeParseTransports(row.transports),
+  };
+}
+
+export async function listWebAuthnCredentialsByUserId(userId: string): Promise<UserCredential[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT user_id, credential_id, public_key, counter, transports
+    FROM webauthn_credentials
+    WHERE user_id = ${userId}
+    ORDER BY created_at ASC
+  ` as unknown[] as any[];
+  return rows.map((row) => ({
+    userId: row.user_id,
+    credentialId: row.credential_id,
+    credentialPublicKey: row.public_key,
+    counter: Number(row.counter) || 0,
+    transports: safeParseTransports(row.transports),
+  }));
+}
+
+export async function updateWebAuthnCredentialCounter(credentialId: string, counter: number): Promise<void> {
+  const sql = getSql();
+  await sql`
+    UPDATE webauthn_credentials
+    SET counter = ${counter}, last_used_at = CURRENT_TIMESTAMP
+    WHERE credential_id = ${credentialId}
+  `;
+}
+
+export async function deleteWebAuthnCredential(credentialId: string, userId?: string): Promise<boolean> {
+  const sql = getSql();
+  if (userId) {
+    const rows = await sql`
+      DELETE FROM webauthn_credentials
+      WHERE credential_id = ${credentialId} AND user_id = ${userId}
+      RETURNING credential_id
+    ` as unknown[];
+    return rows.length > 0;
+  }
+  const rows = await sql`
+    DELETE FROM webauthn_credentials
+    WHERE credential_id = ${credentialId}
+    RETURNING credential_id
+  ` as unknown[];
+  return rows.length > 0;
+}
+
+function safeParseTransports(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
+    if (raw) return raw.split(',').map((t) => t.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+export async function getUserByEmail(email: string): Promise<UserRecord | null> {
+  const sql = getSql();
+  const rows = await sql`SELECT * FROM users WHERE email = ${email}` as unknown[];
+  return (rows[0] as UserRecord) || null;
 }
 
 export async function listUserFiles(userId: string, limit: number = 100, offset: number = 0): Promise<FileRecord[]> {

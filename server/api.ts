@@ -1,7 +1,13 @@
 import { IncomingMessage, ServerResponse } from 'http';
 import { timingSafeEqual, randomBytes, scryptSync, createHmac } from 'crypto';
 import busboy from 'busboy';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares } from './db';
+import {
+  generateRegistrationOptions,
+  verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
+} from '@simplewebauthn/server';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
@@ -91,6 +97,66 @@ function sanitize(str: unknown): string {
   if (typeof str !== 'string') return '';
   return str.replace(/[<>'"&;]/g, '').trim().slice(0, 500);
 }
+
+// ── WebAuthn / Passkey config ──
+const RP_NAME = process.env.WEBAUTHN_RP_NAME || 'LazyDrop';
+
+function getWebAuthnConfig(req: IncomingMessage): { rpID: string; expectedOrigin: string | string[] } {
+  const envRpId = process.env.WEBAUTHN_RP_ID;
+  const envOrigin = process.env.WEBAUTHN_ORIGIN;
+  if (envRpId && envOrigin) return { rpID: envRpId, expectedOrigin: envOrigin };
+
+  const origins = new Set<string>();
+  const originHeader = req.headers.origin;
+  const referer = req.headers.referer;
+  if (originHeader) origins.add(originHeader);
+  if (referer) {
+    try { origins.add(new URL(referer).origin); } catch {}
+  }
+  origins.add('http://localhost:5173');
+  origins.add('http://localhost:3000');
+  origins.add('https://lazy-cloud.vercel.app');
+
+  const originList = [...origins];
+  const primary = originList[0] || 'http://localhost:5173';
+  let rpID = envRpId;
+  if (!rpID) {
+    try { rpID = new URL(primary).hostname; } catch { rpID = 'localhost'; }
+  }
+  return { rpID, expectedOrigin: originList.length > 1 ? originList : primary };
+}
+
+// Challenge store (in-memory, single-instance — fine for this app)
+interface BioChallenge {
+  userId?: string;
+  username?: string;
+  challenge: string;
+  expiresAt: number;
+}
+const bioChallengeStore = new Map<string, BioChallenge>();
+const BIO_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+function saveBioChallenge(key: string, data: BioChallenge) {
+  bioChallengeStore.set(key, data);
+}
+
+function takeBioChallenge(key: string): BioChallenge | null {
+  const entry = bioChallengeStore.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    bioChallengeStore.delete(key);
+    return null;
+  }
+  bioChallengeStore.delete(key);
+  return entry;
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of bioChallengeStore.entries()) {
+    if (now > entry.expiresAt) bioChallengeStore.delete(key);
+  }
+}, 60 * 1000).unref?.();
 
 // ── Rate Limiting ──
 interface RateLimitEntry {
@@ -1600,6 +1666,244 @@ export async function handleApiRequest(
       const user = await getUserById(userAuth.id);
       if (!user) { sendError(res, 404, 'User not found'); return true; }
       sendJson(res, 200, { id: user.id, username: user.username, email: user.email, role: user.role, storage_used: user.storage_used, storage_limit: user.storage_limit, created_at: user.created_at, last_login: user.last_login });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── WEBAUTHN / PASSKEY (BIO) ──
+    // ═══════════════════════════════════════════
+
+    // ── Bio: Registration options (requires authenticated user) ──
+    if (path === '/api/bio/register-options' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+
+      const { rpID, expectedOrigin } = getWebAuthnConfig(req);
+      const existing = await listWebAuthnCredentialsByUserId(user.id);
+
+      const options = await generateRegistrationOptions({
+        rpName: RP_NAME,
+        rpID,
+        userName: user.username,
+        userDisplayName: user.username,
+        userID: new Uint8Array(Buffer.from(user.id, 'utf8')),
+        attestationType: 'none',
+        excludeCredentials: existing.map((c) => ({
+          id: c.credentialId,
+          transports: c.transports as any,
+        })),
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          residentKey: 'preferred',
+          userVerification: 'required',
+        },
+        preferredAuthenticatorType: 'localDevice',
+        timeout: 60000,
+      });
+
+      saveBioChallenge(`reg:${user.id}`, {
+        userId: user.id,
+        username: user.username,
+        challenge: options.challenge,
+        expiresAt: Date.now() + BIO_CHALLENGE_TTL_MS,
+      });
+
+      sendJson(res, 200, { options, expectedOrigin, rpID });
+      return true;
+    }
+
+    // ── Bio: Registration verify ──
+    if (path === '/api/bio/register-verify' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+
+      const stored = takeBioChallenge(`reg:${user.id}`);
+      if (!stored) { sendError(res, 400, 'Registration challenge expired or missing. Please try again.'); return true; }
+
+      const body = await parseJsonBody(req);
+      const { rpID, expectedOrigin } = getWebAuthnConfig(req);
+
+      let verification;
+      try {
+        verification = await verifyRegistrationResponse({
+          response: body.response,
+          expectedChallenge: stored.challenge,
+          expectedOrigin,
+          expectedRPID: rpID,
+          requireUserVerification: true,
+        });
+      } catch (e: any) {
+        sendError(res, 400, e.message || 'Registration verification failed');
+        return true;
+      }
+
+      if (!verification.verified || !verification.registrationInfo) {
+        sendError(res, 400, 'Registration verification failed');
+        return true;
+      }
+
+      const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
+      const transports = (body.response?.response?.transports || body.response?.transports || []) as string[];
+
+      await createWebAuthnCredential({
+        userId: user.id,
+        credentialId: credential.id,
+        credentialPublicKey: Buffer.from(credential.publicKey).toString('base64'),
+        counter: credential.counter || 0,
+        transports,
+      });
+
+      await createAuditLog({
+        admin_id: user.id,
+        action: 'webauthn_register',
+        details: JSON.stringify({ credentialId: credential.id, deviceType: credentialDeviceType, backedUp: credentialBackedUp }),
+        ip_address: getClientIp(req),
+        user_agent: (req.headers['user-agent'] || '').slice(0, 500),
+      }).catch(() => {});
+
+      sendJson(res, 200, {
+        success: true,
+        credentialId: credential.id,
+        deviceType: credentialDeviceType,
+        backedUp: credentialBackedUp,
+      });
+      return true;
+    }
+
+    // ── Bio: Authentication options (login challenge) ──
+    if (path === '/api/bio/login-options' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const identifier = sanitize(body.username || body.email);
+      if (!identifier) { sendError(res, 400, 'Username or email required'); return true; }
+
+      let user = await getUserByUsername(identifier);
+      if (!user && identifier.includes('@')) user = await getUserByEmail(identifier);
+      if (!user) { sendError(res, 404, 'No passkey found for this account'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+
+      const credentials = await listWebAuthnCredentialsByUserId(user.id);
+      if (credentials.length === 0) { sendError(res, 404, 'No passkey registered for this account'); return true; }
+
+      const { rpID, expectedOrigin } = getWebAuthnConfig(req);
+      const options = await generateAuthenticationOptions({
+        rpID,
+        allowCredentials: credentials.map((c) => ({
+          id: c.credentialId,
+          transports: c.transports as any,
+        })),
+        userVerification: 'required',
+        timeout: 60000,
+      });
+
+      saveBioChallenge(`auth:${user.id}`, {
+        userId: user.id,
+        username: user.username,
+        challenge: options.challenge,
+        expiresAt: Date.now() + BIO_CHALLENGE_TTL_MS,
+      });
+
+      sendJson(res, 200, { options, expectedOrigin, rpID });
+      return true;
+    }
+
+    // ── Bio: Authentication verify → issue JWT ──
+    if (path === '/api/bio/login-verify' && req.method === 'POST') {
+      const body = await parseJsonBody(req);
+      const userIdFromBody = body.userId as string | undefined;
+      const bodyIdentifier = sanitize(body.username || body.email);
+      const credentialId = body.credentialId || body.response?.id;
+      if (!credentialId) { sendError(res, 400, 'Missing credential'); return true; }
+
+      const storedCred = await getWebAuthnCredentialByCredentialId(credentialId);
+      if (!storedCred) { sendError(res, 401, 'Unknown credential'); return true; }
+
+      const user = await getUserById(storedCred.userId);
+      if (!user) { sendError(res, 401, 'User not found'); return true; }
+      if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
+      if (userIdFromBody && userIdFromBody !== user.id) { sendError(res, 401, 'Credential/user mismatch'); return true; }
+      if (bodyIdentifier && bodyIdentifier !== user.username && bodyIdentifier !== (user.email || '')) {
+        sendError(res, 401, 'Credential/user mismatch');
+        return true;
+      }
+
+      const stored = takeBioChallenge(`auth:${user.id}`);
+      if (!stored) { sendError(res, 400, 'Login challenge expired or missing. Please try again.'); return true; }
+
+      const { rpID, expectedOrigin } = getWebAuthnConfig(req);
+      let verification;
+      try {
+        verification = await verifyAuthenticationResponse({
+          response: body.response,
+          expectedChallenge: stored.challenge,
+          expectedOrigin,
+          expectedRPID: rpID,
+          credential: {
+            id: storedCred.credentialId,
+            publicKey: Buffer.from(storedCred.credentialPublicKey, 'base64'),
+            counter: storedCred.counter,
+            transports: storedCred.transports as any,
+          },
+          requireUserVerification: true,
+        });
+      } catch (e: any) {
+        sendError(res, 401, e.message || 'Authentication verification failed');
+        return true;
+      }
+
+      if (!verification.verified) {
+        sendError(res, 401, 'Authentication verification failed');
+        return true;
+      }
+
+      await updateWebAuthnCredentialCounter(storedCred.credentialId, verification.authenticationInfo.newCounter);
+      await updateUser(user.id, { last_login: new Date().toISOString() });
+
+      await createAuditLog({
+        admin_id: user.id,
+        action: 'webauthn_login',
+        details: JSON.stringify({ credentialId: storedCred.credentialId }),
+        ip_address: getClientIp(req),
+        user_agent: (req.headers['user-agent'] || '').slice(0, 500),
+      }).catch(() => {});
+
+      const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
+      sendJson(res, 200, {
+        success: true,
+        token,
+        user: { id: user.id, username: user.username, email: user.email, role: user.role },
+      });
+      return true;
+    }
+
+    // ── Bio: List credentials for current user ──
+    if (path === '/api/bio/credentials' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const credentials = await listWebAuthnCredentialsByUserId(userAuth.id);
+      sendJson(res, 200, {
+        credentials: credentials.map((c) => ({
+          credentialId: c.credentialId,
+          transports: c.transports,
+        })),
+      });
+      return true;
+    }
+
+    // ── Bio: Delete a credential ──
+    if (path === '/api/bio/credentials/delete' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const credentialId = body.credentialId;
+      if (!credentialId) { sendError(res, 400, 'credentialId required'); return true; }
+      const deleted = await deleteWebAuthnCredential(credentialId, userAuth.id);
+      if (!deleted) { sendError(res, 404, 'Credential not found'); return true; }
+      sendJson(res, 200, { success: true });
       return true;
     }
 

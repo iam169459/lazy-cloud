@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye } from 'lucide-react';
+import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye, Fingerprint, Shield } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { api, formatBytes, formatDate, AppSettings, FileInfo, ShareRecord as ApiShareRecord } from '@/lib/api';
 import { sounds } from '@/lib/sounds';
+import { enableBiometrics, getBiometricsSupport, friendlyBiometricsError, BiometricsSupport } from '@/lib/biometrics';
 
 interface FileRecord extends FileInfo {}
 type ShareRecord = ApiShareRecord & { file_name: string };
@@ -26,11 +27,41 @@ export default function UserDashboard() {
   const [shareLimit, setShareLimit] = useState('');
   const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [biometricsSupport, setBiometricsSupport] = useState<BiometricsSupport | null>(null);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
+  const [passkeyEnabled, setPasskeyEnabled] = useState(false);
 
   useEffect(() => {
     if (!token) { nav('/login'); return; }
     loadData();
+    getBiometricsSupport().then(setBiometricsSupport).catch(() => setBiometricsSupport({ supported: false, platformAvailable: false }));
+    if (token) {
+      api.bioListCredentials(token)
+        .then((r) => setPasskeyEnabled(r.credentials.length > 0))
+        .catch(() => setPasskeyEnabled(false));
+    }
   }, [token]);
+
+  async function handleEnablePasskey() {
+    if (!token || passkeyLoading) return;
+    setPasskeyLoading(true);
+    try {
+      const result = await enableBiometrics(token);
+      if (result.success) {
+        sounds.success();
+        notify('success', 'Passkey enabled on this device');
+        setPasskeyEnabled(true);
+      } else {
+        sounds.error();
+        notify('error', result.error || friendlyBiometricsError(new Error('Failed')));
+      }
+    } catch (e: any) {
+      sounds.error();
+      notify('error', e.message || 'Failed to enable passkey');
+    } finally {
+      setPasskeyLoading(false);
+    }
+  }
 
   function notify(type: 'success' | 'error', msg: string) {
     setNotif({ type, msg });
@@ -281,6 +312,33 @@ export default function UserDashboard() {
               <div className="flex justify-between"><span style={{ color: colors.textDim }}>Role</span><span className="font-mono" style={{ color: colors.primary }}>{user?.role}</span></div>
               <div className="flex justify-between"><span style={{ color: colors.textDim }}>Storage</span><span className="font-mono" style={{ color: colors.text }}>{formatBytes(stats.storageUsed)} / {formatBytes(stats.storageLimit)}</span></div>
             </div>
+
+            <div className="mt-6 pt-4" style={{ borderTop: `1px solid ${colors.border}` }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" style={{ color: colors.primary }} />
+                  <span className="text-xs font-semibold" style={{ color: colors.text }}>Passkey / Biometrics</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: passkeyEnabled ? `${colors.success}15` : `${colors.textDim}15`, color: passkeyEnabled ? colors.success : colors.textDim }}>
+                  {passkeyEnabled ? 'Enabled' : 'Off'}
+                </span>
+              </div>
+              <p className="text-xs mb-3" style={{ color: colors.textDim }}>
+                {biometricsSupport?.platformAvailable
+                  ? 'Use Touch ID, Face ID, or Windows Hello to sign in without a password.'
+                  : 'Platform biometrics not available on this device.'}
+              </p>
+              <button
+                onClick={handleEnablePasskey}
+                disabled={passkeyLoading || !biometricsSupport?.platformAvailable}
+                className="btn btn-secondary w-full flex items-center justify-center gap-2 text-xs"
+                style={{ borderColor: colors.border, color: colors.text, opacity: biometricsSupport?.platformAvailable ? 1 : 0.5 }}
+              >
+                {passkeyLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Fingerprint className="w-3.5 h-3.5" />}
+                {passkeyEnabled ? 'Add another passkey' : 'Enable passkey'}
+              </button>
+            </div>
+
             <button onClick={handleLogout} className="btn btn-secondary w-full mt-6 flex items-center justify-center gap-2 text-xs" style={{ borderColor: colors.danger, color: colors.danger }}>
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </button>

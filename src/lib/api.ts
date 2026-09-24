@@ -403,6 +403,47 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }) as Promise<{ success: boolean; token: string; user: { id: string; username: string; email: string; role: string } }>,
 
+  // ── WebAuthn / Passkeys ──
+  bioRegisterOptions: (token: string) =>
+    request('/api/bio/register-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({}),
+    }) as Promise<{ options: any; expectedOrigin: string | string[]; rpID: string }>,
+
+  bioRegisterVerify: (token: string, response: any) =>
+    request('/api/bio/register-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ response }),
+    }) as Promise<{ success: boolean; credentialId: string }>,
+
+  bioLoginOptions: (username: string) =>
+    request('/api/bio/login-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username }),
+    }) as Promise<{ options: any; expectedOrigin: string | string[]; rpID: string }>,
+
+  bioLoginVerify: (payload: { response: any; credentialId: string; username?: string; userId?: string }) =>
+    request('/api/bio/login-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }) as Promise<{ success?: boolean; token?: string; user?: { id: string; username: string; email: string; role: string }; error?: string }>,
+
+  bioListCredentials: (token: string) =>
+    request('/api/bio/credentials', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ credentials: { credentialId: string; transports: string[] }[] }>,
+
+  bioDeleteCredential: (token: string, credentialId: string) =>
+    request('/api/bio/credentials/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ credentialId }),
+    }) as Promise<{ success: boolean }>,
+
   // ── User Profile ──
   getUserProfile: (token: string) =>
     request('/api/user/profile', {

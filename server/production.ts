@@ -146,7 +146,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       res.end(JSON.stringify({ error: 'Too many requests. Please try again later.' }));
       return;
     }
-    if (path.startsWith('/api/admin/login') && req.method === 'POST') {
+    if ((path.startsWith('/api/admin/login') || path.startsWith('/api/bio/login')) && req.method === 'POST') {
       if (!checkLoginRateLimit(ip)) {
         res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '300' });
         res.end(JSON.stringify({ error: 'Too many login attempts. Please try again in 5 minutes.' }));

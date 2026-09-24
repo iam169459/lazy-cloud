@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Fingerprint } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { sounds } from '@/lib/sounds';
 
 export default function UserLogin() {
   const { colors } = useTheme();
-  const { login, register } = useUserAuth();
+  const { login, register, loginWithPasskey, biometricsSupport } = useUserAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -32,6 +33,26 @@ export default function UserLogin() {
       setError(result.error || 'Failed');
     }
   }
+
+  async function handlePasskeyLogin() {
+    setError('');
+    if (!username) {
+      setError('Enter your username first, then use passkey.');
+      return;
+    }
+    setPasskeyLoading(true);
+    const result = await loginWithPasskey(username);
+    setPasskeyLoading(false);
+    if (result.success) {
+      sounds.success();
+      window.location.href = '/dashboard';
+    } else {
+      sounds.error();
+      setError(result.error || 'Passkey login failed');
+    }
+  }
+
+  const passkeyEnabled = biometricsSupport?.supported && biometricsSupport?.platformAvailable;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: colors.bg }}>
@@ -59,7 +80,7 @@ export default function UserLogin() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="input w-full pl-10"
-                  style={{ background: colors.input, borderColor: colors.border, color: colors.text }}
+                  style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
                   placeholder="your_username"
                   required
                   minLength={3}
@@ -77,7 +98,7 @@ export default function UserLogin() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="input w-full pl-10"
-                    style={{ background: colors.input, borderColor: colors.border, color: colors.text }}
+                    style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
                     placeholder="you@example.com"
                   />
                 </div>
@@ -93,7 +114,7 @@ export default function UserLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input w-full pl-10 pr-10"
-                  style={{ background: colors.input, borderColor: colors.border, color: colors.text }}
+                  style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
                   placeholder="••••••••"
                   required
                   minLength={6}
@@ -119,6 +140,19 @@ export default function UserLogin() {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
               {mode === 'login' ? 'Sign in' : 'Create account'}
             </button>
+
+            {mode === 'login' && passkeyEnabled && (
+              <button
+                type="button"
+                onClick={handlePasskeyLogin}
+                disabled={passkeyLoading || !username}
+                className="btn btn-secondary w-full flex items-center justify-center gap-2"
+                style={{ borderColor: colors.border, color: colors.text }}
+              >
+                {passkeyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Fingerprint className="w-4 h-4" />}
+                Sign in with passkey
+              </button>
+            )}
           </form>
 
           <div className="mt-6 text-center">

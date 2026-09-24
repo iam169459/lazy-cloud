@@ -19,6 +19,8 @@
     "@aws-sdk/lib-storage": "^3.1127.0",
     "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.2",
     "busboy": "^1.6.0",
     "lucide-react": "^0.446.0",
     "otplib": "^13.5.0",
