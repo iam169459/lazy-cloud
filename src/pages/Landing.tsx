@@ -51,6 +51,9 @@ export default function Landing() {
             <a href="#faq" className="text-sm font-medium" style={{ color: colors.textMuted }}>FAQ</a>
           </div>
           <div className="flex items-center gap-2">
+            <Link to="/admin/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
+              Admin
+            </Link>
             <Link to="/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
               Sign in
             </Link>
@@ -198,6 +201,9 @@ export default function Landing() {
       {/* Footer */}
       <footer className="py-8 text-center" style={{ borderTop: `1px solid ${colors.border}` }}>
         <p className="text-sm" style={{ color: colors.textDim }}>{name} — link-only file sharing</p>
+        <Link to="/admin/login" className="inline-block mt-2 text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
+          Admin panel
+        </Link>
       </footer>
     </div>
   );

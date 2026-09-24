@@ -166,8 +166,10 @@ export default function UserLogin() {
           </div>
         </div>
 
-        <div className="text-center mt-4">
-          <Link to="/" className="text-xs" style={{ color: colors.textDim }}>← Back to LazyDrop</Link>
+        <div className="text-center mt-4 flex items-center justify-center gap-3 text-xs">
+          <Link to="/" style={{ color: colors.textDim }}>← Back to LazyDrop</Link>
+          <span style={{ color: colors.textDim }}>·</span>
+          <Link to="/admin/login" style={{ color: colors.textDim }}>Admin</Link>
         </div>
       </div>
     </div>

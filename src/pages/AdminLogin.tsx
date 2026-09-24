@@ -228,6 +228,9 @@ export default function AdminLogin() {
         <Link to="/" className="flex items-center justify-center gap-1.5 mt-5 text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
           <ArrowLeft className="w-3 h-3" /> Back to home
         </Link>
+        <div className="text-center mt-2 text-xs">
+          <Link to="/login" style={{ color: colors.textDim }}>User sign in</Link>
+        </div>
       </div>
     </div>
   );
