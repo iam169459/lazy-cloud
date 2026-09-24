@@ -26,7 +26,13 @@ export default function DownloadPage() {
     finally { setDownloading(false); }
   }
 
-  const canPreview = (mimeType: string) => mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf';
+  const canPreview = (mimeType: string | null | undefined) => {
+    const m = (mimeType || '').toLowerCase();
+    if (!m) return false;
+    return m.startsWith('image/') || m.startsWith('video/') || m.startsWith('audio/') || m === 'application/pdf'
+      || m.startsWith('text/') || m === 'application/json' || m.includes('markdown') || m.includes('csv')
+      || m.includes('xml') || m.includes('yaml') || m.includes('javascript') || m.includes('typescript');
+  };
 
   if (loading) {
     return (

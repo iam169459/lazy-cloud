@@ -1,35 +1,57 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Download, X, Maximize2, Minimize2, Loader2, AlertCircle, FileText, Image, Video, Music, Archive } from 'lucide-react';
-import { api, formatBytes, formatDate } from '@/lib/api';
+import { Download, X, Maximize2, Minimize2, Loader2, AlertCircle, FileText, Image, Video, Music, Archive, Code, FileType } from 'lucide-react';
+import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 
 function FileIcon({ mimeType, className = 'w-12 h-12' }: { mimeType: string; className?: string }) {
-  if (mimeType.startsWith('image/')) return <Image className={className} style={{ color: 'var(--primary)' }} />;
-  if (mimeType.startsWith('video/')) return <Video className={className} style={{ color: 'var(--accent)' }} />;
-  if (mimeType.startsWith('audio/')) return <Music className={className} style={{ color: 'var(--warning)' }} />;
-  if (mimeType.includes('zip') || mimeType.includes('tar') || mimeType.includes('gzip') || mimeType.includes('rar') || mimeType.includes('7z')) return <Archive className={className} style={{ color: 'var(--muted)' }} />;
+  const m = (mimeType || '').toLowerCase();
+  if (m.startsWith('image/')) return <Image className={className} style={{ color: 'var(--primary)' }} />;
+  if (m.startsWith('video/')) return <Video className={className} style={{ color: 'var(--accent)' }} />;
+  if (m.startsWith('audio/')) return <Music className={className} style={{ color: 'var(--warning)' }} />;
+  if (m.includes('zip') || m.includes('tar') || m.includes('gzip') || m.includes('rar') || m.includes('7z') || m.includes('compress')) return <Archive className={className} style={{ color: 'var(--muted)' }} />;
+  if (m.includes('json') || m.includes('javascript') || m.includes('typescript') || m.includes('xml') || m.includes('html') || m.includes('css') || m.includes('shell') || m.includes('python') || m.includes('sql')) return <Code className={className} style={{ color: 'var(--accent)' }} />;
+  if (m.startsWith('text/') || m.includes('csv') || m.includes('markdown') || m.includes('rtf') || m.includes('pdf') || m.includes('document') || m.includes('sheet') || m.includes('presentation')) return <FileType className={className} style={{ color: 'var(--muted)' }} />;
   return <FileText className={className} style={{ color: 'var(--muted)' }} />;
 }
 
-function canPreview(mimeType: string): boolean {
-  return mimeType.startsWith('image/') || mimeType.startsWith('video/') || mimeType.startsWith('audio/') || mimeType === 'application/pdf';
+const TEXT_TYPES = [
+  'text/', 'application/json', 'application/xml', 'application/javascript', 'application/typescript',
+  'application/x-yaml', 'application/yaml', 'application/toml', 'application/sql', 'application/x-sh',
+  'application/csv', 'application/xhtml+xml', 'application/rtf',
+];
+const CODE_EXT = /\.(js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|c|cpp|cc|h|hpp|cs|php|swift|kt|scala|sh|bash|zsh|fish|ps1|bat|cmd|sql|html|htm|css|scss|sass|less|xml|svg|yml|yaml|toml|ini|cfg|conf|env|dockerfile|makefile|cmake|gradle|properties|gitignore|npmrc|babelrc|eslintrc|prettierrc|editorconfig|lock|log|diff|patch|md|markdown|rst|txt|text|csv|tsv|rtf|vue|svelte|astro|dart|ex|exs|erl|hrl|clj|cljs|hs|ml|mli|fs|fsx|vb|pas|d|nim|zig|r|jl|lua|pl|pm|rkt|scm|lisp|el|vim|tex|bib|org|adoc|asciidoc|brainfuck|befunge|whitespace|malbolge|)$/i;
+
+function canPreview(mimeType: string | null | undefined): boolean {
+  const m = (mimeType || '').toLowerCase();
+  if (!m) return false;
+  if (m.startsWith('image/') || m.startsWith('video/') || m.startsWith('audio/')) return true;
+  if (m === 'application/pdf') return true;
+  if (TEXT_TYPES.some(t => m === t || m.startsWith(t))) return true;
+  return false;
+}
+
+function canPreviewByName(name: string, mimeType: string | null | undefined): boolean {
+  if (canPreview(mimeType)) return true;
+  return CODE_EXT.test(name || '');
+}
+
+function isTextLike(mimeType: string | null | undefined, name: string): boolean {
+  const m = (mimeType || '').toLowerCase();
+  if (m.startsWith('text/')) return true;
+  if (TEXT_TYPES.some(t => m === t || m.startsWith(t))) return true;
+  if (m === 'application/octet-stream' || !m) return CODE_EXT.test(name || '');
+  return false;
 }
 
 export default function PreviewPage() {
   const { id } = useParams<{ id: string }>();
-  const [file, setFile] = useState<{
-    id: string;
-    name: string;
-    size: number;
-    mimeType: string;
-    createdAt: string;
-    downloadCount: number;
-  } | null>(null);
+  const [file, setFile] = useState<FileInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [textLoading, setTextLoading] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -41,25 +63,31 @@ export default function PreviewPage() {
   }, [id]);
 
   useEffect(() => {
-    if (file) {
-      const url = `/api/preview?id=${encodeURIComponent(file.id)}`;
-      setPreviewUrl(url);
+    if (!file) return;
+    const url = `/api/preview?id=${encodeURIComponent(file.id)}`;
+    setPreviewUrl(url);
+    const mime = file.mime_type || '';
+    if (isTextLike(mime, file.original_name)) {
+      setTextLoading(true);
+      fetch(url)
+        .then(r => r.ok ? r.text() : Promise.reject(new Error('Failed to load')))
+        .then(t => setTextContent(t.length > 500000 ? t.slice(0, 500000) + '\n\n… (truncated)' : t))
+        .catch(() => setTextContent(null))
+        .finally(() => setTextLoading(false));
     }
   }, [file]);
 
   const handleDownload = async () => {
     if (!file || downloading) return;
     setDownloading(true);
-    setDownloadProgress(0);
     try {
       const data = await api.getDownloadUrl(file.id);
       const a = document.createElement('a');
       a.href = data.url;
-      a.download = file.name;
+      a.download = file.original_name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(data.url);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -90,7 +118,9 @@ export default function PreviewPage() {
     );
   }
 
-  const isPreviewable = canPreview(file.mimeType);
+  const mime = file.mime_type || 'application/octet-stream';
+  const isPreviewable = canPreviewByName(file.original_name, mime);
+  const showText = isTextLike(mime, file.original_name);
 
   return (
     <div className="min-h-screen" style={{ background: fullscreen ? '#000' : 'var(--bg)', color: 'var(--fg)' }}>
@@ -101,29 +131,15 @@ export default function PreviewPage() {
               <X className="w-5 h-5" />
             </Link>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-semibold truncate">{file.name}</h1>
+              <h1 className="text-lg font-semibold truncate">{file.original_name}</h1>
               <p className="text-xs font-mono" style={{ color: 'var(--text-dim)' }}>
-                {formatBytes(file.size)} • {file.mimeType} • {formatDate(file.createdAt)} • {file.downloadCount} downloads
+                {formatBytes(file.file_size)} • {mime} • {formatDate(file.created_at)} • {file.download_count} downloads
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="btn btn-primary text-xs"
-            >
-              {downloading ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  {downloadProgress}% Downloading
-                </>
-              ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download
-                </>
-              )}
+            <button onClick={handleDownload} disabled={downloading} className="btn btn-primary text-xs">
+              {downloading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading</> : <><Download className="w-3.5 h-3.5" /> Download</>}
             </button>
             <button
               onClick={() => setFullscreen(true)}
@@ -139,15 +155,15 @@ export default function PreviewPage() {
       <main className={`flex-1 flex items-center justify-center p-4 transition-all duration-300 ${fullscreen ? 'fixed inset-0 z-50' : ''}`}>
         {isPreviewable && previewUrl ? (
           <>
-            {file.mimeType.startsWith('image/') && (
+            {mime.startsWith('image/') && (
               <img
                 src={previewUrl}
-                alt={file.name}
+                alt={file.original_name}
                 className={`max-w-full max-h-full object-contain transition-all duration-300 ${fullscreen ? 'w-full h-full' : ''}`}
                 style={{ imageRendering: 'auto' }}
               />
             )}
-            {file.mimeType.startsWith('video/') && (
+            {mime.startsWith('video/') && (
               <video
                 src={previewUrl}
                 controls
@@ -156,33 +172,48 @@ export default function PreviewPage() {
                 autoPlay
               />
             )}
-            {file.mimeType.startsWith('audio/') && (
-              <audio
-                src={previewUrl}
-                controls
-                className="w-full max-w-md"
-                autoPlay
-              />
+            {mime.startsWith('audio/') && (
+              <audio src={previewUrl} controls className="w-full max-w-md" autoPlay />
             )}
-            {file.mimeType === 'application/pdf' && (
+            {mime === 'application/pdf' && (
               <iframe
                 src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=1`}
                 className={`w-full h-[80vh] ${fullscreen ? 'h-full' : ''}`}
                 style={{ border: 'none', borderRadius: fullscreen ? '0' : 'var(--radius-lg)' }}
-                title={file.name}
+                title={file.original_name}
               />
+            )}
+            {showText && (
+              textLoading ? (
+                <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-dim)' }}>
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading text…
+                </div>
+              ) : textContent !== null ? (
+                <pre
+                  className={`w-full max-w-4xl max-h-[80vh] overflow-auto p-4 rounded-lg text-xs font-mono whitespace-pre-wrap break-words ${fullscreen ? 'h-full max-w-full' : ''}`}
+                  style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+                >
+                  {textContent}
+                </pre>
+              ) : (
+                <div className="glass-card p-8 text-center max-w-md w-full" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                  <FileIcon mimeType={mime} className="w-20 h-20 mx-auto mb-4" />
+                  <h2 className="text-lg font-semibold mb-2">Preview not available</h2>
+                  <p className="text-sm opacity-70 mb-6">Could not load text content for this file.</p>
+                  <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
+                    {downloading ? 'Downloading...' : 'Download File'}
+                    <Download className="w-4 h-4" />
+                  </button>
+                </div>
+              )
             )}
           </>
         ) : (
           <div className="glass-card p-8 text-center max-w-md w-full" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-            <FileIcon mimeType={file.mimeType} className="w-20 h-20 mx-auto mb-4" />
+            <FileIcon mimeType={mime} className="w-20 h-20 mx-auto mb-4" />
             <h2 className="text-lg font-semibold mb-2">Preview not available</h2>
-            <p className="text-sm opacity-70 mb-6">This file type ({file.mimeType}) cannot be previewed in the browser.</p>
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="btn btn-primary"
-            >
+            <p className="text-sm opacity-70 mb-6">This file type ({mime}) cannot be previewed in the browser.</p>
+            <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
               {downloading ? 'Downloading...' : 'Download File'}
               <Download className="w-4 h-4" />
             </button>

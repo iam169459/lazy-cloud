@@ -435,14 +435,15 @@ export async function toggleProviderActive(providerId: string): Promise<StorageP
 export async function createFileRecord(file: Omit<FileRecord, 'download_count' | 'created_at'>): Promise<FileRecord> {
   const sql = getSql();
   const rows = (await sql`
-    INSERT INTO files (id, original_name, file_size, mime_type, r2_key, provider_id, download_count, created_at, encrypted, enc_iv, enc_auth_tag)
-    VALUES (${file.id}, ${file.original_name}, ${file.file_size}, ${file.mime_type}, ${file.r2_key}, ${file.provider_id}, 0, CURRENT_TIMESTAMP, ${file.encrypted || false}, ${file.enc_iv || null}, ${file.enc_auth_tag || null})
+    INSERT INTO files (id, original_name, file_size, mime_type, r2_key, provider_id, user_id, download_count, created_at, encrypted, enc_iv, enc_auth_tag)
+    VALUES (${file.id}, ${file.original_name}, ${file.file_size}, ${file.mime_type || 'application/octet-stream'}, ${file.r2_key}, ${file.provider_id}, ${file.user_id || null}, 0, CURRENT_TIMESTAMP, ${file.encrypted || false}, ${file.enc_iv || null}, ${file.enc_auth_tag || null})
     ON CONFLICT (id) DO UPDATE SET
       original_name = EXCLUDED.original_name,
       file_size = EXCLUDED.file_size,
       mime_type = EXCLUDED.mime_type,
       r2_key = EXCLUDED.r2_key,
-      provider_id = EXCLUDED.provider_id
+      provider_id = EXCLUDED.provider_id,
+      user_id = EXCLUDED.user_id
     RETURNING *
   `) as unknown[];
   return rows[0] as FileRecord;

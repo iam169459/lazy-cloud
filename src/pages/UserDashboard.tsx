@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen } from 'lucide-react';
+import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
-import { api, formatBytes, formatDate, AppSettings } from '@/lib/api';
+import { api, formatBytes, formatDate, AppSettings, FileInfo, ShareRecord as ApiShareRecord } from '@/lib/api';
 import { sounds } from '@/lib/sounds';
 
-interface FileRecord { id: string; original_name: string; file_size: number; mime_type: string; download_count: number; created_at: string; encrypted: boolean; }
-interface ShareRecord { id: string; file_id: string; file_name: string; download_count: number; download_limit: number | null; expires_at: string | null; created_at: string; }
+interface FileRecord extends FileInfo {}
+type ShareRecord = ApiShareRecord & { file_name: string };
 
 export default function UserDashboard() {
   const { colors } = useTheme();
@@ -45,8 +45,8 @@ export default function UserDashboard() {
         api.getUserShares(token),
         api.getUserStats(token),
       ]);
-      setFiles(f);
-      setShares(s);
+      setFiles(f as FileRecord[]);
+      setShares(s as ShareRecord[]);
       setStats(st);
     } catch (e: any) {
       notify('error', e.message);
@@ -216,6 +216,9 @@ export default function UserDashboard() {
                       <p className="text-xs font-mono" style={{ color: colors.textDim }}>{formatBytes(f.file_size)} · {formatDate(f.created_at)}</p>
                     </div>
                     <div className="flex items-center gap-1">
+                      <a href={`/preview/${f.id}`} target="_blank" rel="noopener" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Preview">
+                        <Eye className="w-4 h-4" />
+                      </a>
                       <button onClick={() => setShareModal(f.id)} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Share">
                         <Share2 className="w-4 h-4" />
                       </button>
@@ -298,17 +301,17 @@ export default function UserDashboard() {
                 <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Password (optional)</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
-                  <input type="password" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="input w-full pl-9 text-xs" style={{ background: colors.input, borderColor: colors.border, color: colors.text }} placeholder="Optional password" />
+                  <input type="password" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="input w-full pl-9 text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Optional password" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Expires in days</label>
-                  <input type="number" value={shareExpiry} onChange={(e) => setShareExpiry(e.target.value)} className="input w-full text-xs" style={{ background: colors.input, borderColor: colors.border, color: colors.text }} placeholder="Never" min="1" />
+                  <input type="number" value={shareExpiry} onChange={(e) => setShareExpiry(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Never" min="1" />
                 </div>
                 <div>
                   <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Download limit</label>
-                  <input type="number" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.input, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
+                  <input type="number" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
                 </div>
               </div>
               <button onClick={handleCreateShare} className="btn btn-primary w-full text-xs" style={{ background: colors.gradient, color: colors.bg }}>

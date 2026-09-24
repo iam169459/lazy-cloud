@@ -5,6 +5,7 @@ export interface FileInfo {
   mime_type: string;
   created_at: string;
   download_count: number;
+  encrypted?: boolean;
 }
 
 export interface FileWithProvider extends FileInfo {
@@ -39,6 +40,17 @@ export interface ShareCreateResult {
     created_at: string;
   };
   shareUrl: string;
+}
+
+export interface ShareRecord {
+  id: string;
+  file_id: string;
+  password_hash: string | null;
+  expires_at: string | null;
+  download_limit: number | null;
+  download_count: number;
+  created_at: string;
+  file_name?: string;
 }
 
 export interface ApiKey {
@@ -298,7 +310,7 @@ export const api = {
   listShares: (fileId: string, token: string) =>
     request(`/api/admin/shares?fileId=${encodeURIComponent(fileId)}`, {
       headers: { Authorization: `Bearer ${token}` },
-    }) as Promise<{ shares: any[] }>,
+    }) as Promise<{ shares: ShareRecord[] }>,
 
   deleteShare: (shareId: string, token: string) =>
     request('/api/admin/shares/delete', {
@@ -430,7 +442,7 @@ export const api = {
   getUserShares: (token: string) =>
     request('/api/user/shares', {
       headers: { Authorization: `Bearer ${token}` },
-    }) as Promise<(ShareRecord & { file_name: string })[]>,
+    }) as Promise<ShareRecord[]>,
 
   createUserShare: (token: string, fileId: string, options?: { password?: string; expiresInDays?: number; downloadLimit?: number }) =>
     request('/api/user/shares', {

@@ -214,7 +214,7 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
           .split(',')
           .map((t: string) => t.trim().toLowerCase())
           .filter(Boolean);
-        if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+        if (allowed.length > 0 && !allowed.includes('*') && !allowed.some(t => t === mimeType.toLowerCase() || (t.endsWith('/*') && mimeType.toLowerCase().startsWith(t.slice(0, -1))))) {
           uploadError = `File type ${mimeType || 'unknown'} is not allowed.`;
           file.resume();
           return;
@@ -244,6 +244,7 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
             mime_type: mimeType,
             r2_key: fileKey,
             provider_id: providerUsed.id,
+            user_id: null,
             encrypted: false,
             enc_iv: null,
             enc_auth_tag: null,
@@ -327,7 +328,7 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
         .split(',')
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
-      if (allowed.length > 0 && !allowed.includes('*') && !allowed.includes(mimeType.toLowerCase())) {
+      if (allowed.length > 0 && !allowed.includes('*') && !allowed.some(t => t === mimeType.toLowerCase() || (t.endsWith('/*') && mimeType.toLowerCase().startsWith(t.slice(0, -1))))) {
         sendError(res, 415, `File type ${mimeType || 'unknown'} is not allowed.`);
         return resolve(true);
       }
@@ -357,6 +358,7 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
             mime_type: mimeType,
             r2_key: r2Key,
             provider_id: provider.id,
+            user_id: null,
             encrypted: true,
             enc_iv: iv,
             enc_auth_tag: authTag,
@@ -479,9 +481,10 @@ export async function handleApiRequest(
         id: file.id,
         original_name: file.original_name,
         file_size: file.file_size,
-        mime_type: file.mime_type,
+        mime_type: file.mime_type || 'application/octet-stream',
         created_at: file.created_at,
         download_count: file.download_count,
+        encrypted: file.encrypted,
       });
       return true;
     }
@@ -1046,6 +1049,7 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: item.key,
             provider_id: item.provider_id,
+            user_id: null,
             encrypted: false,
             enc_iv: null,
             enc_auth_tag: null,
@@ -1105,6 +1109,7 @@ export async function handleApiRequest(
             mime_type: 'application/octet-stream',
             r2_key: key,
             provider_id: providerId,
+            user_id: null,
             encrypted: false,
             enc_iv: null,
             enc_auth_tag: null,
@@ -1158,6 +1163,11 @@ export async function handleApiRequest(
           const parts = range.replace(/bytes=/, '').split('-');
           const start = parseInt(parts[0], 10);
           const end = parts[1] ? parseInt(parts[1], 10) : contentBuffer.length - 1;
+          if (isNaN(start) || isNaN(end) || start < 0 || end >= contentBuffer.length || start > end) {
+            res.writeHead(416, { 'Content-Range': `bytes */${contentBuffer.length}` });
+            res.end();
+            return true;
+          }
           const chunkSize = (end - start) + 1;
           const chunk = contentBuffer.subarray(start, end + 1);
           res.writeHead(206, {
@@ -1166,6 +1176,9 @@ export async function handleApiRequest(
             'Content-Length': chunkSize,
             'Content-Type': contentType,
             'Cache-Control': 'public, max-age=3600',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+            'X-Frame-Options': 'SAMEORIGIN',
           });
           res.end(chunk);
           return true;
@@ -1176,6 +1189,9 @@ export async function handleApiRequest(
           'Content-Type': contentType,
           'Accept-Ranges': 'bytes',
           'Cache-Control': 'public, max-age=3600',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+          'X-Frame-Options': 'SAMEORIGIN',
         });
         res.end(contentBuffer);
         return true;
@@ -1636,31 +1652,56 @@ export async function handleApiRequest(
       if (!user) { sendError(res, 404, 'User not found'); return true; }
       if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
       const settings = await getAppSettings();
-      const maxFile = Number(settings.maxFileSize);
-      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: maxFile, files: 1 } });
-      let fileUploaded = false;
-      bb.on('file', async (_fieldname, file, info) => {
-        const { originalFilename, mimeType } = info;
-        const provider = await findProviderForSize(Number(info.fileSize) || 0);
-        if (!provider) { sendError(res, 503, 'No storage available'); file.resume(); return; }
-        const id = generateId();
-        const fileKey = `${id}/${originalFilename || 'upload'}`;
-        try {
-          const result = await uploadToProvider(provider, file, fileKey);
-          const record = await createFileRecord({
-            id, original_name: originalFilename || 'upload', file_size: Number(info.fileSize) || 0,
-            mime_type: mimeType || 'application/octet-stream', r2_key: fileKey, provider_id: provider.id,
-            user_id: userAuth.id, download_count: 0, encrypted: false, enc_iv: null, enc_auth_tag: null,
-          });
-          await updateProviderBytes(provider.id, Number(info.fileSize) || 0);
-          await updateUserStorageUsed(userAuth.id);
-          sendJson(res, 200, { success: true, file: record });
-          fileUploaded = true;
-        } catch (err: any) {
-          sendError(res, 500, err.message || 'Upload failed');
+      const maxFile = Number(settings.maxFileSize) || 0;
+      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: maxFile > 0 ? maxFile : undefined, files: 1 } });
+      let resolved = false;
+      let uploadError: string | null = null;
+      bb.on('file', (_fieldname, file, info) => {
+        const filename = info.filename || 'upload';
+        const mimeType = info.mimeType || 'application/octet-stream';
+        file.on('limit', () => {
+          uploadError = `File is too large. Max ${formatBytes(maxFile)}.`;
+          file.resume();
+        });
+        (async () => {
+          try {
+            const allowed = (settings.allowedTypes || '*').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+            if (allowed.length > 0 && !allowed.includes('*') && !allowed.some(t => t === mimeType.toLowerCase() || (t.endsWith('/*') && mimeType.toLowerCase().startsWith(t.slice(0, -1))))) {
+              uploadError = `File type ${mimeType} is not allowed.`;
+              file.resume();
+              return;
+            }
+            if (user.storage_used >= user.storage_limit) {
+              uploadError = 'Storage limit reached.';
+              file.resume();
+              return;
+            }
+            const provider = await findProviderForSize(0);
+            if (!provider) { uploadError = 'No storage available'; file.resume(); return; }
+            const id = generateId();
+            const fileKey = `${id}/${filename}`;
+            await uploadToProvider(provider, fileKey, file, mimeType);
+            if (uploadError || resolved) return;
+            const record = await createFileRecord({
+              id, original_name: filename, file_size: 0,
+              mime_type: mimeType, r2_key: fileKey, provider_id: provider.id,
+              user_id: userAuth.id, encrypted: false, enc_iv: null, enc_auth_tag: null,
+            });
+            await updateUserStorageUsed(userAuth.id);
+            resolved = true;
+            sendJson(res, 200, { success: true, file: record });
+          } catch (err: any) {
+            if (!resolved) { resolved = true; sendError(res, 500, err.message || 'Upload failed'); }
+          }
+        })();
+      });
+      bb.on('error', (err: Error) => { uploadError = err.message; });
+      bb.on('close', () => {
+        if (!resolved) {
+          resolved = true;
+          sendError(res, 400, uploadError || 'No file received');
         }
       });
-      bb.on('close', () => { if (!fileUploaded) return; });
       req.pipe(bb);
       return true;
     }
@@ -1676,7 +1717,11 @@ export async function handleApiRequest(
       if (!file) { sendError(res, 404, 'File not found'); return true; }
       if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
       if (file.provider_id) {
-        try { await deleteFromProvider(file.provider_id, file.r2_key); } catch {}
+        try {
+          const providers = await listProviders();
+          const provider = providers.find(p => p.id === file.provider_id);
+          if (provider) await deleteFromProvider(provider, file.r2_key);
+        } catch {}
         await updateProviderBytes(file.provider_id, -file.file_size);
       }
       await deleteFileRecord(fileId);
@@ -1697,7 +1742,7 @@ export async function handleApiRequest(
       if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
       let passwordHash: string | null = null;
       if (body.password) passwordHash = scryptSync(body.password, 'lazydrop-share', 64).toString('hex');
-      const share = await createShare({ file_id: fileId, password_hash: passwordHash, expires_at: body.expiresInDays ? new Date(Date.now() + body.expiresInDays * 86400000).toISOString() : null, download_limit: body.downloadLimit || null, download_count: 0 });
+      const share = await createShare({ file_id: fileId, password_hash: passwordHash, expires_at: body.expiresInDays ? new Date(Date.now() + body.expiresInDays * 86400000).toISOString() : null, download_limit: body.downloadLimit || null });
       sendJson(res, 201, { success: true, share });
       return true;
     }

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Check, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid } from 'lucide-react';
-import { api, formatBytes, formatDate, FileWithProvider, ShareInfo } from '@/lib/api';
+import { Upload, FileText, Trash2, Check, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye } from 'lucide-react';
+import { api, formatBytes, formatDate, FileWithProvider, ShareRecord } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import DataTable, { Column, BulkAction } from '@/components/DataTable';
@@ -21,7 +21,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
-  const [shareModal, setShareModal] = useState<{ fileId: string; shares: ShareInfo[] } | null>(null);
+  const [shareModal, setShareModal] = useState<{ fileId: string; shares: ShareRecord[] } | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareForm, setShareForm] = useState({ password: '', expiresInDays: '', downloadLimit: '' });
   const [showUploadQueue, setShowUploadQueue] = useState(false);
@@ -165,22 +165,27 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
 
   const rowActions = [
     {
+      label: 'Preview',
+      icon: <Eye className="w-3.5 h-3.5" />,
+      onClick: (f: FileWithProvider) => window.open(`/preview/${f.id}`, '_blank'),
+    },
+    {
       label: 'Copy link',
       icon: <Link2 className="w-3.5 h-3.5" />,
-      onClick: (f) => copyLink(f.id),
+      onClick: (f: FileWithProvider) => copyLink(f.id),
     },
     {
       label: 'Share',
       icon: <Share2 className="w-3.5 h-3.5" />,
-      onClick: (f) => openShareModal(f.id),
-      disabled: (f) => sharingId === f.id,
+      onClick: (f: FileWithProvider) => openShareModal(f.id),
+      disabled: (f: FileWithProvider) => sharingId === f.id,
     },
     {
       label: 'Delete',
       icon: <Trash2 className="w-3.5 h-3.5" />,
-      onClick: (f) => del(f.id, f.original_name),
-      variant: 'danger',
-      disabled: (f) => deletingId === f.id,
+      onClick: (f: FileWithProvider) => del(f.id, f.original_name),
+      variant: 'danger' as const,
+      disabled: (f: FileWithProvider) => deletingId === f.id,
     },
   ];
 
@@ -282,9 +287,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
                 {shareModal.shares.map((s) => (
                   <div key={s.id} className="p-3 rounded-lg" style={{ background: 'var(--input)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{s.shareId.slice(0, 8)}...</span>
+                      <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{s.id.slice(0, 8)}...</span>
                       <button
-                        onClick={() => copyShareLink(`${window.location.origin}/s/${s.shareId}`)}
+                        onClick={() => copyShareLink(`${window.location.origin}/s/${s.id}`)}
                         className="p-1.5 rounded text-xs" style={{ color: 'var(--text-muted)' }}
                         title="Copy link"
                       >
@@ -292,9 +297,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2 text-[10px] font-mono mb-2" style={{ color: 'var(--text-dim)' }}>
-                      {s.requiresPassword && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}><Lock className="w-3 h-3" />Password</span>}
-                      {s.expiresAt && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: colors.danger }}><Clock className="w-3 h-3" />Expires {formatDate(s.expiresAt)}</span>}
-                      {s.downloadLimit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>{s.downloadsRemaining !== null ? `${s.downloadsRemaining}/${s.downloadLimit}` : 'Unlimited'}</span>}
+                      {s.password_hash && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}><Lock className="w-3 h-3" />Password</span>}
+                      {s.expires_at && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: colors.danger }}><Clock className="w-3 h-3" />Expires {formatDate(s.expires_at)}</span>}
+                      {s.download_limit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>{s.download_limit - s.download_count}/{s.download_limit}</span>}
                     </div>
                     <button
                       onClick={() => deleteShare(s.id)}
