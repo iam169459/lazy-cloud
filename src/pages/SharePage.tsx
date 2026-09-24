@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Download, Lock, AlertCircle, Clock, Copy, Check, FileText, Image, Video, Music, Archive } from 'lucide-react';
+import { Download, Lock, AlertCircle, Clock, Copy, Check, FileText, Image, Video, Music, Archive, Coins, ShoppingBag, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/api';
+import { useUserAuth } from '@/lib/userAuth';
+import { sounds } from '@/lib/sounds';
 
 function FileIcon({ mimeType, className = 'w-12 h-12' }: { mimeType: string; className?: string }) {
   if (mimeType.startsWith('image/')) return <Image className={className} style={{ color: 'var(--primary)' }} />;
@@ -15,6 +17,7 @@ function FileIcon({ mimeType, className = 'w-12 h-12' }: { mimeType: string; cla
 export default function SharePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { token } = useUserAuth();
   const [share, setShare] = useState<{
     shareId: string;
     file: { id: string; name: string; size: number; mimeType: string; createdAt: string };
@@ -22,27 +25,55 @@ export default function SharePage() {
     expiresAt: string | null;
     downloadLimit: number | null;
     downloadsRemaining: number | null;
+    priceCoins?: number;
+    purchased?: boolean;
+    isOwner?: boolean;
+    visits?: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    api.getShareInfo(id!)
-      .then(setShare)
+    api.getShareInfo(id!, token || undefined)
+      .then((s) => {
+        setShare(s);
+        // Link-visit beacon: credits the share owner (deduped per IP/day)
+        api.recordLinkVisit(id!).catch(() => {});
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, token]);
+
+  async function handleBuy() {
+    if (!id || !share || buying) return;
+    if (!token) { navigate('/login'); return; }
+    setBuying(true);
+    setBuyError(null);
+    try {
+      await api.purchaseFile(token, share.file.id);
+      sounds.success();
+      const fresh = await api.getShareInfo(id, token);
+      setShare(fresh);
+    } catch (e: any) {
+      sounds.error();
+      setBuyError(e.message || 'Purchase failed');
+    } finally {
+      setBuying(false);
+    }
+  }
 
   const handleDownload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (downloading) return;
     setDownloading(true);
     try {
-      const data = await api.downloadSharedFile(id!, password || undefined);
+      const data = await api.downloadSharedFile(id!, password || undefined, token || undefined);
       const a = document.createElement('a');
       a.href = data.url;
       a.download = share?.file.name || 'download';
@@ -90,8 +121,10 @@ export default function SharePage() {
 
   const isExpired = share.expiresAt && new Date(share.expiresAt) < new Date();
   const isLimitReached = share.downloadLimit && share.downloadsRemaining !== null && share.downloadsRemaining <= 0;
-  const canDownload = !isExpired && !isLimitReached && !share.requiresPassword;
-  const canDownloadWithPassword = !isExpired && !isLimitReached && share.requiresPassword && password;
+  const price = share.priceCoins || 0;
+  const needsPurchase = price > 0 && !share.purchased;
+  const canDownload = !isExpired && !isLimitReached && !share.requiresPassword && !needsPurchase;
+  const canDownloadWithPassword = !isExpired && !isLimitReached && share.requiresPassword && password && !needsPurchase;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
@@ -129,6 +162,44 @@ export default function SharePage() {
             </div>
           </div>
 
+          {price > 0 && (
+            <div className="rounded-lg p-4 border" style={{ background: `${share.purchased ? '#22c55e' : 'var(--primary)'}12`, borderColor: share.purchased ? '#22c55e50' : 'rgba(var(--primary-rgb), 0.3)' }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: share.purchased ? '#22c55e' : 'var(--primary)' }}>
+                <Coins className="w-4 h-4" />
+                <span className="font-medium">
+                  {share.purchased ? 'Purchased — enjoy the file!' : `${price} coins`}
+                </span>
+                {!share.purchased && share.visits !== undefined && (
+                  <span className="ml-auto text-xs opacity-70">{share.visits} visit{share.visits === 1 ? '' : 's'}</span>
+                )}
+              </div>
+              {!share.purchased && (
+                <div className="mt-3">
+                  {token ? (
+                    <button
+                      onClick={handleBuy}
+                      disabled={buying}
+                      className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                      style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
+                    >
+                      {buying ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</> : <><ShoppingBag className="w-4 h-4" /> Buy for {price} coins</>}
+                    </button>
+                  ) : (
+                    <Link
+                      to="/login"
+                      className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                      style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
+                    >
+                      <ShoppingBag className="w-4 h-4" /> Sign in to buy
+                    </Link>
+                  )}
+                  {buyError && <p className="text-xs mt-2 text-center" style={{ color: '#ef4444' }}>{buyError}</p>}
+                  {!buyError && <p className="text-xs mt-2 text-center opacity-60">Earn coins from your own links on the <Link to="/coins" style={{ color: 'var(--primary)' }}>Earn page</Link></p>}
+                </div>
+              )}
+            </div>
+          )}
+
           {share.requiresPassword && (
             <div className="rounded-lg p-4 border" style={{ background: 'rgba(var(--warning-rgb), 0.1)', borderColor: 'rgba(var(--warning-rgb), 0.3)' }}>
               <div className="flex items-center gap-2 text-sm mb-2" style={{ color: 'var(--warning)' }}>
@@ -146,7 +217,7 @@ export default function SharePage() {
                 />
                 <button
                   type="submit"
-                  disabled={downloading || !password}
+                  disabled={downloading || !password || needsPurchase}
                   className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
                 >
                   {downloading ? 'Downloading...' : 'Download'}

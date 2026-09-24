@@ -6,6 +6,9 @@ export interface FileInfo {
   created_at: string;
   download_count: number;
   encrypted?: boolean;
+  price_coins?: number;
+  purchased?: boolean;
+  is_owner?: boolean;
 }
 
 export interface FileWithProvider extends FileInfo {
@@ -27,6 +30,36 @@ export interface ShareInfo {
   expiresAt: string | null;
   downloadLimit: number | null;
   downloadsRemaining: number | null;
+  priceCoins?: number;
+  purchased?: boolean;
+  isOwner?: boolean;
+  visits?: number;
+}
+
+export interface CoinTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  ref: string | null;
+  created_at: string;
+}
+
+export interface CoinsInfo {
+  coins: number;
+  dailyBonus: number;
+  visitReward: number;
+  claimedToday: boolean;
+  transactions: CoinTransaction[];
+}
+
+export interface PurchasedFile {
+  file_id: string;
+  price_paid: number;
+  created_at: string;
+  original_name: string;
+  file_size: number;
+  mime_type: string;
 }
 
 export interface ShareCreateResult {
@@ -157,11 +190,15 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  getFileInfo: (id: string) =>
-    request(`/api/file?id=${encodeURIComponent(id)}`) as Promise<FileInfo>,
+  getFileInfo: (id: string, token?: string) =>
+    request(`/api/file?id=${encodeURIComponent(id)}`, {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }) as Promise<FileInfo>,
 
-  getDownloadUrl: (id: string) =>
-    request(`/api/download?id=${encodeURIComponent(id)}`) as Promise<{ url: string }>,
+  getDownloadUrl: (id: string, token?: string) =>
+    request(`/api/download?id=${encodeURIComponent(id)}`, {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }) as Promise<{ url: string }>,
 
   getEncryptedDownloadUrl: (id: string) =>
     request(`/api/download/encrypted?id=${encodeURIComponent(id)}`) as Promise<{ url: string }>,
@@ -310,11 +347,53 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }) as Promise<{ success: boolean; username: string }>,
 
-  getShareInfo: (shareId: string) =>
-    request(`/api/share?id=${encodeURIComponent(shareId)}`) as Promise<ShareInfo>,
+  getShareInfo: (shareId: string, token?: string) =>
+    request(`/api/share?id=${encodeURIComponent(shareId)}`, {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }) as Promise<ShareInfo>,
 
-  downloadSharedFile: (shareId: string, password?: string) =>
-    request(`/api/share/download?id=${encodeURIComponent(shareId)}${password ? `&password=${encodeURIComponent(password)}` : ''}`) as Promise<{ url: string; name: string; size: number }>,
+  downloadSharedFile: (shareId: string, password?: string, token?: string) =>
+    request(`/api/share/download?id=${encodeURIComponent(shareId)}${password ? `&password=${encodeURIComponent(password)}` : ''}`, {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    }) as Promise<{ url: string; name: string; size: number }>,
+
+  // ── Coins / earning ──
+  getCoins: (token: string) =>
+    request('/api/user/coins', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<CoinsInfo>,
+
+  claimDailyBonus: (token: string) =>
+    request('/api/user/coins/daily-claim', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ success: boolean; coins: number; earned: number }>,
+
+  recordLinkVisit: (shareId: string) =>
+    request('/api/link/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shareId }),
+    }) as Promise<{ ok: boolean; rewarded: boolean; reward: number }>,
+
+  setFilePrice: (token: string, fileId: string, priceCoins: number) =>
+    request('/api/user/files/price', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fileId, priceCoins }),
+    }) as Promise<{ success: boolean; priceCoins: number }>,
+
+  purchaseFile: (token: string, fileId: string) =>
+    request('/api/user/files/purchase', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ fileId }),
+    }) as Promise<{ success: boolean; purchased: boolean; coins?: number; spent?: number }>,
+
+  getMyPurchases: (token: string) =>
+    request('/api/user/purchases', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<PurchasedFile[]>,
 
   createShare: (fileId: string, password?: string, expiresInDays?: number, downloadLimit?: number, token?: string) =>
     request('/api/admin/shares', {
@@ -477,7 +556,7 @@ export const api = {
   getUserStats: (token: string) =>
     request('/api/user/stats', {
       headers: { Authorization: `Bearer ${token}` },
-    }) as Promise<{ fileCount: number; shareCount: number; storageUsed: number; storageLimit: number }>,
+    }) as Promise<{ fileCount: number; shareCount: number; storageUsed: number; storageLimit: number; coins: number }>,
 
   // ── User Files ──
   getUserFiles: (token: string) =>

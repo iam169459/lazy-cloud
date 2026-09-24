@@ -7,7 +7,7 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, spendCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, hasPurchased, purchaseFile, getFileOwner, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
 
@@ -543,6 +543,10 @@ export async function handleApiRequest(
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const viewer = await checkUserAuth(req);
+      const priceCoins = file.price_coins || 0;
+      const isOwner = !!(viewer && file.user_id === viewer.id);
+      const purchased = viewer && priceCoins > 0 ? await hasPurchased(file.id, viewer.id) : false;
       sendJson(res, 200, {
         id: file.id,
         original_name: file.original_name,
@@ -551,6 +555,9 @@ export async function handleApiRequest(
         created_at: file.created_at,
         download_count: file.download_count,
         encrypted: file.encrypted,
+        price_coins: priceCoins,
+        purchased: priceCoins === 0 || isOwner || purchased,
+        is_owner: isOwner,
       });
       return true;
     }
@@ -561,6 +568,17 @@ export async function handleApiRequest(
       if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
+
+      // Paid file gating: owner or purchaser only
+      if ((file.price_coins || 0) > 0) {
+        const viewer = await checkUserAuth(req);
+        const isOwner = viewer && file.user_id === viewer.id;
+        const purchased = viewer ? await hasPurchased(file.id, viewer.id) : false;
+        if (!isOwner && !purchased) {
+          sendJson(res, 402, { error: 'Payment required', price: file.price_coins });
+          return true;
+        }
+      }
 
       const providers = await listProviders();
       const provider = providers.find((p) => p.id === file.provider_id);
@@ -1280,6 +1298,14 @@ export async function handleApiRequest(
       const providers = await listProviders();
       const provider = providers.find((p) => p.id === file.provider_id);
       if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+
+      // Optional viewer context for paid files
+      const viewer = await checkUserAuth(req);
+      const priceCoins = file.price_coins || 0;
+      const isOwner = !!(viewer && file.user_id === viewer.id);
+      const purchased = viewer ? await hasPurchased(file.id, viewer.id) : false;
+      const visits = await countShareVisits(share.id);
+
       sendJson(res, 200, {
         shareId: share.id,
         file: {
@@ -1293,6 +1319,10 @@ export async function handleApiRequest(
         expiresAt: share.expires_at,
         downloadLimit: share.download_limit,
         downloadsRemaining: share.download_limit ? share.download_limit - share.download_count : null,
+        priceCoins,
+        purchased: priceCoins === 0 || isOwner || purchased,
+        isOwner,
+        visits,
       });
       return true;
     }
@@ -1305,6 +1335,17 @@ export async function handleApiRequest(
       if (!share) { sendError(res, 403, share ? 'Share expired or limit reached' : 'Invalid share or password'); return true; }
       const file = await getFileRecord(share.file_id);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
+
+      // Paid file gating: owner or purchaser only
+      if ((file.price_coins || 0) > 0) {
+        const viewer = await checkUserAuth(req);
+        const isOwner = viewer && file.user_id === viewer.id;
+        const purchased = viewer ? await hasPurchased(file.id, viewer.id) : false;
+        if (!isOwner && !purchased) {
+          sendJson(res, 402, { error: 'Payment required', price: file.price_coins });
+          return true;
+        }
+      }
       const providers = await listProviders();
       const provider = providers.find((p) => p.id === file.provider_id);
       if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
@@ -1637,6 +1678,7 @@ export async function handleApiRequest(
       if (existing) { sendError(res, 409, 'Username already taken'); return true; }
       const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
       const user = await createUser(username, email, hash);
+      await addCoins(user.id, COIN_SIGNUP_BONUS, 'signup_bonus');
       const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
       sendJson(res, 201, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
       return true;
@@ -1665,7 +1707,111 @@ export async function handleApiRequest(
       if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
       const user = await getUserById(userAuth.id);
       if (!user) { sendError(res, 404, 'User not found'); return true; }
-      sendJson(res, 200, { id: user.id, username: user.username, email: user.email, role: user.role, storage_used: user.storage_used, storage_limit: user.storage_limit, created_at: user.created_at, last_login: user.last_login });
+      sendJson(res, 200, { id: user.id, username: user.username, email: user.email, role: user.role, storage_used: user.storage_used, storage_limit: user.storage_limit, created_at: user.created_at, last_login: user.last_login, coins: user.coins || 0 });
+      return true;
+    }
+
+    // ═══════════════════════════════════════════
+    // ── COINS / EARNING / PURCHASES ──
+    // ═══════════════════════════════════════════
+
+    // ── Coins: balance + recent transactions ──
+    if (path === '/api/user/coins' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const user = await getUserById(userAuth.id);
+      if (!user) { sendError(res, 404, 'User not found'); return true; }
+      const transactions = await listCoinTransactions(userAuth.id, 50);
+      const claimedToday = !!(user.last_daily_claim && new Date(user.last_daily_claim) >= new Date(new Date().toDateString()));
+      sendJson(res, 200, {
+        coins: user.coins || 0,
+        dailyBonus: COIN_DAILY_BONUS,
+        visitReward: COIN_VISIT_REWARD,
+        claimedToday,
+        transactions,
+      });
+      return true;
+    }
+
+    // ── Coins: claim daily bonus ──
+    if (path === '/api/user/coins/daily-claim' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 10, 60000)) return true;
+      const result = await claimDailyBonus(userAuth.id);
+      if (!result.ok) { sendError(res, 409, 'Daily bonus already claimed today'); return true; }
+      sendJson(res, 200, { success: true, coins: result.coins, earned: COIN_DAILY_BONUS });
+      return true;
+    }
+
+    // ── Link visit beacon: rewards share owner (public, rate-limited, deduped per IP/day) ──
+    if (path === '/api/link/visit' && req.method === 'POST') {
+      if (!applyRateLimit(req, res, 30, 60000)) return true;
+      const body = await parseJsonBody(req);
+      const shareId = sanitize(body.shareId);
+      if (!shareId) { sendError(res, 400, 'shareId required'); return true; }
+      const share = await getShareById(shareId);
+      if (!share) { sendError(res, 404, 'Share not found'); return true; }
+      const file = await getFileRecord(share.file_id);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const ip = getClientIp(req);
+      const day = new Date().toISOString().slice(0, 10);
+      const visitorHash = createHmac('sha256', JWT_SECRET).update(`${ip}|${day}`).digest('hex');
+      const result = await recordLinkVisit(share.id, visitorHash, file.user_id);
+      sendJson(res, 200, { ok: true, rewarded: result.rewarded, reward: result.rewarded ? COIN_VISIT_REWARD : 0 });
+      return true;
+    }
+
+    // ── Files: set price (owner only) ──
+    if (path === '/api/user/files/price' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      const price = Math.max(0, Math.floor(Number(body.priceCoins) || 0));
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      if (price > 1000000) { sendError(res, 400, 'Price too high'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
+      await setFilePrice(fileId, price);
+      sendJson(res, 200, { success: true, priceCoins: price });
+      return true;
+    }
+
+    // ── Files: purchase with coins ──
+    if (path === '/api/user/files/purchase' && req.method === 'POST') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      if (!applyRateLimit(req, res, 20, 60000)) return true;
+      const body = await parseJsonBody(req);
+      const fileId = body.fileId;
+      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      const price = file.price_coins || 0;
+      if (price <= 0) { sendJson(res, 200, { success: true, free: true, purchased: true }); return true; }
+      if (file.user_id === userAuth.id) { sendJson(res, 200, { success: true, free: true, purchased: true }); return true; }
+      const result = await purchaseFile(fileId, userAuth.id, price);
+      if (!result.ok) { sendError(res, 400, result.error || 'Purchase failed'); return true; }
+      sendJson(res, 200, { success: true, purchased: true, coins: result.coins, spent: price });
+      return true;
+    }
+
+    // ── Files: my purchases ──
+    if (path === '/api/user/purchases' && req.method === 'GET') {
+      const userAuth = await checkUserAuth(req);
+      if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const sqlDb = getDb();
+      const rows = await sqlDb`
+        SELECT p.file_id, p.price_paid, p.created_at, f.original_name, f.file_size, f.mime_type
+        FROM file_purchases p
+        JOIN files f ON f.id = p.file_id
+        WHERE p.buyer_id = ${userAuth.id}
+        ORDER BY p.created_at DESC
+        LIMIT 100
+      ` as unknown[];
+      sendJson(res, 200, rows);
       return true;
     }
 
@@ -1935,7 +2081,7 @@ export async function handleApiRequest(
       const fileCount = await countUserFiles(userAuth.id);
       const shares = await listUserShares(userAuth.id);
       const user = await getUserById(userAuth.id);
-      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || 10737418240 });
+      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || 10737418240, coins: user?.coins || 0 });
       return true;
     }
 

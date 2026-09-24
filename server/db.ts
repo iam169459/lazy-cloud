@@ -43,6 +43,7 @@ export interface FileRecord {
   encrypted: boolean;
   enc_iv: string | null;
   enc_auth_tag: string | null;
+  price_coins?: number;
 }
 
 export interface UserRecord {
@@ -58,6 +59,17 @@ export interface UserRecord {
   totp_enabled: boolean;
   created_at: string;
   last_login: string | null;
+  coins: number;
+  last_daily_claim: string | null;
+}
+
+export interface CoinTransaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  ref: string | null;
+  created_at: string;
 }
 
 export async function initDatabase() {
@@ -225,6 +237,45 @@ export async function initDatabase() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_used BIGINT DEFAULT 0`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_limit BIGINT DEFAULT 10737418240`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_daily_claim TIMESTAMP`;
+
+  // ── Coins / purchases / link visits ──
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS price_coins INTEGER DEFAULT 0`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS coin_transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      ref TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_coin_transactions_user_id ON coin_transactions (user_id, created_at DESC)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS file_purchases (
+      id TEXT PRIMARY KEY,
+      file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+      buyer_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      price_paid INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(file_id, buyer_id)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_file_purchases_buyer ON file_purchases (buyer_id)`;
+  await sql`
+    CREATE TABLE IF NOT EXISTS link_visits (
+      id TEXT PRIMARY KEY,
+      share_id TEXT NOT NULL REFERENCES shares(id) ON DELETE CASCADE,
+      visitor_hash TEXT NOT NULL,
+      rewarded_user_id TEXT,
+      reward_amount INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(share_id, visitor_hash)
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_link_visits_share ON link_visits (share_id)`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS webauthn_credentials (
@@ -870,5 +921,139 @@ export async function listUserShares(userId: string): Promise<(ShareRecord & { f
     WHERE f.user_id = ${userId}
     ORDER BY s.created_at DESC
   `) as unknown[] as (ShareRecord & { file_name: string })[];
+}
+
+// ── Coins / purchases / link visits ──
+
+export const COIN_SIGNUP_BONUS = 25;
+export const COIN_DAILY_BONUS = 10;
+export const COIN_VISIT_REWARD = 2;
+
+export async function addCoins(userId: string, amount: number, reason: string, ref?: string | null): Promise<number | null> {
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE users SET coins = COALESCE(coins, 0) + ${amount}
+    WHERE id = ${userId}
+    RETURNING coins
+  ` as unknown[];
+  if (rows.length === 0) return null;
+  await sql`
+    INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
+    VALUES (${randomUUID()}, ${userId}, ${amount}, ${reason}, ${ref ?? null})
+  `;
+  return Number((rows[0] as any).coins);
+}
+
+export async function spendCoins(userId: string, amount: number, reason: string, ref?: string | null): Promise<number | null> {
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE users SET coins = COALESCE(coins, 0) - ${amount}
+    WHERE id = ${userId} AND COALESCE(coins, 0) >= ${amount}
+    RETURNING coins
+  ` as unknown[];
+  if (rows.length === 0) return null;
+  await sql`
+    INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
+    VALUES (${randomUUID()}, ${userId}, ${-amount}, ${reason}, ${ref ?? null})
+  `;
+  return Number((rows[0] as any).coins);
+}
+
+export async function claimDailyBonus(userId: string): Promise<{ ok: boolean; coins?: number; alreadyClaimed?: boolean }> {
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE users
+    SET coins = COALESCE(coins, 0) + ${COIN_DAILY_BONUS}, last_daily_claim = CURRENT_TIMESTAMP
+    WHERE id = ${userId}
+      AND (last_daily_claim IS NULL OR last_daily_claim < CURRENT_DATE)
+    RETURNING coins
+  ` as unknown[];
+  if (rows.length === 0) {
+    const user = await getUserById(userId);
+    return { ok: false, alreadyClaimed: true, coins: user?.coins ?? 0 };
+  }
+  await sql`
+    INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
+    VALUES (${randomUUID()}, ${userId}, ${COIN_DAILY_BONUS}, 'daily_bonus', ${null})
+  `;
+  return { ok: true, coins: Number((rows[0] as any).coins) };
+}
+
+export async function listCoinTransactions(userId: string, limit: number = 50, offset: number = 0): Promise<CoinTransaction[]> {
+  const sql = getSql();
+  return (await sql`
+    SELECT * FROM coin_transactions
+    WHERE user_id = ${userId}
+    ORDER BY created_at DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `) as unknown[] as CoinTransaction[];
+}
+
+export async function recordLinkVisit(shareId: string, visitorHash: string, ownerId: string | null): Promise<{ rewarded: boolean; coins?: number }> {
+  const sql = getSql();
+  const rows = await sql`
+    INSERT INTO link_visits (id, share_id, visitor_hash, rewarded_user_id, reward_amount)
+    VALUES (${randomUUID()}, ${shareId}, ${visitorHash}, ${ownerId}, ${ownerId ? COIN_VISIT_REWARD : 0})
+    ON CONFLICT (share_id, visitor_hash) DO NOTHING
+    RETURNING id
+  ` as unknown[];
+  if (rows.length === 0) return { rewarded: false };
+  if (ownerId) {
+    const coins = await addCoins(ownerId, COIN_VISIT_REWARD, 'link_visit', shareId);
+    return { rewarded: true, coins: coins ?? undefined };
+  }
+  return { rewarded: true };
+}
+
+export async function countShareVisits(shareId: string): Promise<number> {
+  const sql = getSql();
+  const rows = await sql`SELECT COUNT(*)::INT AS count FROM link_visits WHERE share_id = ${shareId}` as unknown[];
+  return Number((rows[0] as any).count);
+}
+
+export async function setFilePrice(fileId: string, priceCoins: number): Promise<void> {
+  const sql = getSql();
+  await sql`UPDATE files SET price_coins = ${priceCoins} WHERE id = ${fileId}`;
+}
+
+export async function hasPurchased(fileId: string, buyerId: string): Promise<boolean> {
+  const sql = getSql();
+  const rows = await sql`SELECT id FROM file_purchases WHERE file_id = ${fileId} AND buyer_id = ${buyerId}` as unknown[];
+  return rows.length > 0;
+}
+
+export async function purchaseFile(fileId: string, buyerId: string, price: number): Promise<{ ok: boolean; error?: string; coins?: number }> {
+  const sql = getSql();
+  const already = await hasPurchased(fileId, buyerId);
+  if (already) return { ok: false, error: 'Already purchased' };
+  // Insert first (unique constraint prevents double-buy races), then transfer coins
+  try {
+    await sql`
+      INSERT INTO file_purchases (id, file_id, buyer_id, price_paid)
+      VALUES (${randomUUID()}, ${fileId}, ${buyerId}, ${price})
+    `;
+  } catch (e: any) {
+    if (String(e.message).includes('unique') || String(e.message).includes('duplicate')) {
+      return { ok: false, error: 'Already purchased' };
+    }
+    throw e;
+  }
+  const buyerCoins = await spendCoins(buyerId, price, 'purchase', fileId);
+  if (buyerCoins === null) {
+    // Refund the purchase row
+    await sql`DELETE FROM file_purchases WHERE file_id = ${fileId} AND buyer_id = ${buyerId}`;
+    return { ok: false, error: 'Not enough coins' };
+  }
+  const file = await getFileRecord(fileId);
+  if (file?.user_id && file.user_id !== buyerId) {
+    await addCoins(file.user_id, price, 'sale', fileId);
+  }
+  return { ok: true, coins: buyerCoins };
+}
+
+export async function getFileOwner(fileId: string): Promise<string | null> {
+  const sql = getSql();
+  const rows = await sql`SELECT user_id FROM files WHERE id = ${fileId}` as unknown[];
+  return (rows[0] as any)?.user_id ?? null;
 }
 

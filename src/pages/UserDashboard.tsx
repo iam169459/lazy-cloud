@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye, Fingerprint, Shield } from 'lucide-react';
+import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye, Fingerprint, Shield, Coins } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { api, formatBytes, formatDate, AppSettings, FileInfo, ShareRecord as ApiShareRecord } from '@/lib/api';
@@ -17,7 +17,7 @@ export default function UserDashboard() {
   const [tab, setTab] = useState<'files' | 'shares' | 'profile'>('files');
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [shares, setShares] = useState<ShareRecord[]>([]);
-  const [stats, setStats] = useState({ fileCount: 0, shareCount: 0, storageUsed: 0, storageLimit: 10737418240 });
+  const [stats, setStats] = useState({ fileCount: 0, shareCount: 0, storageUsed: 0, storageLimit: 10737418240, coins: 0 });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -25,6 +25,7 @@ export default function UserDashboard() {
   const [sharePassword, setSharePassword] = useState('');
   const [shareExpiry, setShareExpiry] = useState('');
   const [shareLimit, setShareLimit] = useState('');
+  const [sharePrice, setSharePrice] = useState('');
   const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [biometricsSupport, setBiometricsSupport] = useState<BiometricsSupport | null>(null);
@@ -118,6 +119,9 @@ export default function UserDashboard() {
   async function handleCreateShare() {
     if (!token || !shareModal) return;
     try {
+      if (sharePrice) {
+        await api.setFilePrice(token, shareModal, Math.max(0, Math.floor(Number(sharePrice) || 0)));
+      }
       const opts: any = {};
       if (sharePassword) opts.password = sharePassword;
       if (shareExpiry) opts.expiresInDays = Number(shareExpiry);
@@ -126,11 +130,12 @@ export default function UserDashboard() {
       sounds.success();
       const url = `${window.location.origin}/s/${result.share.id}`;
       await navigator.clipboard.writeText(url);
-      notify('success', 'Share link copied!');
+      notify('success', sharePrice ? `Share link copied! Priced at ${sharePrice} coins` : 'Share link copied!');
       setShareModal(null);
       setSharePassword('');
       setShareExpiry('');
       setShareLimit('');
+      setSharePrice('');
       await loadData();
     } catch (err: any) { notify('error', err.message); }
   }
@@ -210,6 +215,18 @@ export default function UserDashboard() {
           </div>
         </div>
 
+        {/* Coins banner */}
+        <button onClick={() => nav('/coins')} className="w-full flex items-center gap-3 mb-6 p-4 rounded-xl transition-all hover:scale-[1.005] text-left" style={{ background: `${colors.primary}10`, border: `1px solid ${colors.primary}30` }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${colors.primary}20` }}>
+            <Coins className="w-5 h-5" style={{ color: colors.primary }} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold" style={{ color: colors.text }}>{stats.coins} coins</p>
+            <p className="text-xs" style={{ color: colors.textDim }}>Earn by sharing links and claiming daily bonuses — spend on files</p>
+          </div>
+          <span className="text-xs font-medium" style={{ color: colors.primary }}>Earn →</span>
+        </button>
+
         {/* Tabs */}
         <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: `${colors.text}08` }}>
           {([['files', 'My Files', File], ['shares', 'Shares', Share2], ['profile', 'Profile', User]] as const).map(([key, label, Icon]) => (
@@ -244,7 +261,10 @@ export default function UserDashboard() {
                     <File className="w-5 h-5 shrink-0" style={{ color: colors.primary }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate" style={{ color: colors.text }}>{f.original_name}</p>
-                      <p className="text-xs font-mono" style={{ color: colors.textDim }}>{formatBytes(f.file_size)} · {formatDate(f.created_at)}</p>
+                      <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+                        {formatBytes(f.file_size)} · {formatDate(f.created_at)}
+                        {(f.price_coins || 0) > 0 && <span style={{ color: colors.primary }}> · {f.price_coins} coins</span>}
+                      </p>
                     </div>
                     <div className="flex items-center gap-1">
                       <a href={`/preview/${f.id}`} target="_blank" rel="noopener" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Preview">
@@ -370,6 +390,13 @@ export default function UserDashboard() {
                 <div>
                   <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Download limit</label>
                   <input type="number" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Price in coins <span style={{ opacity: 0.6 }}>(0 = free)</span></label>
+                <div className="relative">
+                  <Coins className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
+                  <input type="number" value={sharePrice} onChange={(e) => setSharePrice(e.target.value)} className="input w-full pl-9 text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Free" min="0" />
                 </div>
               </div>
               <button onClick={handleCreateShare} className="btn btn-primary w-full text-xs" style={{ background: colors.gradient, color: colors.bg }}>
