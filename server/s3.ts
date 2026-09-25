@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { Readable } from 'node:stream';
 import type { StorageProvider } from './db';
 
 const regionCache = new Map<string, string>();
@@ -81,7 +82,7 @@ export async function createS3Client(provider: StorageProvider): Promise<S3Clien
 export async function uploadToProvider(
   provider: StorageProvider,
   key: string,
-  body: Buffer | NodeJS.ReadableStream,
+  body: Buffer | Readable,
   contentType: string
 ): Promise<void> {
   const client = await createS3Client(provider);

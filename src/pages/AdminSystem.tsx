@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Terminal, Loader2, Check, AlertCircle, RefreshCw, GitBranch,
+  Terminal, Loader2, Check, AlertCircle, RefreshCw,
   Zap, ArrowUpCircle
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { readJson } from '@/lib/api';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
@@ -33,22 +34,22 @@ export default function AdminSystem({ token, onNotify }: Props) {
   const [checking, setChecking] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [copied, setCopied] = useState(false);
+  const [, setCopied] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
-  function addLog(text: string, type: LogEntry['type'] = 'info') {
+  const addLog = useCallback(async (text: string, type: LogEntry['type'] = 'info') => {
     const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs((prev) => [...prev, { time, text, type }]);
-  }
+  }, []);
 
-  async function checkUpdate() {
+  const checkUpdate = useCallback(async () => {
     setChecking(true); setLogs([]);
     addLog('Checking for updates...');
     try {
       const res = await fetch('/api/admin/system/check-update', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await readJson(res);
+      const data = await readJson<UpdateStatus & { error?: string }>(res);
       if (!res.ok) throw new Error(data.error || 'Check failed');
       setStatus(data);
       if (data.upToDate) {
@@ -57,14 +58,14 @@ export default function AdminSystem({ token, onNotify }: Props) {
         addLog(`${data.commitsAhead} update(s) available`, 'warn');
         addLog(`Remote: ${data.remoteCommit}`, 'info');
       }
-    } catch (e: any) {
-      addLog(`Check failed: ${e.message}`, 'error');
+    } catch (e) {
+      addLog(`Check failed: ${errMsg(e)}`, 'error');
     } finally {
       setChecking(false);
     }
-  }
+  }, [addLog, token]);
 
-  useEffect(() => { checkUpdate(); }, []);
+  useEffect(() => { checkUpdate(); }, [checkUpdate]);
 
   useEffect(() => {
     if (logRef.current) {
@@ -82,7 +83,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string; pull?: string }>(res);
 
       if (!res.ok) {
         addLog(`Failed: ${data.error || 'Unknown error'}`, 'error');
@@ -104,7 +105,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
 
       sounds.success();
       onNotify('success', 'Update started — server restarting');
-    } catch (e: any) {
+    } catch {
       // Connection lost is expected — server is restarting
       addLog('Server is restarting...', 'success');
       addLog('Page will reload in 5 seconds', 'info');
@@ -114,13 +115,11 @@ export default function AdminSystem({ token, onNotify }: Props) {
     }
   }
 
-  function handleCopyScript() {
     const script = `curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash`;
     navigator.clipboard.writeText(script).then(() => {
       setCopied(true); sounds.copy();
       setTimeout(() => setCopied(false), 2000);
     });
-  }
 
   return (
     <div className="space-y-5 sm:space-y-6">

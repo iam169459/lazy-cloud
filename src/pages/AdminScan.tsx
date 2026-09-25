@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, RefreshCw, Wrench, Zap } from 'lucide-react';
+import { Scan, Database, Cloud, Loader2, Check, AlertTriangle, HardDrive, FileX, Wrench, Zap } from 'lucide-react';
 import { api, formatBytes } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import DataTable, { Column, Action } from '@/components/DataTable';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
@@ -54,8 +55,8 @@ export default function AdminScan({ token, onNotify }: Props) {
       } else {
         onNotify('success', `Storage scan complete: ${result.summary.totalS3Objects} files found, all accounted for`);
       }
-    } catch (e: any) {
-      onNotify('error', `Storage scan failed: ${e.message}`);
+    } catch (e) {
+      onNotify('error', `Storage scan failed: ${errMsg(e)}`);
     } finally {
       setScanningStorage(false);
     }
@@ -72,8 +73,8 @@ export default function AdminScan({ token, onNotify }: Props) {
       } else {
         onNotify('success', `Database scan complete: all ${result.summary.totalDbRecords} records verified`);
       }
-    } catch (e: any) {
-      onNotify('error', `Database scan failed: ${e.message}`);
+    } catch (e) {
+      onNotify('error', `Database scan failed: ${errMsg(e)}`);
     } finally {
       setScanningDb(false);
     }
@@ -99,8 +100,8 @@ export default function AdminScan({ token, onNotify }: Props) {
       }
       if (result.fixed > 0) onNotify('success', `Fixed ${result.fixed} orphaned file(s) — added to database`);
       if (result.failed > 0) onNotify('error', `Failed to fix ${result.failed} file(s)`);
-    } catch (e: any) {
-      onNotify('error', `Fix failed: ${e.message}`);
+    } catch (e) {
+      onNotify('error', `Fix failed: ${errMsg(e)}`);
     } finally {
       setFixing(false);
     }
@@ -120,8 +121,8 @@ export default function AdminScan({ token, onNotify }: Props) {
         onNotify('success', 'No orphaned files found — everything is in sync');
       }
       handleStorageScan();
-    } catch (e: any) {
-      onNotify('error', `Auto-fix failed: ${e.message}`);
+    } catch (e) {
+      onNotify('error', `Auto-fix failed: ${errMsg(e)}`);
     } finally {
       setAutoFixing(false);
     }

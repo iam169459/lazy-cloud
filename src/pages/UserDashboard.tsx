@@ -1,13 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Plus, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye, Fingerprint, Shield, Coins } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { HardDrive, Upload, File, Share2, Trash2, Copy, LogOut, User, Lock, Clock, Download, Loader2, X, ExternalLink, FolderOpen, Eye, Fingerprint, Shield, Coins } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
-import { api, formatBytes, formatDate, AppSettings, FileInfo, ShareRecord as ApiShareRecord } from '@/lib/api';
+import { api, formatBytes, formatDate, FileInfo, ShareRecord as ApiShareRecord } from '@/lib/api';
 import { sounds } from '@/lib/sounds';
 import { enableBiometrics, getBiometricsSupport, friendlyBiometricsError, BiometricsSupport } from '@/lib/biometrics';
+import { errMsg } from '@/lib/errors';
+import type { CreateShareOptions } from '@/lib/api';
 
-interface FileRecord extends FileInfo {}
+type FileRecord = FileInfo;
 type ShareRecord = ApiShareRecord & { file_name: string };
 
 export default function UserDashboard() {
@@ -32,17 +34,6 @@ export default function UserDashboard() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [passkeyEnabled, setPasskeyEnabled] = useState(false);
 
-  useEffect(() => {
-    if (!token) { nav('/login'); return; }
-    loadData();
-    getBiometricsSupport().then(setBiometricsSupport).catch(() => setBiometricsSupport({ supported: false, platformAvailable: false }));
-    if (token) {
-      api.bioListCredentials(token)
-        .then((r) => setPasskeyEnabled(r.credentials.length > 0))
-        .catch(() => setPasskeyEnabled(false));
-    }
-  }, [token]);
-
   async function handleEnablePasskey() {
     if (!token || passkeyLoading) return;
     setPasskeyLoading(true);
@@ -56,20 +47,20 @@ export default function UserDashboard() {
         sounds.error();
         notify('error', result.error || friendlyBiometricsError(new Error('Failed')));
       }
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      notify('error', e.message || 'Failed to enable passkey');
+      notify('error', errMsg(e) || 'Failed to enable passkey');
     } finally {
       setPasskeyLoading(false);
     }
   }
 
-  function notify(type: 'success' | 'error', msg: string) {
+  const notify = useCallback(async (type: 'success' | 'error', msg: string) => {
     setNotif({ type, msg });
     setTimeout(() => setNotif(null), 3000);
-  }
+  }, []);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!token) return;
     try {
       const [f, s, st] = await Promise.all([
@@ -80,12 +71,23 @@ export default function UserDashboard() {
       setFiles(f as FileRecord[]);
       setShares(s as ShareRecord[]);
       setStats(st);
-    } catch (e: any) {
-      notify('error', e.message);
+    } catch (e) {
+      notify('error', errMsg(e));
     } finally {
       setLoading(false);
     }
-  }
+  }, [token, notify]);
+
+  useEffect(() => {
+    if (!token) { nav('/login'); return; }
+    loadData();
+    getBiometricsSupport().then(setBiometricsSupport).catch(() => setBiometricsSupport({ supported: false, platformAvailable: false }));
+    if (token) {
+      api.bioListCredentials(token)
+        .then((r) => setPasskeyEnabled(r.credentials.length > 0))
+        .catch(() => setPasskeyEnabled(false));
+    }
+  }, [token, nav, loadData]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -97,9 +99,9 @@ export default function UserDashboard() {
       sounds.success();
       notify('success', 'File uploaded');
       await loadData();
-    } catch (err: any) {
+    } catch (err) {
       sounds.error();
-      notify('error', err.message);
+      notify('error', errMsg(err));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -113,7 +115,7 @@ export default function UserDashboard() {
       sounds.click();
       notify('success', 'File deleted');
       await loadData();
-    } catch (err: any) { notify('error', err.message); }
+    } catch (err) { notify('error', errMsg(err)); }
   }
 
   async function handleCreateShare() {
@@ -122,7 +124,7 @@ export default function UserDashboard() {
       if (sharePrice) {
         await api.setFilePrice(token, shareModal, Math.max(0, Math.floor(Number(sharePrice) || 0)));
       }
-      const opts: any = {};
+      const opts: CreateShareOptions = {};
       if (sharePassword) opts.password = sharePassword;
       if (shareExpiry) opts.expiresInDays = Number(shareExpiry);
       if (shareLimit) opts.downloadLimit = Number(shareLimit);
@@ -137,7 +139,7 @@ export default function UserDashboard() {
       setShareLimit('');
       setSharePrice('');
       await loadData();
-    } catch (err: any) { notify('error', err.message); }
+    } catch (err) { notify('error', errMsg(err)); }
   }
 
   async function handleDeleteShare(shareId: string) {
@@ -147,7 +149,7 @@ export default function UserDashboard() {
       sounds.click();
       notify('success', 'Share removed');
       await loadData();
-    } catch (err: any) { notify('error', err.message); }
+    } catch (err) { notify('error', errMsg(err)); }
   }
 
   function handleLogout() {

@@ -26,7 +26,7 @@ export async function getBiometricsSupport(): Promise<BiometricsSupport> {
 
 function isUserCancelError(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
-  const name = (e as any).name || '';
+  const name = e.name || '';
   const message = (e.message || '').toLowerCase();
   if (name === 'NotAllowedError') return true;
   if (name === 'AbortError') return true;

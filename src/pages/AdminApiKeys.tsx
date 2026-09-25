@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Plus, Trash2, Copy, Check, Key, Shield, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, Key, AlertCircle } from 'lucide-react';
 import { api, ApiKey } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
-import DataTable, { Column, BulkAction } from '@/components/DataTable';
+import DataTable, { Action, Column, BulkAction } from '@/components/DataTable';
 import { FormSection, FormField, FormActions, SaveButton, CancelButton } from '@/components/Form';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
@@ -27,8 +28,8 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
     try {
       const { keys: loadedKeys } = await api.listApiKeys(token);
       setKeys(loadedKeys);
-    } catch (e: any) {
-      onNotify('error', e.message);
+    } catch (e) {
+      onNotify('error', errMsg(e));
     } finally {
       setLoading(false);
     }
@@ -77,9 +78,9 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
       setFormErrors({});
       setFormTouched(new Set());
       loadKeys();
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setSaving(false);
     }
@@ -94,9 +95,9 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
       sounds.delete();
       onNotify('success', 'API key deleted');
       loadKeys();
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setDeletingId(null);
     }
@@ -164,11 +165,11 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
     },
   ];
 
-  const rowActions = [
+  const rowActions: Action<ApiKey>[] = [
     {
       label: 'Copy key (only works once)',
       icon: <Copy className="w-3.5 h-3.5" />,
-      onClick: (row) => onNotify('error', 'Key only shown once at creation'),
+      onClick: () => onNotify('error', 'Key only shown once at creation'),
     },
     {
       label: 'Delete',
@@ -187,7 +188,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
         sounds.click();
         if (!confirm(`Delete ${selected.length} API key(s)?`)) return;
         for (const k of selected) {
-          try { await api.deleteApiKey(k.id, token); } catch {}
+          try { await api.deleteApiKey(k.id, token); } catch { /* ignore */ }
         }
         sounds.delete();
         onNotify('success', `Deleted ${selected.length} API key(s)`);

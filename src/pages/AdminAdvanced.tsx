@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, Upload, Shield, RotateCcw, User, KeyRound, Lock, Fingerprint, Smartphone, Check, AlertCircle, Copy, X } from 'lucide-react';
+import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, Upload, Shield, RotateCcw, User, KeyRound, Lock, Fingerprint, Smartphone, Check, AlertCircle, Copy } from 'lucide-react';
 import { useTheme, ThemeId, themes } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings, readJson } from '@/lib/api';
 import { FormSection, FormField, FormRow, Toggle, FormActions, SaveButton, CancelButton, DangerButton } from '@/components/Form';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
   onNotify: (type: 'success' | 'error', msg: string) => void;
-}
-
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : 'Something went wrong';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -76,7 +73,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       try {
         const [loaded, twoFa, creds] = await Promise.all([
           api.getSettings(),
-          fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(readJson),
+          fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then((r) => readJson<{ enabled: boolean }>(r)),
           api.getCredentials(token),
         ]);
         const legacy = localStorage.getItem('lazydrop-settings');
@@ -121,14 +118,12 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       .finally(() => setSaving(false));
   }
 
-  function handleReset() {
     if (!confirm('Reset all settings to defaults?')) return;
     sounds.click(); setSaving(true);
     api.updateSettings(DEFAULT_SETTINGS, token)
       .then(() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); sounds.success(); onNotify('success', 'Settings reset'); })
       .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
       .finally(() => setSaving(false));
-  }
 
   function handleClearLocal() {
     if (!confirm('Clear local preferences?')) return;
@@ -158,7 +153,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       await api.updateCredentials(formUsername.trim(), formPassword, token);
       sounds.success(); onNotify('success', 'Credentials updated. Please log in again.');
       setTimeout(() => { window.location.href = '/admin/login'; }, 1500);
-    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    } catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
     finally { setCredSaving(false); }
   }
 
@@ -167,10 +162,10 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
     setTotpLoading(true); sounds.click();
     try {
       const res = await fetch('/api/admin/2fa/setup', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string; qr: string; secret: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA setup failed');
       setTotpQr(data.qr); setTotpSecret(data.secret); setTotpStep('setup'); setTotpCode('');
-    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    } catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
     finally { setTotpLoading(false); }
   }
 
@@ -183,11 +178,11 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA verification failed');
       setTotpEnabled(true); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA enabled!');
-    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    } catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
     finally { setTotpLoading(false); }
   }
 
@@ -200,11 +195,11 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA disable failed');
       setTotpEnabled(false); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA disabled');
-    } catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    } catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
     finally { setTotpLoading(false); }
   }
 
@@ -284,7 +279,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                     setSettings((s) => ({ ...s, backgroundUrl: '', backgroundType: '' }));
                     sounds.success();
                     onNotify('success', 'Background removed');
-                  } catch (e: any) { onNotify('error', errMsg(e)); }
+                  } catch (e) { onNotify('error', errMsg(e)); }
                 }}
                 className="btn btn-secondary text-xs"
               >
@@ -311,7 +306,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                     setSettings((s) => ({ ...s, backgroundUrl: bgUrl, backgroundType: isVideo ? 'video' : 'image' }));
                     sounds.success();
                     onNotify('success', 'Background uploaded');
-                  } catch (err: any) { onNotify('error', errMsg(err)); }
+                  } catch (err) { onNotify('error', errMsg(err)); }
                   e.target.value = '';
                 }}
               />

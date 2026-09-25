@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { FormSection, FormField, FormActions, SaveButton, CancelButton } from '@/components/Form';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
@@ -34,7 +35,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
   useEffect(() => {
     Promise.all([
       api.getCredentials(token),
-      fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then(readJson),
+      fetch('/api/admin/2fa/status', { headers: { Authorization: `Bearer ${token}` } }).then((r) => readJson<{ enabled: boolean }>(r)),
     ])
       .then(([creds, twoFa]) => { setFormUsername(creds.username); setTotpEnabled(twoFa.enabled); })
       .catch((e) => onNotify('error', e.message))
@@ -72,9 +73,9 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
       sounds.success();
       onNotify('success', 'Credentials updated. Please log in again with your new credentials.');
       onCredentialsChanged(formPassword, formUsername.trim());
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setSaving(false);
     }
@@ -94,14 +95,14 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string; qr: string; secret: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA setup failed');
       setTotpQr(data.qr);
       setTotpSecret(data.secret);
       setTotpStep('setup');
       setTotpCode('');
-    } catch (e: any) {
-      sounds.error(); onNotify('error', e.message);
+    } catch (e) {
+      sounds.error(); onNotify('error', errMsg(e));
     } finally { setTotpLoading(false); }
   }
 
@@ -114,12 +115,12 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA verification failed');
       setTotpEnabled(true); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA enabled!');
-    } catch (e: any) {
-      sounds.error(); onNotify('error', e.message);
+    } catch (e) {
+      sounds.error(); onNotify('error', errMsg(e));
     } finally { setTotpLoading(false); }
   }
 
@@ -132,12 +133,12 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: totpCode }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string }>(res);
       if (!res.ok) throw new Error(data.error || '2FA disable failed');
       setTotpEnabled(false); setTotpStep('idle'); setTotpCode('');
       sounds.success(); onNotify('success', '2FA disabled');
-    } catch (e: any) {
-      sounds.error(); onNotify('error', e.message);
+    } catch (e) {
+      sounds.error(); onNotify('error', errMsg(e));
     } finally { setTotpLoading(false); }
   }
 

@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { formatBytes, formatDate } from '@/lib/api';
 import { useUserAuth } from '@/lib/userAuth';
 import { sounds } from '@/lib/sounds';
+import { errMsg } from '@/lib/errors';
 
 function FileIcon({ mimeType, className = 'w-12 h-12' }: { mimeType: string; className?: string }) {
   if (mimeType.startsWith('image/')) return <Image className={className} style={{ color: 'var(--primary)' }} />;
@@ -60,9 +61,9 @@ export default function SharePage() {
       sounds.success();
       const fresh = await api.getShareInfo(id, token);
       setShare(fresh);
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      setBuyError(e.message || 'Purchase failed');
+      setBuyError(errMsg(e) || 'Purchase failed');
     } finally {
       setBuying(false);
     }
@@ -81,8 +82,8 @@ export default function SharePage() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(data.url);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(errMsg(e));
     } finally {
       setDownloading(false);
     }
@@ -124,7 +125,6 @@ export default function SharePage() {
   const price = share.priceCoins || 0;
   const needsPurchase = price > 0 && !share.purchased;
   const canDownload = !isExpired && !isLimitReached && !share.requiresPassword && !needsPurchase;
-  const canDownloadWithPassword = !isExpired && !isLimitReached && share.requiresPassword && password && !needsPurchase;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>

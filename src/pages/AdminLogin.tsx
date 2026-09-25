@@ -34,7 +34,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
     fetch('/api/admin/needs-setup')
-      .then(readJson)
+      .then((r) => readJson<{ needsSetup: boolean }>(r))
       .then(d => { setNeedsSetup(d.needsSetup); if (d.needsSetup) setSetupMode(true); })
       .catch(() => setNeedsSetup(false));
   }, []);
@@ -70,7 +70,7 @@ export default function AdminLogin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass, email: setupEmail }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ error?: string }>(res);
       if (res.ok) {
         sounds.success();
         setSetupSuccess(true);

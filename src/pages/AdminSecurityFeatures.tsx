@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Shield, Lock, Clock, Globe, KeyRound, HardDrive, Users, AlertTriangle, Save, Loader2, Check, Eye, EyeOff, Timer, Crown } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Shield, Lock, Clock, Globe, KeyRound, Users, AlertTriangle, Save, Loader2, Check, EyeOff, Timer, Crown } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
+import { errMsg } from '@/lib/errors';
 
 interface SecurityStatus {
  encryption: { enabled: boolean; usingDefault: boolean };
@@ -23,13 +24,8 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  const [sessionTimeout, setSessionTimeout] = useState(30);
  const [ipWhitelist, setIpWhitelist] = useState<string[]>([]);
  const [newIp, setNewIp] = useState('');
- const [showEncryptionKey, setShowEncryptionKey] = useState(false);
 
- useEffect(() => {
- loadStatus();
- }, [token]);
-
- async function loadStatus() {
+ const loadStatus = useCallback(async () => {
  try {
  const s = await api.getSecurityStatus(token);
  setStatus(s);
@@ -37,12 +33,16 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  setFileTTLDays(s.fileTTL.defaultDays);
  setSessionTimeout(s.sessionTimeout);
  setIpWhitelist(s.ipWhitelist);
- } catch (e: any) {
- onNotify('error', e.message);
+ } catch (e) {
+ onNotify('error', errMsg(e));
  } finally {
  setLoading(false);
  }
- }
+ }, [token, onNotify]);
+
+ useEffect(() => {
+ loadStatus();
+ }, [loadStatus]);
 
  async function handleFileTTLSave() {
  sounds.click();
@@ -52,9 +52,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  sounds.success();
  onNotify('success', 'File TTL settings updated');
  await loadStatus();
- } catch (e: any) {
+ } catch (e) {
  sounds.error();
- onNotify('error', e.message);
+ onNotify('error', errMsg(e));
  } finally {
  setSaving(false);
  }
@@ -68,9 +68,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  sounds.success();
  onNotify('success', 'Session timeout updated');
  await loadStatus();
- } catch (e: any) {
+ } catch (e) {
  sounds.error();
- onNotify('error', e.message);
+ onNotify('error', errMsg(e));
  } finally {
  setSaving(false);
  }
@@ -97,9 +97,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  await api.updateIpWhitelist(updated, token);
  sounds.success();
  onNotify('success', 'IP whitelist updated');
- } catch (e: any) {
+ } catch (e) {
  sounds.error();
- onNotify('error', e.message);
+ onNotify('error', errMsg(e));
  }
  }
 
@@ -111,9 +111,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  sounds.success();
  onNotify('success', 'IP whitelist saved');
  await loadStatus();
- } catch (e: any) {
+ } catch (e) {
  sounds.error();
- onNotify('error', e.message);
+ onNotify('error', errMsg(e));
  } finally {
  setSaving(false);
  }
@@ -127,9 +127,9 @@ export default function AdminSecurityFeatures({ token, onNotify }: { token: stri
  sounds.success();
  onNotify('success', enabled ? 'Encryption enabled for new uploads' : 'Encryption disabled for new uploads');
  await loadStatus();
- } catch (e: any) {
+ } catch (e) {
  sounds.error();
- onNotify('error', e.message);
+ onNotify('error', errMsg(e));
  } finally {
  setSaving(false);
  }

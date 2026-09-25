@@ -2,6 +2,7 @@ import { Plugin, ViteDevServer } from 'vite';
 import { IncomingMessage, ServerResponse } from 'http';
 import { handleApiRequest, cleanupExpiredFiles } from './api';
 import { initDatabase } from './db';
+import { errMsg } from './errors';
 
 let dbReady = false;
 
@@ -44,12 +45,6 @@ function checkLoginRateLimit(ip: string): boolean {
   return entry.count <= LOGIN_LIMIT_MAX;
 }
 
-/* ─── Input sanitization ─── */
-function sanitizeInput(str: string): string {
-  if (typeof str !== 'string') return '';
-  return str.replace(/[<>'"&]/g, '').trim().slice(0, 500);
-}
-
 function getIp(req: IncomingMessage): string {
   return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
 }
@@ -62,8 +57,8 @@ export function lazyDropApiPlugin(): Plugin {
         try {
           await ensureDb();
           await cleanupExpiredFiles();
-        } catch (e: any) {
-          console.error('[lazydrop] auto-delete sweep failed:', e.message);
+        } catch (e) {
+          console.error('[lazydrop] auto-delete sweep failed:', errMsg(e));
         }
       };
       const sweepTimer = setInterval(sweep, 60 * 60 * 1000);
@@ -139,7 +134,7 @@ export function lazyDropApiPlugin(): Plugin {
               res.writeHead(404, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify({ error: 'Not found' }));
             }
-          } catch (e: any) {
+          } catch (e) {
             console.error('Middleware error:', e);
             if (!res.headersSent) {
               res.writeHead(500, { 'Content-Type': 'application/json' });

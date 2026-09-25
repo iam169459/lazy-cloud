@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { randomUUID, scryptSync } from 'crypto';
+import { errMsg } from './errors';
 
 let sql: ReturnType<typeof neon> | null = null;
 
@@ -170,8 +171,8 @@ export async function initDatabase() {
   try {
     await sql`ALTER TABLE files DROP CONSTRAINT IF EXISTS files_provider_id_fkey`;
     await sql`ALTER TABLE files ADD CONSTRAINT files_provider_id_fkey FOREIGN KEY (provider_id) REFERENCES storage_providers(id) ON DELETE SET NULL`;
-  } catch (e: any) {
-    console.warn('[lazydrop] FK migration skipped:', e.message);
+  } catch (e) {
+    console.warn('[lazydrop] FK migration skipped:', errMsg(e));
   }
 
   // Settings JSON on admin_settings (idempotent — safe on every startup)
@@ -291,7 +292,7 @@ export async function initDatabase() {
   await sql`CREATE INDEX IF NOT EXISTS idx_webauthn_credentials_user_id ON webauthn_credentials (user_id)`;
   try {
     await sql`ALTER TABLE webauthn_credentials ADD CONSTRAINT webauthn_credentials_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`;
-  } catch (e: any) {
+  } catch {
     // FK already exists
   }
 
@@ -299,7 +300,7 @@ export async function initDatabase() {
   await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS user_id TEXT`;
   try {
     await sql`ALTER TABLE files ADD CONSTRAINT files_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL`;
-  } catch (e: any) {
+  } catch {
     // FK already exists
   }
   await sql`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id)`;
@@ -327,7 +328,7 @@ export async function getAdminCredentials(): Promise<AdminCredentials | null> {
     try {
       await updateAdminCredentials(envUser, envPass, envEmail);
       return { username: envUser, password: envPass, email: envEmail };
-    } catch {}
+    } catch { /* ignore */ }
     return { username: envUser, password: envPass, email: envEmail };
   }
   return null;
@@ -354,7 +355,7 @@ export async function getTotpSecret(): Promise<string | null> {
   const sql = getSql();
   const rows = (await sql`SELECT totp_secret FROM admin_settings WHERE id = 'singleton'`) as unknown[];
   if (rows.length > 0) {
-    const row = rows[0] as any;
+    const row = rows[0] as { totp_secret?: string | null };
     return row.totp_secret || null;
   }
   return null;
@@ -364,7 +365,7 @@ export async function getTotpEnabled(): Promise<boolean> {
   const sql = getSql();
   const rows = (await sql`SELECT totp_enabled FROM admin_settings WHERE id = 'singleton'`) as unknown[];
   if (rows.length > 0) {
-    const row = rows[0] as any;
+    const row = rows[0] as { totp_enabled?: boolean };
     return row.totp_enabled === true;
   }
   return false;
@@ -645,18 +646,18 @@ export async function getStats(): Promise<{
   const sql = getSql();
   const files = (await sql`SELECT COUNT(*) as count, COALESCE(SUM(file_size), 0) as size, COALESCE(SUM(download_count), 0) as downloads FROM files`) as unknown[];
   const providers = (await sql`SELECT COUNT(*) as count, COALESCE(SUM(current_bytes), 0) as used, COALESCE(SUM(max_bytes), 0) as capacity FROM storage_providers`) as unknown[];
-  const f = files[0] as any;
-  const p = providers[0] as any;
+  const f = files[0] as { count: string | number; size: string | number; downloads: string | number };
+  const p = providers[0] as { count: string | number; used: string | number; capacity: string | number };
   return {
     files: {
-      total_files: String(parseInt(f.count) || 0),
-      total_bytes: String(parseInt(f.size) || 0),
-      total_downloads: String(parseInt(f.downloads) || 0),
+      total_files: String(parseInt(String(f.count)) || 0),
+      total_bytes: String(parseInt(String(f.size)) || 0),
+      total_downloads: String(parseInt(String(f.downloads)) || 0),
     },
     providers: {
-      total_providers: String(parseInt(p.count) || 0),
-      used_bytes: String(parseInt(p.used) || 0),
-      capacity_bytes: String(parseInt(p.capacity) || 0),
+      total_providers: String(parseInt(String(p.count)) || 0),
+      used_bytes: String(parseInt(String(p.used)) || 0),
+      capacity_bytes: String(parseInt(String(p.capacity)) || 0),
     },
   };
 }
@@ -765,18 +766,18 @@ export async function listUsers(limit: number = 100, offset: number = 0): Promis
 export async function updateUser(id: string, patch: Partial<Pick<UserRecord, 'username' | 'email' | 'role' | 'is_active' | 'storage_limit' | 'totp_secret' | 'totp_enabled' | 'password_hash' | 'last_login'>>): Promise<UserRecord | null> {
   const sql = getSql();
   const fields: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   for (const [k, v] of Object.entries(patch)) {
     if (v !== undefined) { fields.push(k); values.push(v); }
   }
   if (fields.length === 0) return getUserById(id);
   // Build dynamic update
   const setClauses = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
-  const result = await sql.unsafe(
+  const rows = (await sql.query(
     `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING *`,
     [id, ...values]
-  );
-  return (result as unknown[])[0] as UserRecord || null;
+  )) as unknown[];
+  return (rows[0] as UserRecord) || null;
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -787,14 +788,14 @@ export async function deleteUser(id: string): Promise<void> {
 export async function updateUserStorageUsed(userId: string): Promise<void> {
   const sql = getSql();
   const rows = await sql`SELECT COALESCE(SUM(file_size), 0)::BIGINT AS total FROM files WHERE user_id = ${userId}` as unknown[];
-  const total = Number((rows[0] as any).total);
+  const total = Number((rows[0] as { total?: string | number }).total);
   await sql`UPDATE users SET storage_used = ${total} WHERE id = ${userId}`;
 }
 
 export async function countUsers(): Promise<number> {
   const sql = getSql();
   const rows = await sql`SELECT COUNT(*)::INT AS count FROM users` as unknown[];
-  return (rows[0] as any).count;
+  return (rows[0] as { count: number }).count;
 }
 
 // ── WebAuthn / Passkey functions ──
@@ -805,6 +806,15 @@ export interface UserCredential {
   credentialPublicKey: string;
   counter: number;
   transports: string[];
+}
+
+/** Raw `webauthn_credentials` row shape before mapping to UserCredential. */
+interface CredentialRow {
+  user_id: string;
+  credential_id: string;
+  public_key: string;
+  counter: number | string;
+  transports: unknown;
 }
 
 export async function createWebAuthnCredential(cred: UserCredential): Promise<UserCredential> {
@@ -828,7 +838,7 @@ export async function getWebAuthnCredentialByCredentialId(credentialId: string):
     FROM webauthn_credentials
     WHERE credential_id = ${credentialId}
   ` as unknown[];
-  const row = rows[0] as any;
+  const row = rows[0] as CredentialRow | undefined;
   if (!row) return null;
   return {
     userId: row.user_id,
@@ -846,7 +856,7 @@ export async function listWebAuthnCredentialsByUserId(userId: string): Promise<U
     FROM webauthn_credentials
     WHERE user_id = ${userId}
     ORDER BY created_at ASC
-  ` as unknown[] as any[];
+  ` as unknown[] as CredentialRow[];
   return rows.map((row) => ({
     userId: row.user_id,
     credentialId: row.credential_id,
@@ -889,7 +899,7 @@ function safeParseTransports(raw: unknown): string[] {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed.map(String);
-    } catch {}
+    } catch { /* ignore */ }
     if (raw) return raw.split(',').map((t) => t.trim()).filter(Boolean);
   }
   return [];
@@ -909,7 +919,7 @@ export async function listUserFiles(userId: string, limit: number = 100, offset:
 export async function countUserFiles(userId: string): Promise<number> {
   const sql = getSql();
   const rows = await sql`SELECT COUNT(*)::INT AS count FROM files WHERE user_id = ${userId}` as unknown[];
-  return (rows[0] as any).count;
+  return (rows[0] as { count: number }).count;
 }
 
 export async function listUserShares(userId: string): Promise<(ShareRecord & { file_name: string })[]> {
@@ -941,7 +951,7 @@ export async function addCoins(userId: string, amount: number, reason: string, r
     INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
     VALUES (${randomUUID()}, ${userId}, ${amount}, ${reason}, ${ref ?? null})
   `;
-  return Number((rows[0] as any).coins);
+  return Number((rows[0] as { coins?: string | number }).coins);
 }
 
 export async function spendCoins(userId: string, amount: number, reason: string, ref?: string | null): Promise<number | null> {
@@ -956,7 +966,7 @@ export async function spendCoins(userId: string, amount: number, reason: string,
     INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
     VALUES (${randomUUID()}, ${userId}, ${-amount}, ${reason}, ${ref ?? null})
   `;
-  return Number((rows[0] as any).coins);
+  return Number((rows[0] as { coins?: string | number }).coins);
 }
 
 export async function claimDailyBonus(userId: string): Promise<{ ok: boolean; coins?: number; alreadyClaimed?: boolean }> {
@@ -976,7 +986,7 @@ export async function claimDailyBonus(userId: string): Promise<{ ok: boolean; co
     INSERT INTO coin_transactions (id, user_id, amount, reason, ref)
     VALUES (${randomUUID()}, ${userId}, ${COIN_DAILY_BONUS}, 'daily_bonus', ${null})
   `;
-  return { ok: true, coins: Number((rows[0] as any).coins) };
+  return { ok: true, coins: Number((rows[0] as { coins?: string | number }).coins) };
 }
 
 export async function listCoinTransactions(userId: string, limit: number = 50, offset: number = 0): Promise<CoinTransaction[]> {
@@ -1008,7 +1018,7 @@ export async function recordLinkVisit(shareId: string, visitorHash: string, owne
 export async function countShareVisits(shareId: string): Promise<number> {
   const sql = getSql();
   const rows = await sql`SELECT COUNT(*)::INT AS count FROM link_visits WHERE share_id = ${shareId}` as unknown[];
-  return Number((rows[0] as any).count);
+  return Number((rows[0] as { count?: string | number }).count);
 }
 
 export async function setFilePrice(fileId: string, priceCoins: number): Promise<void> {
@@ -1032,8 +1042,8 @@ export async function purchaseFile(fileId: string, buyerId: string, price: numbe
       INSERT INTO file_purchases (id, file_id, buyer_id, price_paid)
       VALUES (${randomUUID()}, ${fileId}, ${buyerId}, ${price})
     `;
-  } catch (e: any) {
-    if (String(e.message).includes('unique') || String(e.message).includes('duplicate')) {
+  } catch (e) {
+    if (String(errMsg(e)).includes('unique') || String(errMsg(e)).includes('duplicate')) {
       return { ok: false, error: 'Already purchased' };
     }
     throw e;
@@ -1054,6 +1064,6 @@ export async function purchaseFile(fileId: string, buyerId: string, price: numbe
 export async function getFileOwner(fileId: string): Promise<string | null> {
   const sql = getSql();
   const rows = await sql`SELECT user_id FROM files WHERE id = ${fileId}` as unknown[];
-  return (rows[0] as any)?.user_id ?? null;
+  return (rows[0] as { user_id?: string } | undefined)?.user_id ?? null;
 }
 

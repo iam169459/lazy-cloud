@@ -3,7 +3,7 @@ import { lazy, Suspense, Component, ReactNode, useState, useEffect } from 'react
 import { AuthProvider } from '@/lib/auth';
 import { UserAuthProvider } from '@/lib/userAuth';
 import { ThemeProvider } from '@/lib/theme';
-import { api, AppSettings } from '@/lib/api';
+import { api } from '@/lib/api';
 
 const Landing = lazy(() => import('@/pages/Landing'));
 const DownloadPage = lazy(() => import('@/pages/Download'));

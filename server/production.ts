@@ -3,6 +3,7 @@ import { join } from 'path';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { initDatabase } from './db';
 import { handleApiRequest, cleanupExpiredFiles } from './api';
+import { errMsg } from './errors';
 
 const PORT = parseInt(process.env.PORT || '3000');
 const HOST = '0.0.0.0';
@@ -164,7 +165,7 @@ const server = createServer(async (req: IncomingMessage, res: ServerResponse) =>
       if (!handled) {
         sendError(res, 404, 'API endpoint not found');
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error('API error:', e);
       if (!res.headersSent) {
         sendError(res, 500, 'Internal server error');
@@ -187,8 +188,8 @@ setInterval(async () => {
   try {
     await ensureDb();
     await cleanupExpiredFiles();
-  } catch (e: any) {
-    console.error('[lazydrop] auto-delete sweep failed:', e.message);
+  } catch (e) {
+    console.error('[lazydrop] auto-delete sweep failed:', errMsg(e));
   }
 }, 60 * 60 * 1000);
 

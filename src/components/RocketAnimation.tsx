@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 
@@ -122,7 +122,7 @@ export default function RocketAnimation({ active, onComplete }: RocketAnimationP
   const pctRef = useRef<HTMLSpanElement>(null);
   const rafRef = useRef<number>(0);
   const startRef = useRef(0);
-  const [statusText, setStatusText] = useState('INITIALIZING...');
+  const [, setStatusText] = useState('INITIALIZING...');
   const [pctText, setPctText] = useState('0%');
 
   useEffect(() => {

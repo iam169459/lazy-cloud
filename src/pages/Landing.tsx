@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, Lock, Shield, Upload, Download, Smartphone,
+  ArrowRight, Shield, Upload, Download, Smartphone,
   Clock, Zap, ChevronDown, Globe
 } from 'lucide-react';
 import { useTheme } from '@/lib/theme';

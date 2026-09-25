@@ -7,25 +7,87 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, spendCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, hasPurchased, purchaseFile, getFileOwner, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
+import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
+import type { AppSettings } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
-import { encryptFile, decryptFile, isEncryptionEnabled, getEncryptionStatus } from './encryption';
+import { encryptFile, decryptFile, getEncryptionStatus } from './encryption';
+import { errMsg } from './errors';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lazydrop-jwt-secret-change-in-production';
 
-function jwtSign(payload: any): string {
+interface JwtPayload {
+  userId?: string;
+  role?: string;
+  username?: string;
+  iat?: number;
+  exp?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Shape of JSON bodies accepted by the hand-rolled endpoints. Optional fields are the ones
+ * endpoints guard before use; `id` and `response` are always sent when an endpoint reads them.
+ */
+interface RequestBody {
+  id: string;
+  response: RegistrationResponseJSON & { transports?: string[] };
+  defaultDays: string;
+  minutes: string;
+  email?: string;
+  username?: string;
+  password?: string;
+  currentPassword?: string;
+  newPassword?: string;
+  fileId?: string;
+  shareId?: string;
+  userId?: string;
+  credentialId?: string;
+  role?: string;
+  is_active?: boolean;
+  storage_limit?: number;
+  name?: string;
+  permissions?: string;
+  code?: string;
+  totp?: string;
+  priceCoins?: number;
+  expiresInDays?: number;
+  downloadLimit?: number;
+  bytes?: number;
+  max_bytes?: number;
+  enabled?: boolean;
+  region?: string;
+  provider_type?: string;
+  provider_name?: string;
+  endpoint_url?: string;
+  bucket_name?: string;
+  access_key_id?: string;
+  secret_access_key?: string;
+  ips?: string[];
+  items?: { key: string; provider_id: string; size: number }[];
+}
+
+interface AuthLoginBody {
+  response: AuthenticationResponseJSON;
+  credentialId?: string;
+  userId?: string;
+  username?: string;
+  email?: string;
+}
+
+function jwtSign(payload: JwtPayload): string {
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const body = Buffer.from(JSON.stringify({ ...payload, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url');
   const sig = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
   return `${header}.${body}.${sig}`;
 }
 
-function jwtVerify(token: string): any | null {
+function jwtVerify(token: string): JwtPayload | null {
   try {
     const [header, body, sig] = token.split('.');
     const expected = createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
     if (sig !== expected) return null;
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    const payload: JwtPayload = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch { return null; }
@@ -50,13 +112,13 @@ async function ensureDb() {
   }
 }
 
-function parseJsonBody(req: IncomingMessage): Promise<any> {
+function parseJsonBody<T = RequestBody>(req: IncomingMessage): Promise<T> {
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', (chunk) => (data += chunk));
     req.on('end', () => {
       try {
-        resolve(data ? JSON.parse(data) : {});
+        resolve((data ? JSON.parse(data) : {}) as T);
       } catch (e) {
         reject(e);
       }
@@ -65,7 +127,7 @@ function parseJsonBody(req: IncomingMessage): Promise<any> {
   });
 }
 
-function sendJson(res: ServerResponse, status: number, data: any) {
+function sendJson(res: ServerResponse, status: number, data: unknown) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -111,7 +173,7 @@ function getWebAuthnConfig(req: IncomingMessage): { rpID: string; expectedOrigin
   const referer = req.headers.referer;
   if (originHeader) origins.add(originHeader);
   if (referer) {
-    try { origins.add(new URL(referer).origin); } catch {}
+    try { origins.add(new URL(referer).origin); } catch { /* ignore */ }
   }
   origins.add('http://localhost:5173');
   origins.add('http://localhost:3000');
@@ -239,14 +301,14 @@ export async function cleanupExpiredFiles(): Promise<number> {
         }
         await deleteFileRecord(f.id);
         removed++;
-      } catch (e: any) {
-        console.error(`[lazydrop] auto-delete failed for ${f.id}:`, e.message);
+      } catch (e) {
+        console.error(`[lazydrop] auto-delete failed for ${f.id}:`, errMsg(e));
       }
     }
     if (removed > 0) console.log(`[lazydrop] auto-deleted ${removed} expired file(s)`);
     return removed;
-  } catch (e: any) {
-    console.error('[lazydrop] cleanup sweep failed:', e.message);
+  } catch (e) {
+    console.error('[lazydrop] cleanup sweep failed:', errMsg(e));
     return 0;
   }
 }
@@ -317,10 +379,10 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
           });
           sendJson(res, 200, { id: fileId, name: fileName, size: 0 });
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!resolved) {
           resolved = true;
-          sendError(res, 500, `Upload to storage failed: ${e.message}`);
+          sendError(res, 500, `Upload to storage failed: ${errMsg(e)}`);
         }
       }
     })();
@@ -430,14 +492,14 @@ async function handleEncryptedUpload(req: IncomingMessage, res: ServerResponse):
             enc_auth_tag: authTag,
           });
           await updateProviderBytes(provider.id, fileBuffer.length);
-        } catch (dbErr: any) {
+        } catch (dbErr) {
           await deleteFromProvider(provider, r2Key).catch(() => {});
-          sendError(res, 500, `File uploaded but failed to save record: ${dbErr.message}`);
+          sendError(res, 500, `File uploaded but failed to save record: ${errMsg(dbErr)}`);
           return resolve(true);
         }
         sendJson(res, 200, { id: fileId, name: fileName, size: fileSize, encrypted: true });
-      } catch (e: any) {
-        sendError(res, 500, `Encrypted upload to storage failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Encrypted upload to storage failed: ${errMsg(e)}`);
       }
       resolve(true);
     });
@@ -454,8 +516,8 @@ async function checkAuth(req: IncomingMessage): Promise<boolean> {
   if (token === DEFAULT_PASS) return true;
   try {
     const creds = await getAdminCredentials();
-    if (token === creds.password) return true;
-  } catch {}
+    if (creds && token === creds.password) return true;
+  } catch { /* ignore */ }
   try {
     const apiKey = await getApiKeyByHash(token);
     if (apiKey) {
@@ -463,7 +525,7 @@ async function checkAuth(req: IncomingMessage): Promise<boolean> {
       await updateApiKeyLastUsed(apiKey.id);
       return true;
     }
-  } catch {}
+  } catch { /* ignore */ }
   return false;
 }
 
@@ -530,8 +592,8 @@ export async function handleApiRequest(
         envContent += `\nADMIN_PASSWORD=${password}`;
       }
       writeFileSync(envPath, envContent.trim() + '\n');
-    } catch (e: any) {
-      console.warn('[lazydrop] Could not write to .env:', e.message);
+    } catch (e) {
+      console.warn('[lazydrop] Could not write to .env:', errMsg(e));
     }
     sendJson(res, 200, { success: true, message: 'Admin credentials configured. Please log in.' });
     return true;
@@ -613,7 +675,7 @@ export async function handleApiRequest(
       }
 
       let valid = false;
-      let token = creds.password;
+      const token = creds.password;
 
       if (safeCompare(inputUser, creds.username) && safeCompare(inputPass, creds.password)) {
         valid = true;
@@ -630,15 +692,15 @@ export async function handleApiRequest(
           sendJson(res, 200, { success: false, requiresTotp: true, message: 'Enter your 6-digit authenticator code' });
           return true;
         }
-        const { authenticator } = await import('otplib');
+        const { verify: verifyTotp } = await import('otplib');
         const { getTotpSecret } = await import('./db.js');
         const secret = await getTotpSecret();
         if (!secret) {
           sendError(res, 500, '2FA misconfigured');
           return true;
         }
-        const totpValid = authenticator.verify({ token: inputTotp, secret });
-        if (!totpValid) {
+        const totpResult = await verifyTotp({ token: inputTotp, secret });
+        if (!totpResult.valid) {
           sendError(res, 401, 'Invalid authenticator code');
           return true;
         }
@@ -699,8 +761,8 @@ export async function handleApiRequest(
         const blob = new Blob([decrypted]);
         const url = URL.createObjectURL(blob);
         sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
-      } catch (e: any) {
-        sendError(res, 500, `Decryption failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Decryption failed: ${errMsg(e)}`);
       }
       return true;
     }
@@ -723,9 +785,9 @@ export async function handleApiRequest(
       if (provider) {
         try {
           await deleteFromProvider(provider, file.r2_key);
-        } catch (e: any) {
-          console.error('Failed to delete from storage provider:', e.message);
-          sendError(res, 500, `File removed from database but failed to delete from storage: ${e.message}`);
+        } catch (e) {
+          console.error('Failed to delete from storage provider:', errMsg(e));
+          sendError(res, 500, `File removed from database but failed to delete from storage: ${errMsg(e)}`);
           return true;
         }
         await updateProviderBytes(provider.id, -file.file_size);
@@ -813,8 +875,8 @@ export async function handleApiRequest(
       try {
         const objects = await listObjects(provider);
         sendJson(res, 200, { success: true, fileCount: objects.length, bucket: provider.bucket_name });
-      } catch (e: any) {
-        sendJson(res, 200, { success: false, error: e.message, bucket: provider.bucket_name });
+      } catch (e) {
+        sendJson(res, 200, { success: false, error: errMsg(e), bucket: provider.bucket_name });
       }
       return true;
     }
@@ -830,8 +892,8 @@ export async function handleApiRequest(
       try {
         const sizeInfo = await getBucketSize(provider);
         sendJson(res, 200, { success: true, ...sizeInfo });
-      } catch (e: any) {
-        sendJson(res, 200, { success: false, error: e.message });
+      } catch (e) {
+        sendJson(res, 200, { success: false, error: errMsg(e) });
       }
       return true;
     }
@@ -839,8 +901,8 @@ export async function handleApiRequest(
     if (path === '/api/admin/providers/update-bytes' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      const id: string = body.id;
-      const bytes: number = body.bytes;
+      const id = body.id;
+      const bytes = body.bytes;
       if (!id || bytes === undefined) { sendError(res, 400, 'Missing provider id or bytes'); return true; }
       const sql = getDb();
       await sql`UPDATE storage_providers SET current_bytes = ${bytes} WHERE id = ${id}`;
@@ -855,7 +917,7 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/settings' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const body = await parseJsonBody(req);
+      const body = await parseJsonBody<Partial<AppSettings>>(req);
       const settings = await updateAppSettings(body);
       sendJson(res, 200, { settings });
       return true;
@@ -864,7 +926,7 @@ export async function handleApiRequest(
     // ── Admin: Upload background image/video ──
     if (path === '/api/admin/background' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { writeFileSync, mkdirSync, existsSync, unlinkSync, copyFileSync } = await import('fs');
+      const { writeFileSync, mkdirSync, existsSync, unlinkSync } = await import('fs');
       const { join } = await import('path');
       const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
       const bgDirs = [
@@ -888,7 +950,7 @@ export async function handleApiRequest(
           // Remove old backgrounds from all dirs
           for (const d of bgDirs) {
             for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
-              try { unlinkSync(join(d, 'background' + e)); } catch {}
+              try { unlinkSync(join(d, 'background' + e)); } catch { /* ignore */ }
             }
           }
           for (const d of bgDirs) {
@@ -931,6 +993,7 @@ export async function handleApiRequest(
     if (path === '/api/admin/credentials' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const creds = await getAdminCredentials();
+      if (!creds) { sendError(res, 404, 'Admin credentials not configured'); return true; }
       sendJson(res, 200, { username: creds.username });
       return true;
     }
@@ -957,7 +1020,6 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const encStatus = getEncryptionStatus();
       const settings = await getAppSettings();
-      const creds = await getAdminCredentials();
       sendJson(res, 200, {
         encryption: encStatus,
         fileTTL: {
@@ -1000,7 +1062,7 @@ export async function handleApiRequest(
 
     if (path === '/api/admin/security/encryption' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const body = await parseJsonBody(req);
+      await parseJsonBody(req);
       sendJson(res, 200, { success: true, note: 'Encryption setting updated. Use ENCRYPTION_KEY env var for custom keys.' });
       return true;
     }
@@ -1018,12 +1080,12 @@ export async function handleApiRequest(
             bucket: p.bucket_name,
             files: objects.map((o) => ({ key: o.key, size: o.size })),
           });
-        } catch (e: any) {
+        } catch (e) {
           results.push({
             provider: p.provider_name,
             bucket: p.bucket_name,
             files: [],
-            error: e.message,
+            error: errMsg(e),
           });
         }
       }
@@ -1084,8 +1146,8 @@ export async function handleApiRequest(
           const objects = objectCache.get(provider.id)!;
           const found = objects.some((o) => o.key === f.r2_key);
           results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: found });
-        } catch (e: any) {
-          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: false, error: e.message });
+        } catch (e) {
+          results.push({ fileId: f.id, name: f.original_name, provider: provider.provider_name, exists: false, error: errMsg(e) });
         }
       }
       const missing = results.filter((r) => !r.exists);
@@ -1113,7 +1175,7 @@ export async function handleApiRequest(
           for (const o of objects) {
             allS3.push({ key: o.key, size: o.size, provider_id: p.id });
           }
-        } catch {}
+        } catch { /* ignore */ }
       }
       const orphaned = allS3.filter((f) => !dbKeys.has(f.key));
       if (orphaned.length === 0) {
@@ -1142,11 +1204,11 @@ export async function handleApiRequest(
             await updateProviderBytes(item.provider_id, item.size).catch(() => {});
           }
           results.push({ key: item.key, success: true });
-        } catch (e: any) {
-          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+        } catch (e) {
+          if (errMsg(e)?.includes('duplicate') || errMsg(e)?.includes('already exists')) {
             results.push({ key: item.key, success: true });
           } else {
-            results.push({ key: item.key, success: false, error: e.message });
+            results.push({ key: item.key, success: false, error: errMsg(e) });
           }
         }
       }
@@ -1202,11 +1264,11 @@ export async function handleApiRequest(
             await updateProviderBytes(providerId, size).catch(() => {});
           }
           results.push({ key, success: true });
-        } catch (e: any) {
-          if (e.message?.includes('duplicate') || e.message?.includes('already exists')) {
+        } catch (e) {
+          if (errMsg(e)?.includes('duplicate') || errMsg(e)?.includes('already exists')) {
             results.push({ key, success: true });
           } else {
-            results.push({ key, success: false, error: e.message });
+            results.push({ key, success: false, error: errMsg(e) });
           }
         }
       }
@@ -1231,7 +1293,7 @@ export async function handleApiRequest(
         if (!fileBuffer) { sendError(res, 500, 'Failed to retrieve file'); return true; }
 
         let contentBuffer = fileBuffer;
-        let contentType = file.mime_type || 'application/octet-stream';
+        const contentType = file.mime_type || 'application/octet-stream';
 
         if (file.encrypted) {
           try {
@@ -1279,8 +1341,8 @@ export async function handleApiRequest(
         });
         res.end(contentBuffer);
         return true;
-      } catch (e: any) {
-        sendError(res, 500, `Preview failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Preview failed: ${errMsg(e)}`);
         return true;
       }
     }
@@ -1359,8 +1421,8 @@ export async function handleApiRequest(
           const blob = new Blob([decrypted]);
           const url = URL.createObjectURL(blob);
           sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
-        } catch (e: any) {
-          sendError(res, 500, `Decryption failed: ${e.message}`);
+        } catch (e) {
+          sendError(res, 500, `Decryption failed: ${errMsg(e)}`);
         }
         return true;
       }
@@ -1472,8 +1534,8 @@ export async function handleApiRequest(
           updatesAvailable: ahead !== '0',
           commitsAhead: parseInt(ahead) || 0,
         });
-      } catch (e: any) {
-        sendError(res, 500, `Check failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Check failed: ${errMsg(e)}`);
       }
       return true;
     }
@@ -1481,12 +1543,12 @@ export async function handleApiRequest(
     // ── System: Pull latest ──
     if (path === '/api/admin/system/pull' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { execSync, spawn } = await import('child_process');
+      const { execSync } = await import('child_process');
       try {
         const result = execSync('git pull origin dev', { cwd: process.cwd(), timeout: 30000 }).toString().trim();
         sendJson(res, 200, { message: 'Pulled latest changes', pull: result });
-      } catch (e: any) {
-        sendError(res, 500, `Pull failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Pull failed: ${errMsg(e)}`);
       }
       return true;
     }
@@ -1500,10 +1562,11 @@ export async function handleApiRequest(
         execSync('npm install', { cwd, timeout: 120000 });
         try {
           execSync('npm run build', { cwd, timeout: 120000, stdio: ['pipe', 'pipe', 'pipe'] });
-        } catch (buildErr: any) {
-          const stderr = buildErr.stderr ? buildErr.stderr.toString() : '';
-          const stdout = buildErr.stdout ? buildErr.stdout.toString() : '';
-          sendError(res, 500, `Build failed: ${stderr || stdout || buildErr.message}`);
+        } catch (buildErr) {
+          const e = buildErr as { stderr?: Buffer; stdout?: Buffer };
+          const stderr = e.stderr ? e.stderr.toString() : '';
+          const stdout = e.stdout ? e.stdout.toString() : '';
+          sendError(res, 500, `Build failed: ${stderr || stdout || errMsg(buildErr)}`);
           return true;
         }
 
@@ -1518,8 +1581,8 @@ export async function handleApiRequest(
           nohup node dist-server/production.js > /tmp/lazydrop.log 2>&1 &
         `;
         spawn('bash', ['-c', script], { detached: true, stdio: 'ignore', cwd }).unref();
-      } catch (e: any) {
-        sendError(res, 500, `Rebuild failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Rebuild failed: ${errMsg(e)}`);
       }
       return true;
     }
@@ -1535,8 +1598,8 @@ export async function handleApiRequest(
       let pullResult = '';
       try {
         pullResult = execSync('git pull origin dev', { cwd, timeout: 30000 }).toString().trim();
-      } catch (e: any) {
-        sendError(res, 500, `Pull failed: ${e.message}`);
+      } catch (e) {
+        sendError(res, 500, `Pull failed: ${errMsg(e)}`);
         return true;
       }
 
@@ -1574,7 +1637,7 @@ export async function handleApiRequest(
     // ── 2FA: Setup (generate secret + QR) ──
     if (path === '/api/admin/2fa/setup' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { authenticator } = await import('otplib');
+      const { generateSecret, generateURI } = await import('otplib');
       const QRCode = await import('qrcode');
       const { getAdminCredentials, setTotpSecret, getTotpEnabled } = await import('./db.js');
 
@@ -1586,8 +1649,8 @@ export async function handleApiRequest(
       const creds = await getAdminCredentials();
       if (!creds) { sendError(res, 400, 'No admin credentials'); return true; }
 
-      const secret = authenticator.generateSecret();
-      const otpauth = authenticator.keyuri(creds.username, 'LazyDrop', secret);
+      const secret = generateSecret();
+      const otpauth = generateURI({ issuer: 'LazyDrop', label: creds.username, secret });
       const qrDataUrl = await QRCode.toDataURL(otpauth);
 
       // Save secret (not enabled yet — waiting for verification)
@@ -1600,7 +1663,7 @@ export async function handleApiRequest(
     // ── 2FA: Verify & Enable ──
     if (path === '/api/admin/2fa/verify' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { authenticator } = await import('otplib');
+      const { verify: verifyTotp } = await import('otplib');
       const { getTotpSecret, enableTotp } = await import('./db.js');
       const body = await parseJsonBody(req);
       const code = sanitize(body.code);
@@ -1616,8 +1679,8 @@ export async function handleApiRequest(
         return true;
       }
 
-      const valid = authenticator.verify({ token: code, secret });
-      if (!valid) {
+      const verifyResult = await verifyTotp({ token: code, secret });
+      if (!verifyResult.valid) {
         sendError(res, 400, 'Invalid code. Check your authenticator app.');
         return true;
       }
@@ -1630,7 +1693,7 @@ export async function handleApiRequest(
     // ── 2FA: Disable ──
     if (path === '/api/admin/2fa/disable' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { authenticator } = await import('otplib');
+      const { verify: verifyTotp } = await import('otplib');
       const { getTotpSecret, getTotpEnabled, disableTotp } = await import('./db.js');
       const body = await parseJsonBody(req);
       const code = sanitize(body.code);
@@ -1651,8 +1714,8 @@ export async function handleApiRequest(
         return true;
       }
 
-      const valid = authenticator.verify({ token: code, secret });
-      if (!valid) {
+      const verifyResult = await verifyTotp({ token: code, secret });
+      if (!verifyResult.valid) {
         sendError(res, 400, 'Invalid code');
         return true;
       }
@@ -1839,7 +1902,7 @@ export async function handleApiRequest(
         attestationType: 'none',
         excludeCredentials: existing.map((c) => ({
           id: c.credentialId,
-          transports: c.transports as any,
+          transports: c.transports,
         })),
         authenticatorSelection: {
           authenticatorAttachment: 'platform',
@@ -1883,8 +1946,8 @@ export async function handleApiRequest(
           expectedRPID: rpID,
           requireUserVerification: true,
         });
-      } catch (e: any) {
-        sendError(res, 400, e.message || 'Registration verification failed');
+      } catch (e) {
+        sendError(res, 400, errMsg(e) || 'Registration verification failed');
         return true;
       }
 
@@ -1940,7 +2003,7 @@ export async function handleApiRequest(
         rpID,
         allowCredentials: credentials.map((c) => ({
           id: c.credentialId,
-          transports: c.transports as any,
+          transports: c.transports,
         })),
         userVerification: 'required',
         timeout: 60000,
@@ -1959,7 +2022,7 @@ export async function handleApiRequest(
 
     // ── Bio: Authentication verify → issue JWT ──
     if (path === '/api/bio/login-verify' && req.method === 'POST') {
-      const body = await parseJsonBody(req);
+      const body = await parseJsonBody<AuthLoginBody>(req);
       const userIdFromBody = body.userId as string | undefined;
       const bodyIdentifier = sanitize(body.username || body.email);
       const credentialId = body.credentialId || body.response?.id;
@@ -1992,12 +2055,12 @@ export async function handleApiRequest(
             id: storedCred.credentialId,
             publicKey: Buffer.from(storedCred.credentialPublicKey, 'base64'),
             counter: storedCred.counter,
-            transports: storedCred.transports as any,
+            transports: storedCred.transports,
           },
           requireUserVerification: true,
         });
-      } catch (e: any) {
-        sendError(res, 401, e.message || 'Authentication verification failed');
+      } catch (e) {
+        sendError(res, 401, errMsg(e) || 'Authentication verification failed');
         return true;
       }
 
@@ -2058,7 +2121,7 @@ export async function handleApiRequest(
       const userAuth = await checkUserAuth(req);
       if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
-      const patch: any = {};
+      const patch: Parameters<typeof updateUser>[1] = {};
       if (body.email !== undefined) patch.email = sanitize(body.email);
       if (body.currentPassword && body.newPassword) {
         const user = await getUserById(userAuth.id);
@@ -2140,8 +2203,8 @@ export async function handleApiRequest(
             await updateUserStorageUsed(userAuth.id);
             resolved = true;
             sendJson(res, 200, { success: true, file: record });
-          } catch (err: any) {
-            if (!resolved) { resolved = true; sendError(res, 500, err.message || 'Upload failed'); }
+          } catch (err) {
+            if (!resolved) { resolved = true; sendError(res, 500, errMsg(err) || 'Upload failed'); }
           }
         })();
       });
@@ -2171,7 +2234,7 @@ export async function handleApiRequest(
           const providers = await listProviders();
           const provider = providers.find(p => p.id === file.provider_id);
           if (provider) await deleteFromProvider(provider, file.r2_key);
-        } catch {}
+        } catch { /* ignore */ }
         await updateProviderBytes(file.provider_id, -file.file_size);
       }
       await deleteFileRecord(fileId);
@@ -2240,7 +2303,7 @@ export async function handleApiRequest(
       const body = await parseJsonBody(req);
       const userId = body.userId;
       if (!userId) { sendError(res, 400, 'userId required'); return true; }
-      const patch: any = {};
+      const patch: Parameters<typeof updateUser>[1] = {};
       if (body.role !== undefined) patch.role = body.role;
       if (body.is_active !== undefined) patch.is_active = body.is_active;
       if (body.storage_limit !== undefined) patch.storage_limit = Number(body.storage_limit);
@@ -2271,9 +2334,9 @@ export async function handleApiRequest(
     }
 
     return false;
-  } catch (e: any) {
+  } catch (e) {
     console.error('API error:', e);
-    sendError(res, 500, e.message || 'Internal server error');
+    sendError(res, 500, errMsg(e) || 'Internal server error');
     return true;
   }
 }

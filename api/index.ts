@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Pre-bundled by build.sh so Vercel's nft includes the full server graph.
 import { handleApiRequest } from '../dist-server/api-handler.js';
+import { errMsg } from '@/lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Security headers
@@ -23,14 +24,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const path = req.url?.split('?')[0] || '';
-    const handled = await handleApiRequest(req as any, res as any, path);
+    const handled = await handleApiRequest(req, res, path);
     if (!handled && !res.headersSent) {
       res.status(404).json({ error: 'API endpoint not found' });
     }
-  } catch (e: any) {
+  } catch (e) {
     console.error('API error:', e?.stack || e);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error', detail: e?.message });
+      res.status(500).json({ error: 'Internal server error', detail: errMsg(e) });
     }
   }
 }

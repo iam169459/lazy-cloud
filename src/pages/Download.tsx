@@ -5,6 +5,7 @@ import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { useUserAuth } from '@/lib/userAuth';
+import { errMsg } from '@/lib/errors';
 
 export default function DownloadPage() {
   const { fileId } = useParams<{ fileId: string }>();
@@ -31,7 +32,7 @@ export default function DownloadPage() {
     if (!fileId) return;
     setDownloading(true); sounds.download();
     try { const { url } = await api.getDownloadUrl(fileId, token || undefined); window.location.href = url; }
-    catch (e: any) { sounds.error(); setError(e.message || 'Download failed'); }
+    catch (e) { sounds.error(); setError(errMsg(e) || 'Download failed'); }
     finally { setDownloading(false); }
   }
 
@@ -46,9 +47,9 @@ export default function DownloadPage() {
       setBought(true);
       const fresh = await api.getFileInfo(fileId, token);
       setFile(fresh);
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      setBuyError(e.message || 'Purchase failed');
+      setBuyError(errMsg(e) || 'Purchase failed');
     } finally {
       setBuying(false);
     }

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Users, User, Shield, ShieldOff, Trash2, Save, Loader2, Search, HardDrive, Clock } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { api, formatBytes, formatDate } from '@/lib/api';
 import { sounds } from '@/lib/sounds';
+import { errMsg } from '@/lib/errors';
 
 interface UserRecord {
   id: string; username: string; email: string; role: string;
@@ -21,15 +22,15 @@ export default function AdminUsers({ token, onNotify }: Props) {
   const [editRole, setEditRole] = useState('');
   const [editLimit, setEditLimit] = useState('');
 
-  useEffect(() => { loadUsers(); }, []);
-
-  async function loadUsers() {
+  const loadUsers = useCallback(async () => {
     try {
       const data = await api.adminListUsers(token);
       setUsers(data);
-    } catch (e: any) { onNotify('error', e.message); }
+    } catch (e) { onNotify('error', errMsg(e)); }
     finally { setLoading(false); }
-  }
+  }, [token, onNotify]);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
 
   async function handleUpdate(userId: string) {
     try {
@@ -38,7 +39,7 @@ export default function AdminUsers({ token, onNotify }: Props) {
       onNotify('success', 'User updated');
       setEditing(null);
       await loadUsers();
-    } catch (e: any) { onNotify('error', e.message); }
+    } catch (e) { onNotify('error', errMsg(e)); }
   }
 
   async function handleToggleActive(userId: string, current: boolean) {
@@ -47,7 +48,7 @@ export default function AdminUsers({ token, onNotify }: Props) {
       sounds.click();
       onNotify('success', current ? 'User disabled' : 'User enabled');
       await loadUsers();
-    } catch (e: any) { onNotify('error', e.message); }
+    } catch (e) { onNotify('error', errMsg(e)); }
   }
 
   async function handleDelete(userId: string, username: string) {
@@ -57,7 +58,7 @@ export default function AdminUsers({ token, onNotify }: Props) {
       sounds.click();
       onNotify('success', `User "${username}" deleted`);
       await loadUsers();
-    } catch (e: any) { onNotify('error', e.message); }
+    } catch (e) { onNotify('error', errMsg(e)); }
   }
 
   const filtered = users.filter(u => u.username.toLowerCase().includes(search.toLowerCase()) || (u.email && u.email.toLowerCase().includes(search.toLowerCase())));
@@ -78,7 +79,7 @@ export default function AdminUsers({ token, onNotify }: Props) {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: colors.textDim }} />
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users..." className="input w-full pl-10 text-sm" style={{ background: colors.input, borderColor: colors.border, color: colors.text }} />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users..." className="input w-full pl-10 text-sm" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} />
       </div>
 
       {/* User List */}
@@ -125,14 +126,14 @@ export default function AdminUsers({ token, onNotify }: Props) {
               <div className="mt-3 pt-3 flex flex-wrap items-end gap-3" style={{ borderTop: `1px solid ${colors.border}` }}>
                 <div>
                   <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Role</label>
-                  <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="input text-xs py-1.5" style={{ background: colors.input, borderColor: colors.border, color: colors.text }}>
+                  <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="input text-xs py-1.5" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}>
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Storage limit (bytes)</label>
-                  <input type="number" value={editLimit} onChange={(e) => setEditLimit(e.target.value)} className="input text-xs w-36 py-1.5" style={{ background: colors.input, borderColor: colors.border, color: colors.text }} />
+                  <input type="number" value={editLimit} onChange={(e) => setEditLimit(e.target.value)} className="input text-xs w-36 py-1.5" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} />
                 </div>
                 <button onClick={() => handleUpdate(u.id)} className="btn btn-primary text-xs py-1.5" style={{ background: colors.gradient, color: colors.bg }}>
                   Save

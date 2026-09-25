@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Check, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye } from 'lucide-react';
+import { Upload, FileText, Trash2, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider, ShareRecord } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import DataTable, { Column, BulkAction } from '@/components/DataTable';
 import UploadQueue from '@/components/UploadQueue';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   files: FileWithProvider[];
@@ -18,7 +19,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [, setCopiedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [shareModal, setShareModal] = useState<{ fileId: string; shares: ShareRecord[] } | null>(null);
@@ -33,8 +34,8 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     try {
       await api.uploadFile(fl[0], token, (p) => setProgress(p));
       sounds.store(); onNotify('success', `${fl[0].name} uploaded`); onRefresh();
-    } catch (e: any) {
-      sounds.error(); onNotify('error', e.message || 'Upload failed');
+    } catch (e) {
+      sounds.error(); onNotify('error', errMsg(e) || 'Upload failed');
     } finally {
       setUploading(false); setProgress(0); if (ref.current) ref.current.value = '';
     }
@@ -52,7 +53,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   async function del(id: string, name: string) {
     if (!confirm(`Delete "${name}"?`)) return; sounds.click(); setDeletingId(id);
     try { await api.deleteFile(id, token); sounds.delete(); onNotify('success', 'Deleted'); onRefresh(); }
-    catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
     finally { setDeletingId(null); }
   }
 
@@ -62,8 +63,8 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     try {
       const { shares } = await api.listShares(fileId, token);
       setShareModal({ fileId, shares });
-    } catch (e: any) {
-      onNotify('error', e.message);
+    } catch (e) {
+      onNotify('error', errMsg(e));
     } finally {
       setSharingId(null);
     }
@@ -74,7 +75,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     if (!shareModal) return;
     setShareLoading(true);
     try {
-      const result = await api.createShare(
+      await api.createShare(
         shareModal.fileId,
         shareForm.password || undefined,
         shareForm.expiresInDays ? parseInt(shareForm.expiresInDays) : undefined,
@@ -86,9 +87,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       setShareForm({ password: '', expiresInDays: '', downloadLimit: '' });
       const { shares } = await api.listShares(shareModal.fileId, token);
       setShareModal({ fileId: shareModal.fileId, shares });
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setShareLoading(false);
     }
@@ -104,9 +105,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       onNotify('success', 'Share deleted');
       const { shares } = await api.listShares(shareModal.fileId, token);
       setShareModal({ fileId: shareModal.fileId, shares });
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     }
   }
 
@@ -197,7 +198,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
         sounds.click();
         if (!confirm(`Delete ${selected.length} file(s)?`)) return;
         for (const f of selected) {
-          try { await api.deleteFile(f.id, token); } catch {}
+          try { await api.deleteFile(f.id, token); } catch { /* ignore */ }
         }
         sounds.delete();
         onNotify('success', `Deleted ${selected.length} file(s)`);
@@ -220,14 +221,12 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(data.url);
-          } catch {}
+          } catch { /* ignore */ }
         }
         onNotify('success', `Started ${selected.length} download(s)`);
       },
     },
   ];
-
-  const recentFiles = files.slice(0, 10);
 
   if (shareModal) {
     return (

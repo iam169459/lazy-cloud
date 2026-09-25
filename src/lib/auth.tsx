@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: user, password: pass, totp }),
       });
-      const data = await readJson(res);
+      const data = await readJson<{ requiresTotp?: boolean; success?: boolean; token?: string }>(res);
       if (data.requiresTotp) {
         return { success: false, requiresTotp: true };
       }

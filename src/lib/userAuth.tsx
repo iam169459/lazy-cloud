@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { loginWithBiometrics, getBiometricsSupport, BiometricsSupport } from './biometrics';
 import { readJson } from './api';
+import { errMsg } from '@/lib/errors';
 
 interface UserInfo {
   id: string;
@@ -23,6 +24,13 @@ const UserAuthContext = createContext<UserAuthState | null>(null);
 
 const TOKEN_KEY = 'lazydrop_user_token';
 const USER_KEY = 'lazydrop_user_info';
+
+interface AuthResponse {
+  success?: boolean;
+  token?: string;
+  user?: UserInfo;
+  error?: string;
+}
 
 function persistSession(token: string, user: UserInfo) {
   localStorage.setItem(TOKEN_KEY, token);
@@ -47,16 +55,16 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      const data = await readJson(res);
-      if (data.success) {
+      const data = await readJson<AuthResponse>(res);
+      if (data.success && data.token && data.user) {
         persistSession(data.token, data.user);
         setToken(data.token);
         setUser(data.user);
         return { success: true };
       }
       return { success: false, error: data.error || 'Login failed' };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Network error' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) || 'Network error' };
     }
   }
 
@@ -67,16 +75,16 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),
       });
-      const data = await readJson(res);
-      if (data.success) {
+      const data = await readJson<AuthResponse>(res);
+      if (data.success && data.token && data.user) {
         persistSession(data.token, data.user);
         setToken(data.token);
         setUser(data.user);
         return { success: true };
       }
       return { success: false, error: data.error || 'Registration failed' };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Network error' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) || 'Network error' };
     }
   }
 
@@ -90,8 +98,8 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
         return { success: true };
       }
       return { success: false, error: result.error || 'Passkey login failed' };
-    } catch (e: any) {
-      return { success: false, error: e.message || 'Network error' };
+    } catch (e) {
+      return { success: false, error: errMsg(e) || 'Network error' };
     }
   }
 

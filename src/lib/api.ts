@@ -1,3 +1,10 @@
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/browser';
+
 export interface FileInfo {
   id: string;
   original_name: string;
@@ -146,6 +153,12 @@ export interface Stats {
   };
 }
 
+export interface CreateShareOptions {
+  password?: string;
+  expiresInDays?: number;
+  downloadLimit?: number;
+}
+
 export interface AppSettings {
   siteName: string;
   maxFileSize: string;
@@ -159,7 +172,7 @@ export interface AppSettings {
   backgroundType: 'image' | 'video' | '';
 }
 
-export async function readJson<T = any>(res: Response): Promise<T> {
+export async function readJson<T = unknown>(res: Response): Promise<T> {
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
     const text = await res.text().catch(() => '');
@@ -175,16 +188,16 @@ export async function readJson<T = any>(res: Response): Promise<T> {
   }
 }
 
-async function request(path: string, options: RequestInit = {}) {
+async function request(path: string, options: RequestInit = {}): Promise<unknown> {
   const res = await fetch(path, {
     ...options,
     headers: {
       ...options.headers,
     },
   });
-  const data = await readJson(res);
+  const data = await readJson<{ error?: string }>(res);
   if (!res.ok) {
-    throw new Error(data?.error || 'Request failed');
+    throw new Error(data.error || 'Request failed');
   }
   return data;
 }
@@ -241,7 +254,7 @@ export const api = {
     request('/api/admin/background', {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
-    }),
+    }) as Promise<{ success: boolean }>,
 
   listFiles: (token: string) =>
     request('/api/admin/files', {
@@ -504,9 +517,9 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({}),
-    }) as Promise<{ options: any; expectedOrigin: string | string[]; rpID: string }>,
+    }) as Promise<{ options: PublicKeyCredentialCreationOptionsJSON; expectedOrigin: string | string[]; rpID: string }>,
 
-  bioRegisterVerify: (token: string, response: any) =>
+  bioRegisterVerify: (token: string, response: RegistrationResponseJSON) =>
     request('/api/bio/register-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -518,9 +531,9 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username }),
-    }) as Promise<{ options: any; expectedOrigin: string | string[]; rpID: string }>,
+    }) as Promise<{ options: PublicKeyCredentialRequestOptionsJSON; expectedOrigin: string | string[]; rpID: string }>,
 
-  bioLoginVerify: (payload: { response: any; credentialId: string; username?: string; userId?: string }) =>
+  bioLoginVerify: (payload: { response: AuthenticationResponseJSON; credentialId: string; username?: string; userId?: string }) =>
     request('/api/bio/login-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -550,7 +563,7 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(data),
-    }),
+    }) as Promise<{ success: boolean; user: { id: string; email: string } }>,
 
   // ── User Dashboard ──
   getUserStats: (token: string) =>
@@ -572,7 +585,7 @@ export const api = {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileId }),
-    }),
+    }) as Promise<{ success: boolean }>,
 
   // ── User Shares ──
   getUserShares: (token: string) =>
@@ -580,19 +593,19 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
     }) as Promise<ShareRecord[]>,
 
-  createUserShare: (token: string, fileId: string, options?: { password?: string; expiresInDays?: number; downloadLimit?: number }) =>
+  createUserShare: (token: string, fileId: string, options?: CreateShareOptions) =>
     request('/api/user/shares', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileId, ...options }),
-    }),
+    }) as Promise<{ success: boolean; share: ShareRecord }>,
 
   deleteUserShare: (shareId: string, token: string) =>
     request('/api/user/shares/', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ shareId }),
-    }),
+    }) as Promise<{ success: boolean }>,
 
   // ── Admin: User Management ──
   adminListUsers: (token: string) =>
@@ -605,14 +618,14 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(data),
-    }),
+    }) as Promise<{ success: boolean; user: { id: string; role: string; is_active: boolean; storage_limit: number; email: string } }>,
 
   adminDeleteUser: (token: string, userId: string) =>
     request('/api/admin/users/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ userId }),
-    }),
+    }) as Promise<{ success: boolean }>,
 
   adminUserCount: (token: string) =>
     request('/api/admin/users/count', {

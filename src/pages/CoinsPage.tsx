@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Coins, Gift, Share2, ArrowLeft, Loader2, Check, Download, ShoppingBag, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { api, CoinsInfo, PurchasedFile, formatDate, formatBytes } from '@/lib/api';
 import { sounds } from '@/lib/sounds';
+import { errMsg } from '@/lib/errors';
 
 const reasonLabels: Record<string, string> = {
   signup_bonus: 'Signup bonus',
@@ -24,17 +25,12 @@ export default function CoinsPage() {
   const [claiming, setClaiming] = useState(false);
   const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  useEffect(() => {
-    if (!token) { nav('/login'); return; }
-    load();
-  }, [token]);
-
-  function notify(type: 'success' | 'error', msg: string) {
+  const notify = useCallback(async (type: 'success' | 'error', msg: string) => {
     setNotif({ type, msg });
     setTimeout(() => setNotif(null), 3000);
-  }
+  }, []);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!token) return;
     try {
       const [c, p] = await Promise.all([
@@ -43,12 +39,17 @@ export default function CoinsPage() {
       ]);
       setCoins(c);
       setPurchases(p);
-    } catch (e: any) {
-      notify('error', e.message);
+    } catch (e) {
+      notify('error', errMsg(e));
     } finally {
       setLoading(false);
     }
-  }
+  }, [token, notify]);
+
+  useEffect(() => {
+    if (!token) { nav('/login'); return; }
+    load();
+  }, [token, nav, load]);
 
   async function handleClaim() {
     if (!token || claiming || !coins || coins.claimedToday) return;
@@ -58,9 +59,9 @@ export default function CoinsPage() {
       sounds.success();
       notify('success', `+${res.earned} coins claimed!`);
       await load();
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      notify('error', e.message);
+      notify('error', errMsg(e));
     } finally {
       setClaiming(false);
     }

@@ -9,6 +9,7 @@ import { sounds } from '@/lib/sounds';
 import { cloudProviders, CloudProvider, getProviderById, detectProviderFromEndpoint } from '@/lib/providers';
 import DataTable, { Column, Action } from '@/components/DataTable';
 import { FormSection, FormField, FormActions, SaveButton, CancelButton } from '@/components/Form';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   providers: StorageProvider[];
@@ -113,15 +114,15 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         if (sizeInfo.success) {
           await api.updateProviderBytes(provider.id, sizeInfo.usedBytes, token);
         }
-      } catch {}
+      } catch { /* ignore */ }
       sounds.store();
       onNotify('success', 'Storage bucket added');
       resetForm();
       setShowForm(false);
       onRefresh();
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setSaving(false);
     }
@@ -143,9 +144,9 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       sounds.delete();
       onNotify('success', 'Bucket removed');
       onRefresh();
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setDeletingId(null);
     }
@@ -154,7 +155,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
   async function handleToggleActive(id: string) {
     sounds.toggle();
     try { await api.toggleProvider(id, token); onRefresh(); }
-    catch (e: any) { sounds.error(); onNotify('error', e.message); }
+    catch (e) { sounds.error(); onNotify('error', errMsg(e)); }
   }
 
   async function handleRefreshSize(id: string) {
@@ -169,9 +170,9 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       } else {
         onNotify('error', 'Failed to detect size');
       }
-    } catch (e: any) {
+    } catch (e) {
       sounds.error();
-      onNotify('error', e.message);
+      onNotify('error', errMsg(e));
     } finally {
       setRefreshingId(null);
     }
@@ -187,8 +188,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       } else {
         onNotify('error', `Connection failed: ${res.error}`);
       }
-    } catch (e: any) {
-      onNotify('error', `Test failed: ${e.message}`);
+    } catch (e) {
+      onNotify('error', `Test failed: ${errMsg(e)}`);
     } finally {
       setTestingId(null);
     }

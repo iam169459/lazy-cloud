@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
-  Shield, Sliders, Scan, Menu, X, ChevronsLeft, ChevronsRight, Terminal, Key, Activity, Users
+  Sliders, Scan, Menu, ChevronsLeft, ChevronsRight, Terminal, Key, Activity, Users
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, formatBytes, FileWithProvider, StorageProvider, Stats } from '@/lib/api';
 import ThemeSwitcher from '@/components/ThemeSwitcher';
+import { errMsg } from '@/lib/errors';
 
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 const AdminStorage = lazy(() => import('./AdminStorage'));
@@ -37,6 +38,7 @@ const pageDescriptions: Record<Tab, string> = {
   dashboard: 'Upload, manage, and share your files.',
   users: 'Manage registered users and permissions.',
   storage: 'Manage your storage backends.',
+  security: 'Manage credentials, 2FA, and access controls.',
   advanced: 'Configure themes, credentials, 2FA, and system preferences.',
   'api-keys': 'Manage API keys for programmatic access.',
   'audit-log': 'View admin action audit trail.',
@@ -69,7 +71,7 @@ export default function AdminPanel() {
     try {
       const [s, f, p] = await Promise.all([api.getStats(token), api.listFiles(token), api.listProviders(token)]);
       setStats(s); setFiles(f.files); setProviders(p.providers);
-    } catch (e: any) { notify('error', e.message); } finally { setLoading(false); }
+    } catch (e) { notify('error', errMsg(e)); } finally { setLoading(false); }
   }, [token, notify]);
 
   useEffect(() => { if (!token) { nav('/admin/login'); return; } refresh(); }, [token, nav, refresh]);
@@ -325,6 +327,7 @@ export default function AdminPanel() {
 
 const pageTitles: Record<Tab, string> = {
   dashboard: 'Files',
+  users: 'Users',
   storage: 'Storage',
   security: 'Credentials',
   'api-keys': 'API Keys',

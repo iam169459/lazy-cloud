@@ -9,7 +9,10 @@ try {
 
 function getCtx(): AudioContext {
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    audioCtx = new AudioContextCtor();
   }
   return audioCtx;
 }
@@ -28,7 +31,7 @@ function playTone(freq: number, duration: number, type: OscillatorType = 'sine',
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 function playNoise(duration: number, volume = 0.05) {
@@ -48,7 +51,7 @@ function playNoise(duration: number, volume = 0.05) {
     source.connect(gain);
     gain.connect(ctx.destination);
     source.start();
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 export const sounds = {

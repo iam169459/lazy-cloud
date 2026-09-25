@@ -4,6 +4,7 @@ import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { formatBytes } from '@/lib/api';
+import { errMsg } from '@/lib/errors';
 
 interface UploadItem {
   id: string;
@@ -37,16 +38,6 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
   const processingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addFiles = useCallback((files: FileList) => {
-    const newItems: UploadItem[] = Array.from(files).map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      progress: 0,
-      status: 'pending' as const,
-    }));
-    setQueue((prev) => [...prev, ...newItems]);
-    processQueue();
-  }, []);
 
   const processQueue = useCallback(async () => {
     if (processingRef.current) return;
@@ -75,8 +66,8 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
         }
         setQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: 'completed', progress: 100, result } : i)));
         sounds.store();
-      } catch (e: any) {
-        setQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: 'error', error: e.message } : i)));
+      } catch (e) {
+        setQueue((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: 'error', error: errMsg(e) } : i)));
         sounds.error();
       } finally {
         setActiveCount((c) => c - 1);
@@ -85,6 +76,17 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
 
     processingRef.current = false;
   }, [queue, token, encrypted, maxConcurrent]);
+
+  const addFiles = useCallback((files: FileList) => {
+    const newItems: UploadItem[] = Array.from(files).map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      progress: 0,
+      status: 'pending' as const,
+    }));
+    setQueue((prev) => [...prev, ...newItems]);
+    processQueue();
+  }, [processQueue]);
 
   const removeItem = useCallback((id: string) => {
     setQueue((prev) => prev.filter((item) => item.id !== id));
@@ -110,7 +112,6 @@ export default function UploadQueue({ token, onComplete, onClose, encrypted = fa
   };
 
   const completedFiles = queue.filter((item) => item.status === 'completed');
-  const hasErrors = queue.some((item) => item.status === 'error');
   const isUploading = activeCount > 0;
 
   if (onComplete && completedFiles.length > 0 && queue.every((item) => item.status !== 'uploading' && item.status !== 'pending')) {

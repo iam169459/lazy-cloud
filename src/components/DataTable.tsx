@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal, Download, Trash2, Copy } from 'lucide-react';
+import { ChevronUp, ChevronDown, Search, ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 
 export interface Column<T> {
@@ -44,10 +44,9 @@ interface DataTableProps<T> {
   loading?: boolean;
   loadingText?: string;
   selectable?: boolean;
-  onSelectionChange?: (selected: T[]) => void;
 }
 
-export default function DataTable<T extends Record<string, any>>({
+export default function DataTable<T extends object>({
   columns,
   data,
   actions,
@@ -62,7 +61,6 @@ export default function DataTable<T extends Record<string, any>>({
   loading,
   loadingText = 'Loading...',
   selectable = false,
-  onSelectionChange,
 }: DataTableProps<T>) {
   const { colors } = useTheme();
   const [search, setSearch] = useState('');
@@ -83,8 +81,8 @@ export default function DataTable<T extends Record<string, any>>({
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
     return [...filtered].sort((a, b) => {
-      const aVal = a[sortKey];
-      const bVal = b[sortKey];
+      const aVal = a[sortKey as keyof T];
+      const bVal = b[sortKey as keyof T];
       const cmp = String(aVal ?? '').localeCompare(String(bVal ?? ''), undefined, { numeric: true });
       return sortDir === 'asc' ? cmp : -cmp;
     });
@@ -210,7 +208,7 @@ export default function DataTable<T extends Record<string, any>>({
                       )}
                       {columns.map((col) => (
                         <td key={col.key} className="px-4 py-2.5 text-xs" style={{ textAlign: col.align || 'left' }}>
-                          {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                          {col.render ? col.render(row) : String(row[col.key as keyof T] ?? '')}
                         </td>
                       ))}
                       {actions && actions.length > 0 && (
@@ -261,7 +259,7 @@ export default function DataTable<T extends Record<string, any>>({
                         <div key={col.key} className="mb-1">
                           <span className="text-[10px] font-mono uppercase block" style={{ color: colors.textDim }}>{col.label}</span>
                           <div className="text-xs">
-                            {col.render ? col.render(row) : String(row[col.key] ?? '')}
+                            {col.render ? col.render(row) : String(row[col.key as keyof T] ?? '')}
                           </div>
                         </div>
                       ))}

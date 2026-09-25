@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Download, X, Maximize2, Minimize2, Loader2, AlertCircle, FileText, Image, Video, Music, Archive, Code, FileType } from 'lucide-react';
 import { api, formatBytes, formatDate, FileInfo } from '@/lib/api';
+import { errMsg } from '@/lib/errors';
 
 function FileIcon({ mimeType, className = 'w-12 h-12' }: { mimeType: string; className?: string }) {
   const m = (mimeType || '').toLowerCase();
@@ -88,8 +89,8 @@ export default function PreviewPage() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(errMsg(e));
     } finally {
       setDownloading(false);
     }

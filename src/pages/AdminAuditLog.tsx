@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, ChevronLeft, ChevronRight, Download, Search, Filter } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { api, AuditLogEntry, formatDate } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
-import { sounds } from '@/lib/sounds';
-import DataTable, { Column, BulkAction } from '@/components/DataTable';
-import { FormSection, FormField, FormActions, SaveButton, CancelButton } from '@/components/Form';
+import DataTable, { Column } from '@/components/DataTable';
+import { errMsg } from '@/lib/errors';
 
 interface Props {
   token: string;
@@ -17,8 +16,7 @@ export default function AdminAuditLog({ token, onNotify }: Props) {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
-  const [totalLogs, setTotalLogs] = useState(0);
-  const [filters, setFilters] = useState({ action: '', adminId: '', dateFrom: '', dateTo: '' });
+  const [, setTotalLogs] = useState(0);
 
   const loadLogs = useCallback(async () => {
     setLoading(true);
@@ -26,8 +24,8 @@ export default function AdminAuditLog({ token, onNotify }: Props) {
       const { logs: loadedLogs } = await api.getAuditLogs(token, pageSize, page * pageSize);
       setLogs(loadedLogs);
       setTotalLogs(loadedLogs.length + page * pageSize);
-    } catch (e: any) {
-      onNotify('error', e.message);
+    } catch (e) {
+      onNotify('error', errMsg(e));
     } finally {
       setLoading(false);
     }
