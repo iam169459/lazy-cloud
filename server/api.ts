@@ -8,7 +8,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, hasPurchased, purchaseFile, listPurchasableFiles, listPurchasedFileIds, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
 import type { AppSettings } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, getEncryptionStatus } from './encryption';
@@ -1825,10 +1825,32 @@ export async function handleApiRequest(
       return true;
     }
 
-    // ── Files: set price (owner only) ──
-    if (path === '/api/user/files/price' && req.method === 'POST') {
+    // ── Shop: browse files for sale (only admin-priced files are listed) ──
+    if (path === '/api/shop' && req.method === 'GET') {
       const userAuth = await checkUserAuth(req);
       if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
+      const rows = await listPurchasableFiles();
+      const owned = new Set(await listPurchasedFileIds(userAuth.id));
+      sendJson(res, 200, {
+        files: rows.map((f) => ({
+          id: f.id,
+          original_name: f.original_name,
+          file_size: f.file_size,
+          mime_type: f.mime_type,
+          download_count: f.download_count,
+          created_at: f.created_at,
+          price_coins: f.price_coins,
+          owner: f.owner,
+          own: f.user_id === userAuth.id,
+          purchased: owned.has(f.id),
+        })),
+      });
+      return true;
+    }
+
+    // ── Files: set price (admin only — users cannot sell files) ──
+    if (path === '/api/admin/files/price' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
       const fileId = body.fileId;
       const price = Math.max(0, Math.floor(Number(body.priceCoins) || 0));
@@ -1836,7 +1858,6 @@ export async function handleApiRequest(
       if (price > 1000000) { sendError(res, 400, 'Price too high'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
-      if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
       await setFilePrice(fileId, price);
       sendJson(res, 200, { success: true, priceCoins: price });
       return true;

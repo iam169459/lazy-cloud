@@ -1067,3 +1067,34 @@ export async function getFileOwner(fileId: string): Promise<string | null> {
   return (rows[0] as { user_id?: string } | undefined)?.user_id ?? null;
 }
 
+export interface ShopFileRecord {
+  id: string;
+  original_name: string;
+  file_size: number;
+  mime_type: string;
+  download_count: number;
+  created_at: string;
+  price_coins: number;
+  user_id: string | null;
+  owner: string | null;
+}
+
+export async function listPurchasableFiles(limit = 200): Promise<ShopFileRecord[]> {
+  const sql = getSql();
+  return (await sql`
+    SELECT f.id, f.original_name, f.file_size, f.mime_type, f.download_count,
+           f.created_at, f.price_coins, f.user_id, u.username AS owner
+    FROM files f
+    LEFT JOIN users u ON u.id = f.user_id
+    WHERE f.price_coins > 0
+    ORDER BY f.created_at DESC
+    LIMIT ${limit}
+  `) as unknown as ShopFileRecord[];
+}
+
+export async function listPurchasedFileIds(buyerId: string): Promise<string[]> {
+  const sql = getSql();
+  const rows = await sql`SELECT file_id FROM file_purchases WHERE buyer_id = ${buyerId}` as unknown[];
+  return rows.map((r) => String((r as { file_id?: string }).file_id ?? '')).filter(Boolean);
+}
+

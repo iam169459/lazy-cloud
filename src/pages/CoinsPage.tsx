@@ -148,17 +148,21 @@ export default function CoinsPage() {
             </Link>
           </div>
 
-          {/* Sell files */}
+        </div>
+
+        {/* Shop */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold" style={{ color: colors.text }}>Spend coins</h2>
           <div className="glass-card p-4 flex items-center gap-4" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${colors.accent}15` }}>
               <ShoppingBag className="w-5 h-5" style={{ color: colors.accent }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium" style={{ color: colors.text }}>Sell files</p>
-              <p className="text-xs" style={{ color: colors.textDim }}>Set a coin price on your files — buyers pay you directly</p>
+              <p className="text-sm font-medium" style={{ color: colors.text }}>Shop</p>
+              <p className="text-xs" style={{ color: colors.textDim }}>Buy files listed by the admin — you can only buy, not sell</p>
             </div>
-            <Link to="/dashboard" className="text-xs px-3 py-1.5 rounded-lg border" style={{ borderColor: colors.border, color: colors.textDim }} onClick={() => sounds.click()}>
-              My files
+            <Link to="/shop" className="text-xs px-3 py-1.5 rounded-lg border" style={{ borderColor: colors.accent, color: colors.accent }} onClick={() => sounds.click()}>
+              Browse
             </Link>
           </div>
         </div>

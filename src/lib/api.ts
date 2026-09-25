@@ -69,6 +69,19 @@ export interface PurchasedFile {
   mime_type: string;
 }
 
+export interface ShopFile {
+  id: string;
+  original_name: string;
+  file_size: number;
+  mime_type: string;
+  download_count: number;
+  created_at: string;
+  price_coins: number;
+  owner: string | null;
+  own: boolean;
+  purchased: boolean;
+}
+
 export interface ShareCreateResult {
   share: {
     id: string;
@@ -390,18 +403,23 @@ export const api = {
     }) as Promise<{ ok: boolean; rewarded: boolean; reward: number }>,
 
   setFilePrice: (token: string, fileId: string, priceCoins: number) =>
-    request('/api/user/files/price', {
+    request('/api/admin/files/price', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileId, priceCoins }),
     }) as Promise<{ success: boolean; priceCoins: number }>,
+
+  getShop: (token: string) =>
+    request('/api/shop', {
+      headers: { Authorization: `Bearer ${token}` },
+    }) as Promise<{ files: ShopFile[] }>,
 
   purchaseFile: (token: string, fileId: string) =>
     request('/api/user/files/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ fileId }),
-    }) as Promise<{ success: boolean; purchased: boolean; coins?: number; spent?: number }>,
+    }) as Promise<{ success: boolean; purchased: boolean; free?: boolean; coins?: number; spent?: number }>,
 
   getMyPurchases: (token: string) =>
     request('/api/user/purchases', {

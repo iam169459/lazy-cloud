@@ -14,6 +14,7 @@ const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const UserLogin = lazy(() => import('@/pages/UserLogin'));
 const UserDashboard = lazy(() => import('@/pages/UserDashboard'));
 const CoinsPage = lazy(() => import('@/pages/CoinsPage'));
+const ShopPage = lazy(() => import('@/pages/ShopPage'));
 
 function Loader() {
   return (
@@ -92,6 +93,7 @@ function App() {
               <Route path="/register" element={<UserLogin />} />
               <Route path="/dashboard" element={<UserDashboard />} />
               <Route path="/coins" element={<CoinsPage />} />
+              <Route path="/shop" element={<ShopPage />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>

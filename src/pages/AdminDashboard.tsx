@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Trash2, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye } from 'lucide-react';
+import { Upload, FileText, Trash2, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye, Coins } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider, ShareRecord } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -26,6 +26,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   const [shareLoading, setShareLoading] = useState(false);
   const [shareForm, setShareForm] = useState({ password: '', expiresInDays: '', downloadLimit: '' });
   const [showUploadQueue, setShowUploadQueue] = useState(false);
+  const [priceModal, setPriceModal] = useState<{ fileId: string; name: string; price: number } | null>(null);
+  const [priceValue, setPriceValue] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(async (fl: FileList) => {
@@ -122,6 +125,31 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     setShareForm({ password: '', expiresInDays: '', downloadLimit: '' });
   }
 
+  function openPriceModal(f: FileWithProvider) {
+    sounds.click();
+    setPriceValue(String(f.price_coins || 0));
+    setPriceModal({ fileId: f.id, name: f.original_name, price: f.price_coins || 0 });
+  }
+
+  async function handleSetPrice(e: React.FormEvent) {
+    e.preventDefault();
+    if (!priceModal) return;
+    const price = Math.max(0, Math.floor(Number(priceValue) || 0));
+    setPriceSaving(true);
+    try {
+      await api.setFilePrice(token, priceModal.fileId, price);
+      sounds.success();
+      onNotify('success', price > 0 ? `Listed for ${price} coins` : 'Set to free');
+      setPriceModal(null);
+      onRefresh();
+    } catch (err) {
+      sounds.error();
+      onNotify('error', errMsg(err));
+    } finally {
+      setPriceSaving(false);
+    }
+  }
+
   const columns: Column<FileWithProvider>[] = [
     {
       key: 'original_name',
@@ -156,6 +184,17 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       render: (f) => <span className="text-xs whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(f.created_at)}</span>,
     },
     {
+      key: 'price_coins',
+      label: 'Price',
+      sortable: true,
+      render: (f) => {
+        const price = f.price_coins || 0;
+        return price > 0
+          ? <span className="flex items-center gap-1 text-xs font-mono font-medium" style={{ color: colors.primary }}><Coins className="w-3 h-3" />{price}</span>
+          : <span className="text-xs" style={{ color: colors.textDim }}>Free</span>;
+      },
+    },
+    {
       key: 'download_count',
       label: 'Downloads',
       sortable: true,
@@ -180,6 +219,11 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       icon: <Share2 className="w-3.5 h-3.5" />,
       onClick: (f: FileWithProvider) => openShareModal(f.id),
       disabled: (f: FileWithProvider) => sharingId === f.id,
+    },
+    {
+      label: 'Set price',
+      icon: <Coins className="w-3.5 h-3.5" />,
+      onClick: (f: FileWithProvider) => openPriceModal(f),
     },
     {
       label: 'Delete',
@@ -227,6 +271,45 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       },
     },
   ];
+
+  if (priceModal) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
+        <div className="glass-card w-full max-w-sm animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+          <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h3 className="text-sm font-semibold">Set price</h3>
+            <button onClick={() => setPriceModal(null)} className="p-1 rounded-md" style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+          </div>
+          <form onSubmit={handleSetPrice} className="p-6 space-y-4">
+            <div>
+              <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>File</p>
+              <p className="text-xs font-mono truncate" style={{ color: 'var(--text)' }}>{priceModal.name}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Price in coins <span style={{ opacity: 0.6 }}>(0 = free)</span></label>
+              <input
+                type="number"
+                value={priceValue}
+                onChange={(e) => setPriceValue(e.target.value)}
+                placeholder="0"
+                min="0"
+                max="1000000"
+                className="input"
+                autoFocus
+              />
+              <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-dim)' }}>Priced files are listed in the user Shop.</p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setPriceModal(null)} className="btn btn-secondary flex-1">Cancel</button>
+              <button type="submit" disabled={priceSaving} className="btn btn-primary flex-1">
+                {priceSaving ? 'Saving...' : 'Save price'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (shareModal) {
     return (
