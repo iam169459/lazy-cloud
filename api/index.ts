@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Pre-bundled by build.sh so Vercel's nft includes the full server graph.
 import { handleApiRequest } from '../dist-server/api-handler.js';
-import { errMsg } from '@/lib/errors';
+import { errMsg } from '../src/lib/errors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Security headers
