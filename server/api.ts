@@ -928,7 +928,7 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const { writeFileSync, mkdirSync, existsSync, unlinkSync } = await import('fs');
       const { join } = await import('path');
-      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+      const bb = busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
       const bgDirs = [
         join(process.cwd(), 'public', 'bg'),
         join(process.cwd(), 'dist', 'bg'),
@@ -936,6 +936,7 @@ export async function handleApiRequest(
       for (const d of bgDirs) { if (!existsSync(d)) mkdirSync(d, { recursive: true }); }
 
       let saved = false;
+      let fileDone: Promise<void> = Promise.resolve();
       bb.on('file', (_fieldname, file, info) => {
         const mime = info.mimeType || '';
         const isImage = mime.startsWith('image/');
@@ -945,28 +946,39 @@ export async function handleApiRequest(
         const fileName = 'background' + ext;
         const chunks: Buffer[] = [];
         file.on('data', (chunk: Buffer) => chunks.push(chunk));
-        file.on('end', () => {
-          const buf = Buffer.concat(chunks);
-          // Remove old backgrounds from all dirs
-          for (const d of bgDirs) {
-            for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
-              try { unlinkSync(join(d, 'background' + e)); } catch { /* ignore */ }
+        fileDone = new Promise<void>((doneFile) => {
+          file.on('end', () => {
+            const buf = Buffer.concat(chunks);
+            // Remove old backgrounds from all dirs
+            for (const d of bgDirs) {
+              for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
+                try { unlinkSync(join(d, 'background' + e)); } catch { /* ignore */ }
+              }
             }
-          }
-          for (const d of bgDirs) {
-            writeFileSync(join(d, fileName), buf);
-          }
-          const bgUrl = `/bg/${fileName}`;
-          const bgType = isVideo ? 'video' : 'image';
-          updateAppSettings({ backgroundUrl: bgUrl, backgroundType: bgType });
-          saved = true;
+            for (const d of bgDirs) {
+              writeFileSync(join(d, fileName), buf);
+            }
+            const bgUrl = `/bg/${fileName}`;
+            const bgType = isVideo ? 'video' : 'image';
+            updateAppSettings({ backgroundUrl: bgUrl, backgroundType: bgType });
+            saved = true;
+            doneFile();
+          });
+          file.on('error', () => doneFile());
         });
       });
-      bb.on('close', () => {
-        if (saved) sendJson(res, 200, { message: 'Background updated' });
-        else sendError(res, 400, 'No valid image or video uploaded');
+      bb.on('error', () => { /* handled below */ });
+      await new Promise<void>((resolve) => {
+        bb.on('close', () => {
+          void (async () => {
+            try { await fileDone; } catch { /* ignore */ }
+            if (saved) sendJson(res, 200, { message: 'Background updated' });
+            else sendError(res, 400, 'No valid image or video uploaded');
+            resolve();
+          })();
+        });
+        req.pipe(bb);
       });
-      req.pipe(bb);
       return true;
     }
 
@@ -2195,9 +2207,15 @@ export async function handleApiRequest(
       if (!user.is_active) { sendError(res, 403, 'Account disabled'); return true; }
       const settings = await getAppSettings();
       const maxFile = Number(settings.maxFileSize) || 0;
-      const bb = (await import('busboy')).default({ headers: req.headers, limits: { fileSize: maxFile > 0 ? maxFile : undefined, files: 1 } });
-      let resolved = false;
+      const bb = busboy({ headers: req.headers, limits: { fileSize: maxFile > 0 ? maxFile : undefined, files: 1 } });
+      let responded = false;
       let uploadError: string | null = null;
+      let processing: Promise<void> = Promise.resolve();
+      const respond = (status: number, error: string) => {
+        if (responded) return;
+        responded = true;
+        sendError(res, status, error);
+      };
       bb.on('file', (_fieldname, file, info) => {
         const filename = info.filename || 'upload';
         const mimeType = info.mimeType || 'application/octet-stream';
@@ -2205,7 +2223,7 @@ export async function handleApiRequest(
           uploadError = `File is too large. Max ${formatBytes(maxFile)}.`;
           file.resume();
         });
-        (async () => {
+        processing = (async () => {
           try {
             const allowed = (settings.allowedTypes || '*').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
             if (allowed.length > 0 && !allowed.includes('*') && !allowed.some(t => t === mimeType.toLowerCase() || (t.endsWith('/*') && mimeType.toLowerCase().startsWith(t.slice(0, -1))))) {
@@ -2223,28 +2241,34 @@ export async function handleApiRequest(
             const id = generateId();
             const fileKey = `${id}/${filename}`;
             await uploadToProvider(provider, fileKey, file, mimeType);
-            if (uploadError || resolved) return;
+            if (uploadError || responded) return;
             const record = await createFileRecord({
               id, original_name: filename, file_size: 0,
               mime_type: mimeType, r2_key: fileKey, provider_id: provider.id,
               user_id: userAuth.id, encrypted: false, enc_iv: null, enc_auth_tag: null,
             });
             await updateUserStorageUsed(userAuth.id);
-            resolved = true;
+            if (responded) return;
+            responded = true;
             sendJson(res, 200, { success: true, file: record });
           } catch (err) {
-            if (!resolved) { resolved = true; sendError(res, 500, errMsg(err) || 'Upload failed'); }
+            respond(500, errMsg(err) || 'Upload failed');
           }
         })();
       });
       bb.on('error', (err: Error) => { uploadError = err.message; });
-      bb.on('close', () => {
-        if (!resolved) {
-          resolved = true;
-          sendError(res, 400, uploadError || 'No file received');
-        }
+      // The response must be awaited: returning before the upload finishes lets
+      // the platform tear the request down before busboy sees any body bytes.
+      await new Promise<void>((resolve) => {
+        bb.on('close', () => {
+          void (async () => {
+            try { await processing; } catch (err) { respond(500, errMsg(err) || 'Upload failed'); }
+            if (!responded) respond(400, uploadError || 'No file received');
+            resolve();
+          })();
+        });
+        req.pipe(bb);
       });
-      req.pipe(bb);
       return true;
     }
 
