@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Coins, ShoppingBag, ArrowLeft, Loader2, Check, Download, RefreshCw, ArrowUpRight, FileText, Gift } from 'lucide-react';
+import { Coins, ShoppingBag, ArrowLeft, Loader2, Check, Download, RefreshCw, ArrowUpRight, FileText, Gift, Search } from 'lucide-react';
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { api, ShopItem, formatDate, formatBytes } from '@/lib/api';
@@ -15,6 +15,7 @@ export default function ShopPage() {
   const [coins, setCoins] = useState(0);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const [notif, setNotif] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const notify = useCallback((type: 'success' | 'error', msg: string) => {
@@ -64,6 +65,10 @@ export default function ShopPage() {
       setBuying(null);
     }
   }
+
+  const filtered = query.trim()
+    ? items.filter((i) => i.name.toLowerCase().includes(query.trim().toLowerCase()))
+    : items;
 
   if (loading) {
     return (
@@ -126,15 +131,29 @@ export default function ShopPage() {
             <span className="text-xs font-mono" style={{ color: colors.textDim }}>{items.length} item(s)</span>
           </div>
 
-          {items.length === 0 ? (
+          {items.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search files..."
+                className="input w-full pl-9 text-xs"
+                style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
+              />
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
             <div className="text-center py-12 glass-card" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
               <FileText className="w-10 h-10 mx-auto mb-2" style={{ color: `${colors.text}30` }} />
-              <p className="text-sm" style={{ color: colors.textDim }}>Nothing for sale right now</p>
-              <p className="text-xs mt-1" style={{ color: `${colors.text}40` }}>New files are added by the admin — check back soon</p>
+              <p className="text-sm" style={{ color: colors.textDim }}>{items.length === 0 ? 'Nothing for sale right now' : 'No files match your search'}</p>
+              <p className="text-xs mt-1" style={{ color: `${colors.text}40` }}>{items.length === 0 ? 'New files are added by the admin — check back soon' : 'Try a different keyword'}</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {items.map((item) => {
+              {filtered.map((item) => {
                 const affordable = coins >= item.priceCoins;
                 return (
                   <div key={item.id} className="flex items-center gap-3 p-4 rounded-xl" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
