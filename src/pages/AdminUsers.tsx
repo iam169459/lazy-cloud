@@ -21,6 +21,13 @@ export default function AdminUsers({ token, onNotify }: Props) {
   const [editing, setEditing] = useState<string | null>(null);
   const [editRole, setEditRole] = useState('');
   const [editLimit, setEditLimit] = useState('');
+  const [defaultLimit, setDefaultLimit] = useState(2147483648);
+
+  useEffect(() => {
+    api.getSettings()
+      .then((s) => { if (Number(s.defaultStorageLimit) > 0) setDefaultLimit(Number(s.defaultStorageLimit)); })
+      .catch(() => { /* keep fallback */ });
+  }, []);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -33,8 +40,10 @@ export default function AdminUsers({ token, onNotify }: Props) {
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
   async function handleUpdate(userId: string) {
+    const limit = Number(editLimit);
+    if (!(limit > 0)) { onNotify('error', 'Storage limit must be greater than 0'); return; }
     try {
-      await api.adminUpdateUser(token, { userId, role: editRole, storage_limit: Number(editLimit) });
+      await api.adminUpdateUser(token, { userId, role: editRole, storage_limit: limit });
       sounds.success();
       onNotify('success', 'User updated');
       setEditing(null);
@@ -47,6 +56,17 @@ export default function AdminUsers({ token, onNotify }: Props) {
       await api.adminUpdateUser(token, { userId, is_active: !current });
       sounds.click();
       onNotify('success', current ? 'User disabled' : 'User enabled');
+      await loadUsers();
+    } catch (e) { onNotify('error', errMsg(e)); }
+  }
+
+  async function handleApplyDefault() {
+    if (!confirm(`Set the storage limit of all ${users.length} user(s) to ${formatBytes(defaultLimit)}? Existing per-user overrides will be overwritten.`)) return;
+    try {
+      const result = await api.adminApplyDefaultStorage(token);
+      sounds.success();
+      onNotify('success', `Set ${result.updated} user(s) to ${formatBytes(result.storageLimit)}`);
+      setEditing(null);
       await loadUsers();
     } catch (e) { onNotify('error', errMsg(e)); }
   }
@@ -72,8 +92,11 @@ export default function AdminUsers({ token, onNotify }: Props) {
           <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: colors.text }}>
             <Users className="w-5 h-5" style={{ color: colors.primary }} /> User Management
           </h2>
-          <p className="text-xs mt-1" style={{ color: colors.textDim }}>{users.length} registered user{users.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs mt-1" style={{ color: colors.textDim }}>{users.length} registered user{users.length !== 1 ? 's' : ''} · default limit {formatBytes(defaultLimit)}</p>
         </div>
+        <button onClick={handleApplyDefault} className="btn text-xs" style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, color: colors.textDim }}>
+          Apply default to all
+        </button>
       </div>
 
       {/* Search */}
@@ -132,8 +155,19 @@ export default function AdminUsers({ token, onNotify }: Props) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Storage limit (bytes)</label>
-                  <input type="number" value={editLimit} onChange={(e) => setEditLimit(e.target.value)} className="input text-xs w-36 py-1.5" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} />
+                  <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Storage limit (GB) · {formatBytes(Number(editLimit) || 0)}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={Number(editLimit) > 0 ? Number(editLimit) / (1024 * 1024 * 1024) : ''}
+                    onChange={(e) => {
+                      const gb = Number(e.target.value);
+                      setEditLimit(e.target.value === '' || isNaN(gb) || gb <= 0 ? '' : String(Math.round(gb * 1024 * 1024 * 1024)));
+                    }}
+                    className="input text-xs w-28 py-1.5"
+                    style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
+                  />
                 </div>
                 <button onClick={() => handleUpdate(u.id)} className="btn btn-primary text-xs py-1.5" style={{ background: colors.gradient, color: colors.bg }}>
                   Save

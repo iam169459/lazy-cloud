@@ -3,7 +3,7 @@ import { Settings, Loader2, Save, Palette, Volume2, VolumeX, Trash2, Download, U
 import { useTheme, ThemeId, themes } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
 import { sounds } from '@/lib/sounds';
-import { api, AppSettings, readJson } from '@/lib/api';
+import { api, AppSettings, readJson, formatBytes } from '@/lib/api';
 import { FormSection, FormField, FormRow, Toggle, FormActions, SaveButton, CancelButton, DangerButton } from '@/components/Form';
 import { errMsg } from '@/lib/errors';
 
@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableDownloadCounter: true,
   enablePublicUpload: false,
   maxStoragePerBucket: '10188208025',
+  defaultStorageLimit: '2147483648',
   backgroundUrl: '',
   backgroundType: '',
 };
@@ -39,6 +40,8 @@ function validate(settings: AppSettings): Errors {
   }
   const maxStorage = Number(settings.maxStoragePerBucket);
   if (isNaN(maxStorage) || maxStorage < 0) e.maxStoragePerBucket = 'Must be a non-negative number';
+  const defaultLimit = Number(settings.defaultStorageLimit);
+  if (isNaN(defaultLimit) || defaultLimit <= 0) e.defaultStorageLimit = 'Must be greater than 0';
   return e;
 }
 
@@ -323,7 +326,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
 
         {/* File Settings */}
         <FormSection title="File Management" icon={<Download className="w-4 h-4" />}>
-          <FormField label="Max file size" required error={touched.has('maxFileSize') ? errors.maxFileSize : undefined} hint="Max upload size in bytes">
+          <FormField label="Max file size" required error={touched.has('maxFileSize') ? errors.maxFileSize : undefined} hint={`Max upload size in bytes · ${formatBytes(Number(settings.maxFileSize) || 0)}`}>
             <input type="number" value={settings.maxFileSize} onChange={(e) => update('maxFileSize', e.target.value)} onBlur={() => blur('maxFileSize')} className="input w-32" min="0" />
           </FormField>
           <FormField label="Allowed file types" required error={touched.has('allowedTypes') ? errors.allowedTypes : undefined} hint="MIME types or * for all">
@@ -348,8 +351,25 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
 
         {/* Storage Limits */}
         <FormSection title="Storage Limits" icon={<Upload className="w-4 h-4" />}>
-          <FormField label="Max bytes per bucket" required error={touched.has('maxStoragePerBucket') ? errors.maxStoragePerBucket : undefined} hint="Default for new buckets">
+          <FormField label="Max bytes per bucket" required error={touched.has('maxStoragePerBucket') ? errors.maxStoragePerBucket : undefined} hint={`Default for new buckets · ${formatBytes(Number(settings.maxStoragePerBucket) || 0)}`}>
             <input type="number" value={settings.maxStoragePerBucket} onChange={(e) => update('maxStoragePerBucket', e.target.value)} onBlur={() => blur('maxStoragePerBucket')} className="input w-32" min="0" />
+          </FormField>
+          <FormField label="Default user storage" required error={touched.has('defaultStorageLimit') ? errors.defaultStorageLimit : undefined} hint={`Given to every new account · ${formatBytes(Number(settings.defaultStorageLimit) || 0)}`}>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={Number(settings.defaultStorageLimit) > 0 ? Number(settings.defaultStorageLimit) / (1024 * 1024 * 1024) : ''}
+                onChange={(e) => {
+                  const gb = Number(e.target.value);
+                  update('defaultStorageLimit', e.target.value === '' || isNaN(gb) || gb <= 0 ? '' : String(Math.round(gb * 1024 * 1024 * 1024)));
+                }}
+                onBlur={() => blur('defaultStorageLimit')}
+                className="input w-24"
+              />
+              <span className="text-xs" style={{ color: colors.textDim }}>GB</span>
+            </div>
           </FormField>
         </FormSection>
 

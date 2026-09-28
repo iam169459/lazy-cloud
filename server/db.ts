@@ -16,6 +16,8 @@ function getSql() {
   return sql;
 }
 
+export const DEFAULT_USER_STORAGE_LIMIT = 2147483648;
+
 export interface StorageProvider {
   id: string;
   provider_type: string;
@@ -221,7 +223,7 @@ export async function initDatabase() {
       password_hash TEXT NOT NULL,
       role TEXT DEFAULT 'user',
       storage_used BIGINT DEFAULT 0,
-      storage_limit BIGINT DEFAULT 10737418240,
+      storage_limit BIGINT DEFAULT 2147483648,
       is_active BOOLEAN DEFAULT true,
       totp_secret TEXT,
       totp_enabled BOOLEAN DEFAULT false,
@@ -236,7 +238,22 @@ export async function initDatabase() {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_used BIGINT DEFAULT 0`;
-  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_limit BIGINT DEFAULT 10737418240`;
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS storage_limit BIGINT DEFAULT 2147483648`;
+
+  // One-time switch of the per-user default from 10 GB to 2 GB, including
+  // accounts that still sit on the old default. Guarded by the column default
+  // so it never runs twice (custom per-user limits are left alone).
+  try {
+    const cols = await sql`SELECT column_default FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'storage_limit'` as unknown[];
+    const colDefault = String((cols[0] as { column_default?: string | null } | undefined)?.column_default ?? '');
+    if (!colDefault.includes('2147483648')) {
+      await sql`ALTER TABLE users ALTER COLUMN storage_limit SET DEFAULT 2147483648`;
+      const updated = await sql`UPDATE users SET storage_limit = 2147483648 WHERE storage_limit = 10737418240` as unknown[];
+      console.log('[lazydrop] user storage default set to 2GB,', Array.isArray(updated) ? updated.length : 0, 'user(s) updated');
+    }
+  } catch (e) {
+    console.warn('[lazydrop] user storage default migration skipped:', errMsg(e));
+  }
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0`;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_daily_claim TIMESTAMP`;
@@ -408,6 +425,7 @@ export interface AppSettings {
   enableDownloadCounter: boolean;
   enablePublicUpload: boolean;
   maxStoragePerBucket: string;
+  defaultStorageLimit: string;
   sessionTimeout: string;
   ipWhitelist: string;
   backgroundUrl: string;
@@ -423,6 +441,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   enableDownloadCounter: true,
   enablePublicUpload: false,
   maxStoragePerBucket: '10188208025',
+  defaultStorageLimit: '2147483648',
   sessionTimeout: '30',
   ipWhitelist: '',
   backgroundUrl: '',
@@ -739,12 +758,13 @@ export async function cleanupExpiredFiles(): Promise<void> {
 
 // ── User functions ──
 
-export async function createUser(username: string, email: string, passwordHash: string, role: string = 'user'): Promise<UserRecord> {
+export async function createUser(username: string, email: string, passwordHash: string, role: string = 'user', storageLimit?: number): Promise<UserRecord> {
   const sql = getSql();
   const id = randomUUID();
+  const limit = Number(storageLimit) > 0 ? Number(storageLimit) : DEFAULT_USER_STORAGE_LIMIT;
   const rows = await sql`
-    INSERT INTO users (id, username, email, password_hash, role)
-    VALUES (${id}, ${username}, ${email || null}, ${passwordHash}, ${role})
+    INSERT INTO users (id, username, email, password_hash, role, storage_limit)
+    VALUES (${id}, ${username}, ${email || null}, ${passwordHash}, ${role}, ${limit})
     RETURNING *
   ` as unknown[];
   return rows[0] as UserRecord;

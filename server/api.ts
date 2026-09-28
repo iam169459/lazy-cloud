@@ -8,7 +8,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD, DEFAULT_USER_STORAGE_LIMIT } from './db';
 import type { AppSettings } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, getEncryptionStatus } from './encryption';
@@ -1752,7 +1752,8 @@ export async function handleApiRequest(
       const existing = await getUserByUsername(username);
       if (existing) { sendError(res, 409, 'Username already taken'); return true; }
       const hash = scryptSync(password, 'lazydrop-user', 64).toString('hex');
-      const user = await createUser(username, email, hash);
+      const settings = await getAppSettings();
+      const user = await createUser(username, email, hash, 'user', Number(settings.defaultStorageLimit));
       await addCoins(user.id, COIN_SIGNUP_BONUS, 'signup_bonus');
       const token = jwtSign({ userId: user.id, role: user.role, username: user.username });
       sendJson(res, 201, { success: true, token, user: { id: user.id, username: user.username, email: user.email, role: user.role } });
@@ -2185,7 +2186,9 @@ export async function handleApiRequest(
       const fileCount = await countUserFiles(userAuth.id);
       const shares = await listUserShares(userAuth.id);
       const user = await getUserById(userAuth.id);
-      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || 10737418240, coins: user?.coins || 0 });
+      const settings = await getAppSettings();
+      const defaultLimit = Number(settings.defaultStorageLimit) || DEFAULT_USER_STORAGE_LIMIT;
+      sendJson(res, 200, { fileCount, shareCount: shares.length, storageUsed: user?.storage_used || 0, storageLimit: user?.storage_limit || defaultLimit, coins: user?.coins || 0 });
       return true;
     }
 
@@ -2359,11 +2362,26 @@ export async function handleApiRequest(
       const patch: Parameters<typeof updateUser>[1] = {};
       if (body.role !== undefined) patch.role = body.role;
       if (body.is_active !== undefined) patch.is_active = body.is_active;
-      if (body.storage_limit !== undefined) patch.storage_limit = Number(body.storage_limit);
+      if (body.storage_limit !== undefined) {
+        const limit = Number(body.storage_limit);
+        if (!(limit > 0)) { sendError(res, 400, 'Storage limit must be greater than 0'); return true; }
+        patch.storage_limit = limit;
+      }
       if (body.email !== undefined) patch.email = sanitize(body.email);
       const updated = await updateUser(userId, patch);
       if (updated) sendJson(res, 200, { success: true, user: { id: updated.id, username: updated.username, email: updated.email, role: updated.role, is_active: updated.is_active, storage_limit: updated.storage_limit } });
       else sendError(res, 404, 'User not found');
+      return true;
+    }
+
+    // ── Admin: Give every user the default storage limit ──
+    if (path === '/api/admin/users/apply-default-storage' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const settings = await getAppSettings();
+      const limit = Number(settings.defaultStorageLimit) || DEFAULT_USER_STORAGE_LIMIT;
+      const sql = getDb();
+      const rows = await sql`UPDATE users SET storage_limit = ${limit} RETURNING id` as unknown[];
+      sendJson(res, 200, { success: true, storageLimit: limit, updated: Array.isArray(rows) ? rows.length : 0 });
       return true;
     }
 

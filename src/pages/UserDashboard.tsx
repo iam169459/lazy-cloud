@@ -19,7 +19,7 @@ export default function UserDashboard() {
   const [tab, setTab] = useState<'files' | 'shares' | 'profile'>('files');
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [shares, setShares] = useState<ShareRecord[]>([]);
-  const [stats, setStats] = useState({ fileCount: 0, shareCount: 0, storageUsed: 0, storageLimit: 10737418240, coins: 0 });
+  const [stats, setStats] = useState({ fileCount: 0, shareCount: 0, storageUsed: 0, storageLimit: 2147483648, coins: 0 });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);

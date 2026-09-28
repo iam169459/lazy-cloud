@@ -178,6 +178,7 @@ export interface AppSettings {
   enableDownloadCounter: boolean;
   enablePublicUpload: boolean;
   maxStoragePerBucket: string;
+  defaultStorageLimit: string;
   backgroundUrl: string;
   backgroundType: 'image' | 'video' | '';
 }
@@ -641,6 +642,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ userId }),
     }) as Promise<{ success: boolean }>,
+
+  adminApplyDefaultStorage: (token: string) =>
+    request('/api/admin/users/apply-default-storage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    }) as Promise<{ success: boolean; storageLimit: number; updated: number }>,
 
   adminUserCount: (token: string) =>
     request('/api/admin/users/count', {
