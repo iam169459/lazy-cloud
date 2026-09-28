@@ -304,6 +304,10 @@ export async function initDatabase() {
     // FK already exists
   }
   await sql`CREATE INDEX IF NOT EXISTS idx_files_user_id ON files (user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_files_price ON files (price_coins) WHERE price_coins > 0`;
+
+  // Only the admin sells (site files have no owner). Clear prices set by users.
+  await sql`UPDATE files SET price_coins = 0 WHERE user_id IS NOT NULL AND price_coins > 0`;
 }
 
 export interface AdminCredentials {
@@ -1021,6 +1025,17 @@ export async function countShareVisits(shareId: string): Promise<number> {
   return Number((rows[0] as { count?: string | number }).count);
 }
 
+export async function listShopFiles(): Promise<FileRecord[]> {
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM files
+    WHERE price_coins > 0 AND user_id IS NULL
+    ORDER BY created_at DESC
+    LIMIT 200
+  ` as unknown;
+  return rows as FileRecord[];
+}
+
 export async function setFilePrice(fileId: string, priceCoins: number): Promise<void> {
   const sql = getSql();
   await sql`UPDATE files SET price_coins = ${priceCoins} WHERE id = ${fileId}`;
@@ -1065,36 +1080,5 @@ export async function getFileOwner(fileId: string): Promise<string | null> {
   const sql = getSql();
   const rows = await sql`SELECT user_id FROM files WHERE id = ${fileId}` as unknown[];
   return (rows[0] as { user_id?: string } | undefined)?.user_id ?? null;
-}
-
-export interface ShopFileRecord {
-  id: string;
-  original_name: string;
-  file_size: number;
-  mime_type: string;
-  download_count: number;
-  created_at: string;
-  price_coins: number;
-  user_id: string | null;
-  owner: string | null;
-}
-
-export async function listPurchasableFiles(limit = 200): Promise<ShopFileRecord[]> {
-  const sql = getSql();
-  return (await sql`
-    SELECT f.id, f.original_name, f.file_size, f.mime_type, f.download_count,
-           f.created_at, f.price_coins, f.user_id, u.username AS owner
-    FROM files f
-    LEFT JOIN users u ON u.id = f.user_id
-    WHERE f.price_coins > 0
-    ORDER BY f.created_at DESC
-    LIMIT ${limit}
-  `) as unknown as ShopFileRecord[];
-}
-
-export async function listPurchasedFileIds(buyerId: string): Promise<string[]> {
-  const sql = getSql();
-  const rows = await sql`SELECT file_id FROM file_purchases WHERE buyer_id = ${buyerId}` as unknown[];
-  return rows.map((r) => String((r as { file_id?: string }).file_id ?? '')).filter(Boolean);
 }
 

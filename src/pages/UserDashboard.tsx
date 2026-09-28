@@ -212,7 +212,7 @@ export default function UserDashboard() {
           </div>
         </div>
 
-        {/* Coins + Shop banners */}
+        {/* Coins banner */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <button onClick={() => nav('/coins')} className="flex items-center gap-3 p-4 rounded-xl transition-all hover:scale-[1.005] text-left" style={{ background: `${colors.primary}10`, border: `1px solid ${colors.primary}30` }}>
             <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${colors.primary}20` }}>
@@ -220,7 +220,7 @@ export default function UserDashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold" style={{ color: colors.text }}>{stats.coins} coins</p>
-              <p className="text-xs truncate" style={{ color: colors.textDim }}>Earn by sharing links and daily bonuses</p>
+              <p className="text-xs truncate" style={{ color: colors.textDim }}>Earn — daily bonus & link visits</p>
             </div>
             <span className="text-xs font-medium shrink-0" style={{ color: colors.primary }}>Earn →</span>
           </button>
@@ -230,7 +230,7 @@ export default function UserDashboard() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold" style={{ color: colors.text }}>Shop</p>
-              <p className="text-xs truncate" style={{ color: colors.textDim }}>Buy files with your coins</p>
+              <p className="text-xs truncate" style={{ color: colors.textDim }}>Buy files with coins</p>
             </div>
             <span className="text-xs font-medium shrink-0" style={{ color: colors.accent }}>Buy →</span>
           </button>
@@ -272,7 +272,6 @@ export default function UserDashboard() {
                       <p className="text-sm font-medium truncate" style={{ color: colors.text }}>{f.original_name}</p>
                       <p className="text-xs font-mono" style={{ color: colors.textDim }}>
                         {formatBytes(f.file_size)} · {formatDate(f.created_at)}
-                        {(f.price_coins || 0) > 0 && <span style={{ color: colors.primary }}> · {f.price_coins} coins</span>}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">

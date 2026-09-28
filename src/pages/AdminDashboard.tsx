@@ -26,8 +26,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
   const [shareLoading, setShareLoading] = useState(false);
   const [shareForm, setShareForm] = useState({ password: '', expiresInDays: '', downloadLimit: '' });
   const [showUploadQueue, setShowUploadQueue] = useState(false);
-  const [priceModal, setPriceModal] = useState<{ fileId: string; name: string; price: number } | null>(null);
-  const [priceValue, setPriceValue] = useState('');
+  const [priceModal, setPriceModal] = useState<{ fileId: string; name: string; price: string } | null>(null);
   const [priceSaving, setPriceSaving] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
 
@@ -125,26 +124,18 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     setShareForm({ password: '', expiresInDays: '', downloadLimit: '' });
   }
 
-  function openPriceModal(f: FileWithProvider) {
-    sounds.click();
-    setPriceValue(String(f.price_coins || 0));
-    setPriceModal({ fileId: f.id, name: f.original_name, price: f.price_coins || 0 });
-  }
-
-  async function handleSetPrice(e: React.FormEvent) {
-    e.preventDefault();
-    if (!priceModal) return;
-    const price = Math.max(0, Math.floor(Number(priceValue) || 0));
+  async function savePrice() {
+    if (!priceModal || priceSaving) return;
+    const price = Math.max(0, Math.floor(Number(priceModal.price) || 0));
     setPriceSaving(true);
     try {
       await api.setFilePrice(token, priceModal.fileId, price);
       sounds.success();
-      onNotify('success', price > 0 ? `Listed for ${price} coins` : 'Set to free');
+      onNotify('success', price > 0 ? `Listed for ${price} coins` : 'Removed from sale');
       setPriceModal(null);
       onRefresh();
-    } catch (err) {
-      sounds.error();
-      onNotify('error', errMsg(err));
+    } catch (e) {
+      sounds.error(); onNotify('error', errMsg(e));
     } finally {
       setPriceSaving(false);
     }
@@ -177,22 +168,20 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       render: (f) => <span className="text-xs font-mono whitespace-nowrap" style={{ color: colors.textMuted }}>{formatBytes(f.file_size)}</span>,
     },
     {
+      key: 'price_coins',
+      label: 'Price',
+      sortable: true,
+      hideOnMobile: true,
+      render: (f) => (f.price_coins || 0) > 0
+        ? <span className="text-xs font-mono whitespace-nowrap" style={{ color: colors.success }}>{f.price_coins} coins</span>
+        : <span className="text-xs whitespace-nowrap" style={{ color: colors.textMuted }}>Free</span>,
+    },
+    {
       key: 'created_at',
       label: 'Date',
       sortable: true,
       hideOnMobile: true,
       render: (f) => <span className="text-xs whitespace-nowrap" style={{ color: colors.textMuted }}>{formatDate(f.created_at)}</span>,
-    },
-    {
-      key: 'price_coins',
-      label: 'Price',
-      sortable: true,
-      render: (f) => {
-        const price = f.price_coins || 0;
-        return price > 0
-          ? <span className="flex items-center gap-1 text-xs font-mono font-medium" style={{ color: colors.primary }}><Coins className="w-3 h-3" />{price}</span>
-          : <span className="text-xs" style={{ color: colors.textDim }}>Free</span>;
-      },
     },
     {
       key: 'download_count',
@@ -223,7 +212,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     {
       label: 'Set price',
       icon: <Coins className="w-3.5 h-3.5" />,
-      onClick: (f: FileWithProvider) => openPriceModal(f),
+      onClick: (f: FileWithProvider) => setPriceModal({ fileId: f.id, name: f.original_name, price: String(f.price_coins || 0) }),
     },
     {
       label: 'Delete',
@@ -277,35 +266,34 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
         <div className="glass-card w-full max-w-sm animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-            <h3 className="text-sm font-semibold">Set price</h3>
-            <button onClick={() => setPriceModal(null)} className="p-1 rounded-md" style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+            <h3 className="text-sm font-semibold">Sell file</h3>
+            <button onClick={() => setPriceModal(null)} style={{ color: 'var(--text-muted)' }} title="Close">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <form onSubmit={handleSetPrice} className="p-6 space-y-4">
+          <div className="p-6 space-y-4">
+            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{priceModal.name}</p>
             <div>
-              <p className="text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>File</p>
-              <p className="text-xs font-mono truncate" style={{ color: 'var(--text)' }}>{priceModal.name}</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Price in coins <span style={{ opacity: 0.6 }}>(0 = free)</span></label>
+              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Price in coins</label>
               <input
                 type="number"
-                value={priceValue}
-                onChange={(e) => setPriceValue(e.target.value)}
-                placeholder="0"
-                min="0"
-                max="1000000"
+                min={0}
+                value={priceModal.price}
+                onChange={(e) => setPriceModal((prev) => (prev ? { ...prev, price: e.target.value } : prev))}
                 className="input"
                 autoFocus
               />
-              <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-dim)' }}>Priced files are listed in the user Shop.</p>
+              <p className="text-[11px] mt-2" style={{ color: 'var(--text-dim)' }}>
+                Listed in the user Shop. Set 0 to take it off sale.
+              </p>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setPriceModal(null)} className="btn btn-secondary flex-1">Cancel</button>
-              <button type="submit" disabled={priceSaving} className="btn btn-primary flex-1">
+              <button className="btn btn-secondary flex-1" onClick={() => setPriceModal(null)}>Cancel</button>
+              <button className="btn btn-primary flex-1" onClick={savePrice} disabled={priceSaving}>
                 {priceSaving ? 'Saving...' : 'Save price'}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       </div>
     );
