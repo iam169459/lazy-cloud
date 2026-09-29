@@ -490,7 +490,7 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
-    return (localStorage.getItem('lazydrop-theme') as ThemeId) || 'cyber';
+    return (localStorage.getItem('lazydrop-theme') as ThemeId) || 'matrix';
   });
 
   function setTheme(t: ThemeId) {
