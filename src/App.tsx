@@ -1,109 +1,94 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { lazy, Suspense, Component, ReactNode, useState, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider } from '@/lib/auth';
 import { UserAuthProvider } from '@/lib/userAuth';
-import { ThemeProvider } from '@/lib/theme';
-import { api } from '@/lib/api';
+import LoadingBar from '@/components/LoadingBar';
+import { GridBackground, Scanlines, OrbGlow, ParticleField } from '@/components/sci-fi';
+import { SkeletonPage } from '@/components/skeleton';
+import { fadeIn } from '@/lib/animations';
+import { motion } from 'framer-motion';
 
+// Lazy load standalone pages (don't need special props)
 const Landing = lazy(() => import('@/pages/Landing'));
-const DownloadPage = lazy(() => import('@/pages/Download'));
-const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
-const SharePage = lazy(() => import('@/pages/SharePage'));
-const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
-const AdminPanel = lazy(() => import('@/pages/AdminPanel'));
 const UserLogin = lazy(() => import('@/pages/UserLogin'));
 const UserDashboard = lazy(() => import('@/pages/UserDashboard'));
+const AdminLogin = lazy(() => import('@/pages/AdminLogin'));
+const DownloadPage = lazy(() => import('@/pages/Download'));
+const SharePage = lazy(() => import('@/pages/SharePage'));
+const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
 const CoinsPage = lazy(() => import('@/pages/CoinsPage'));
 const ShopPage = lazy(() => import('@/pages/ShopPage'));
 
-function Loader() {
+// Admin pages that need props - not lazy loaded
+import AdminPanel from '@/pages/AdminPanel';
+
+function SkeletonFallback({ type = 'dashboard' }: { type?: string }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg)' }}>
-      <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
-    </div>
+    <motion.div variants={fadeIn} initial="hidden" animate="enter">
+      <SkeletonPage type={type} />
+    </motion.div>
   );
 }
 
-function Background() {
-  const [bg, setBg] = useState<{ url: string; type: string }>({ url: '', type: '' });
-
-  useEffect(() => {
-    api.getSettings().then((s) => {
-      if (s.backgroundUrl) setBg({ url: s.backgroundUrl, type: s.backgroundType });
-    }).catch(() => {});
-  }, []);
-
-  if (!bg.url) return null;
-
+function AppContent() {
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
-      {bg.type === 'video' ? (
-        <video
-          src={bg.url}
-          className="w-full h-full object-cover"
-          muted
-          autoPlay
-          loop
-          playsInline
-        />
-      ) : (
-        <img src={bg.url} alt="" className="w-full h-full object-cover" />
-      )}
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
-    </div>
+    <>
+      <LoadingBar />
+      <GridBackground animate intensity={0.8} />
+      <Scanlines speed={1} opacity={0.3} />
+      <OrbGlow variant="orb1" size={500} blur={150} />
+      <OrbGlow variant="orb2" size={300} blur={100} />
+      <OrbGlow variant="orb3" size={400} blur={120} />
+      <ParticleField count={30} speed={0.5} size={1.5} />
+      
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<UserLogin />} />
+          <Route path="/dashboard" element={
+            <Suspense fallback={<SkeletonFallback type="dashboard" />}>
+              <UserDashboard />
+            </Suspense>
+          } />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/*" element={<AdminPanel />} />
+          <Route path="/file/:fileId" element={
+            <Suspense fallback={<SkeletonFallback type="stats" />}>
+              <DownloadPage />
+            </Suspense>
+          } />
+          <Route path="/s/:shareId" element={
+            <Suspense fallback={<SkeletonFallback type="stats" />}>
+              <SharePage />
+            </Suspense>
+          } />
+          <Route path="/preview/:fileId" element={<PreviewPage />} />
+          <Route path="/coins" element={
+            <Suspense fallback={<SkeletonFallback type="stats" />}>
+              <CoinsPage />
+            </Suspense>
+          } />
+          <Route path="/shop" element={
+            <Suspense fallback={<SkeletonFallback type="list" />}>
+              <ShopPage />
+            </Suspense>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 }
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <div className="fixed inset-0 flex items-center justify-center p-6" style={{ background: '#0f172a', color: '#e2e8f0' }}>
-          <div className="max-w-md text-center space-y-4">
-            <p className="text-lg font-semibold" style={{ color: '#ef4444' }}>Something went wrong</p>
-            <p className="text-sm opacity-70">{this.state.error.message}</p>
-            <button onClick={() => { this.setState({ error: null }); window.location.reload(); }} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
-              Reload page
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function App() {
+export default function App() {
   return (
-    <ErrorBoundary>
     <ThemeProvider>
-      <UserAuthProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <Background />
-          <Suspense fallback={<Loader />}>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/file/:fileId" element={<DownloadPage />} />
-              <Route path="/preview/:id" element={<PreviewPage />} />
-              <Route path="/s/:id" element={<SharePage />} />
-              <Route path="/login" element={<UserLogin />} />
-              <Route path="/register" element={<UserLogin />} />
-              <Route path="/dashboard" element={<UserDashboard />} />
-              <Route path="/coins" element={<CoinsPage />} />
-              <Route path="/shop" element={<ShopPage />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin" element={<AdminPanel />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <UserAuthProvider>
+          <AppContent />
+        </UserAuthProvider>
       </AuthProvider>
-      </UserAuthProvider>
     </ThemeProvider>
-    </ErrorBoundary>
   );
 }
-
-export default App;

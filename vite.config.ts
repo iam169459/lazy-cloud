@@ -32,15 +32,22 @@ export default defineConfig(async ({ mode }) => {
           manualChunks: {
             'react-vendor': ['react', 'react-dom'],
             'router': ['react-router-dom'],
+            'framer-motion': ['framer-motion'],
+            'lucide': ['lucide-react'],
+            'webauthn': ['@simplewebauthn/browser'],
+            'crypto': ['otplib', 'qrcode'],
+            'aws': ['@aws-sdk/client-s3', '@aws-sdk/lib-storage', '@aws-sdk/s3-request-presigner'],
           },
         },
       },
       target: 'es2020',
       minify: 'esbuild',
       sourcemap: false,
+      cssCodeSplit: true,
+      reportCompressedSize: true,
     },
     optimizeDeps: {
-      include: ['lucide-react'],
+      include: ['lucide-react', 'framer-motion'],
     },
     server: {
       host: '0.0.0.0',
@@ -48,6 +55,10 @@ export default defineConfig(async ({ mode }) => {
       fs: {
         allow: ['..'],
       },
+    },
+    esbuild: {
+      treeShaking: true,
+      legalComments: 'none',
     },
   };
 });
