@@ -8,7 +8,7 @@ export type ThemeId =
   | 'purple' 
   | 'neon' 
   | 'cyber'
-  | 'void'        // Deep space void
+  | 'void'        // Deep space void theme
   | 'matrix'      // Green matrix
   | 'synthwave'   // Retro-futuristic
   | 'hologram';   // Holographic UI
@@ -42,7 +42,6 @@ interface ThemeColors {
   orb1: string;
   orb2: string;
   orb3: string;
-  // New sci-fi specific
   hologram: string;
   hologramGlow: string;
   terminal: string;
@@ -54,7 +53,6 @@ interface ThemeColors {
 }
 
 const themes: Record<ThemeId, ThemeColors> = {
-  // Original themes preserved
   black: {
     bg: '#06060c',
     bgCard: 'rgba(255,255,255,0.02)',
@@ -321,45 +319,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     void: '#000000',
     voidGlow: 'rgba(0,212,255,0.05)',
   },
-  // NEW SCI-FI THEMES
-  void: {
-    bg: '#030305',
-    bgCard: 'rgba(255,255,255,0.015)',
-    bgHover: 'rgba(168,85,247,0.04)',
-    border: 'rgba(255,255,255,0.04)',
-    borderActive: 'rgba(168,85,247,0.3)',
-    text: '#faf5ff',
-    textMuted: '#8b5cf6',
-    textDim: '#3c096c',
-    primary: '#a855f7',
-    primaryGlow: 'rgba(168,85,247,0.18)',
-    secondary: '#7c3aed',
-    accent: '#ec4899',
-    accentGlow: 'rgba(236,72,153,0.15)',
-    danger: '#f43f5e',
-    warning: '#fbbf24',
-    success: '#a855f7',
-    gradient: 'linear-gradient(135deg, #a855f7, #7c3aed, #ec4899)',
-    cardBg: 'rgba(255,255,255,0.015)',
-    cardBorder: 'rgba(255,255,255,0.04)',
-    cardHover: 'rgba(168,85,247,0.05)',
-    inputBg: 'rgba(255,255,255,0.02)',
-    inputBorder: 'rgba(255,255,255,0.06)',
-    inputFocus: 'rgba(168,85,247,0.35)',
-    scanline: 'rgba(168,85,247,0.01)',
-    gridLine: 'rgba(168,85,247,0.02)',
-    orb1: 'rgba(168,85,247,0.08)',
-    orb2: 'rgba(124,58,237,0.05)',
-    orb3: 'rgba(236,72,153,0.03)',
-    hologram: '#d946ef',
-    hologramGlow: 'rgba(217,70,239,0.2)',
-    terminal: '#a855f7',
-    terminalGlow: 'rgba(168,85,247,0.12)',
-    energy: '#ec4899',
-    energyGlow: 'rgba(236,72,153,0.12)',
-    void: '#000000',
-    voidGlow: 'rgba(168,85,247,0.03)',
-  },
   matrix: {
     bg: '#000d00',
     bgCard: 'rgba(0,255,65,0.02)',
@@ -474,6 +433,44 @@ const themes: Record<ThemeId, ThemeColors> = {
     void: '#000000',
     voidGlow: 'rgba(0,255,255,0.05)',
   },
+  void: {
+    bg: '#000000',
+    bgCard: 'rgba(255,255,255,0.01)',
+    bgHover: 'rgba(255,255,255,0.02)',
+    border: 'rgba(255,255,255,0.03)',
+    borderActive: 'rgba(255,255,255,0.2)',
+    text: '#ffffff',
+    textMuted: '#888888',
+    textDim: '#444444',
+    primary: '#ffffff',
+    primaryGlow: 'rgba(255,255,255,0.1)',
+    secondary: '#cccccc',
+    accent: '#aaaaaa',
+    accentGlow: 'rgba(170,170,170,0.1)',
+    danger: '#ff4444',
+    warning: '#ffaa00',
+    success: '#00ff88',
+    gradient: 'linear-gradient(135deg, #ffffff, #aaaaaa, #ffffff)',
+    cardBg: 'rgba(255,255,255,0.01)',
+    cardBorder: 'rgba(255,255,255,0.03)',
+    cardHover: 'rgba(255,255,255,0.02)',
+    inputBg: 'rgba(255,255,255,0.02)',
+    inputBorder: 'rgba(255,255,255,0.05)',
+    inputFocus: 'rgba(255,255,255,0.2)',
+    scanline: 'rgba(255,255,255,0.01)',
+    gridLine: 'rgba(255,255,255,0.02)',
+    orb1: 'rgba(255,255,255,0.04)',
+    orb2: 'rgba(255,255,255,0.02)',
+    orb3: 'rgba(255,255,255,0.01)',
+    hologram: '#ffffff',
+    hologramGlow: 'rgba(255,255,255,0.1)',
+    terminal: '#ffffff',
+    terminalGlow: 'rgba(255,255,255,0.1)',
+    energy: '#ffffff',
+    energyGlow: 'rgba(255,255,255,0.1)',
+    void: '#000000',
+    voidGlow: 'rgba(255,255,255,0.02)',
+  },
 };
 
 interface ThemeContextType {
@@ -483,14 +480,14 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'cyber',
-  colors: themes.cyber,
+  theme: 'matrix',
+  colors: themes.matrix,
   setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
-    return (localStorage.getItem('lazydrop-theme') as ThemeId) || 'matrix';
+    return 'matrix';
   });
 
   function setTheme(t: ThemeId) {
@@ -506,6 +503,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
     root.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const c = themes[theme];
+    const root = document.documentElement;
+    Object.entries(c).forEach(([k, v]) => {
+      root.style.setProperty(`--${k.replace(/([A-Z])/g, '-$1').toLowerCase()}`, v);
+    });
+    root.setAttribute('data-theme', theme);
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, colors: themes[theme], setTheme }}>
