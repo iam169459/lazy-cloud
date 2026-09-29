@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@/lib/theme';
 import { AuthProvider } from '@/lib/auth';
 import { UserAuthProvider } from '@/lib/userAuth';
@@ -7,7 +7,7 @@ import LoadingBar from '@/components/LoadingBar';
 import { GridBackground, Scanlines, OrbGlow, ParticleField } from '@/components/sci-fi';
 import { SkeletonPage } from '@/components/skeleton';
 import { fadeIn } from '@/lib/animations';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Lazy load standalone pages (don't need special props)
 const Landing = lazy(() => import('@/pages/Landing'));
@@ -32,6 +32,14 @@ function SkeletonFallback({ type = 'dashboard' }: { type?: string }) {
 }
 
 function AppContent() {
+  const location = useLocation();
+  const [routeKey, setRouteKey] = useState(0);
+  
+  // Trigger route transition
+  useEffect(() => {
+    setRouteKey(k => k + 1);
+  }, [location.pathname]);
+
   return (
     <>
       <LoadingBar />
@@ -40,42 +48,52 @@ function AppContent() {
       <OrbGlow variant="orb1" size={500} blur={150} />
       <OrbGlow variant="orb2" size={300} blur={100} />
       <OrbGlow variant="orb3" size={400} blur={120} />
-      <ParticleField count={30} speed={0.5} size={1.5} />
+      <ParticleField count={30} speed={0.5} particleSize={1.5} />
       
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<UserLogin />} />
-          <Route path="/dashboard" element={
-            <Suspense fallback={<SkeletonFallback type="dashboard" />}>
-              <UserDashboard />
-            </Suspense>
-          } />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin/*" element={<AdminPanel />} />
-          <Route path="/file/:fileId" element={
-            <Suspense fallback={<SkeletonFallback type="stats" />}>
-              <DownloadPage />
-            </Suspense>
-          } />
-          <Route path="/s/:shareId" element={
-            <Suspense fallback={<SkeletonFallback type="stats" />}>
-              <SharePage />
-            </Suspense>
-          } />
-          <Route path="/preview/:fileId" element={<PreviewPage />} />
-          <Route path="/coins" element={
-            <Suspense fallback={<SkeletonFallback type="stats" />}>
-              <CoinsPage />
-            </Suspense>
-          } />
-          <Route path="/shop" element={
-            <Suspense fallback={<SkeletonFallback type="list" />}>
-              <ShopPage />
-            </Suspense>
-          } />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes key={routeKey} location={location} children={[
+            <Route key="home" path="/" element={
+              <Suspense fallback={<SkeletonFallback type="dashboard" />}>
+                <Landing />
+              </Suspense>
+            } />,
+            <Route key="login" path="/login" element={
+              <Suspense fallback={<SkeletonFallback type="form" />}>
+                <UserLogin />
+              </Suspense>
+            } />,
+            <Route key="dashboard" path="/dashboard" element={
+              <Suspense fallback={<SkeletonFallback type="dashboard" />}>
+                <UserDashboard />
+              </Suspense>
+            } />,
+            <Route key="admin-login" path="/admin/login" element={<AdminLogin />} />,
+            <Route key="admin" path="/admin/*" element={<AdminPanel />} />,
+            <Route key="file" path="/file/:fileId" element={
+              <Suspense fallback={<SkeletonFallback type="stats" />}>
+                <DownloadPage />
+              </Suspense>
+            } />,
+            <Route key="share" path="/s/:shareId" element={
+              <Suspense fallback={<SkeletonFallback type="stats" />}>
+                <SharePage />
+              </Suspense>
+            } />,
+            <Route key="preview" path="/preview/:fileId" element={<PreviewPage />} />,
+            <Route key="coins" path="/coins" element={
+              <Suspense fallback={<SkeletonFallback type="stats" />}>
+                <CoinsPage />
+              </Suspense>
+            } />,
+            <Route key="shop" path="/shop" element={
+              <Suspense fallback={<SkeletonFallback type="list" />}>
+                <ShopPage />
+              </Suspense>
+            } />,
+            <Route key="wildcard" path="*" element={<Navigate to="/" replace />} />
+          ]} />
+        </AnimatePresence>
       </BrowserRouter>
     </>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
 interface ParticleFieldProps {
@@ -6,7 +6,7 @@ interface ParticleFieldProps {
   count?: number;
   color?: string;
   speed?: number;
-  size?: number;
+  particleSize?: number;
 }
 
 export default function ParticleField({ 
@@ -14,20 +14,32 @@ export default function ParticleField({
   count = 50,
   color,
   speed = 1,
-  size = 2
+  particleSize = 2
 }: ParticleFieldProps) {
   const { colors } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; radius: number; opacity: number }>>([]);
   const animationIdRef = useRef<number>();
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Use local variables for TypeScript narrowing
     const c = canvas;
     const x = ctx;
 
@@ -37,7 +49,7 @@ export default function ParticleField({
       y: Math.random() * c.offsetHeight,
       vx: (Math.random() - 0.5) * 0.5 * speed,
       vy: (Math.random() - 0.5) * 0.5 * speed,
-      radius: Math.random() * size + 0.5,
+      radius: Math.random() * particleSize + 0.5,
       opacity: Math.random() * 0.5 + 0.2,
     }));
     particlesRef.current = particles;
@@ -83,13 +95,14 @@ export default function ParticleField({
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [colors.primary, count, speed, size, color]);
+  }, [colors.primary, count, speed, particleSize, reducedMotion]);
 
   return (
     <canvas 
       ref={canvasRef} 
       className={`fixed inset-0 pointer-events-none ${className}`}
       style={{ zIndex: -1 }}
+      aria-hidden="true"
     />
   );
 }

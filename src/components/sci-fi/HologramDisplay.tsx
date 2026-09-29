@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useTheme } from '@/lib/theme';
 
 interface HologramDisplayProps {
@@ -15,6 +15,15 @@ export default function HologramDisplay({
   intensity = 1
 }: HologramDisplayProps) {
   const { colors } = useTheme();
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   const animations = {
     scan: `hologram-scan ${2 / intensity}s linear infinite`,
@@ -33,7 +42,7 @@ export default function HologramDisplay({
         background: `linear-gradient(135deg, ${colors.hologram}05 0%, ${colors.bgCard} 100%)`,
         border: `1px solid ${colors.hologram}40`,
         boxShadow: `0 0 40px ${colors.hologramGlow}, inset 0 1px 0 ${colors.hologram}20`,
-        animation: animations[variant] || 'none',
+        animation: reducedMotion ? 'none' : animations[variant],
       }}
     >
       {/* Scanline overlay */}
@@ -48,7 +57,7 @@ export default function HologramDisplay({
               ${colors.hologram}10 3px,
               ${colors.hologram}10 6px
             )`,
-            animation: 'hologram-scanlines 3s linear infinite',
+            animation: reducedMotion ? 'none' : 'hologram-scanlines 3s linear infinite',
             pointerEvents: 'none',
           }}
         />
@@ -88,6 +97,11 @@ export default function HologramDisplay({
         @keyframes hologram-scanlines {
           0% { transform: translateY(-100%); }
           100% { transform: translateY(100%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="hologram-scan"], [style*="hologram-flicker"], [style*="hologram-scanlines"] {
+            animation: none !important;
+          }
         }
       `}</style>
     </div>

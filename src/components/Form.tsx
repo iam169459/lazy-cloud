@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { useId } from 'react';
 import { useTheme } from '@/lib/theme';
 
@@ -14,7 +15,7 @@ export function FormSection({ title, icon, description, children }: {
       {(title || icon) && (
         <div className="flex items-center gap-2 mb-4">
           {icon && (
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${colors.primary}15`, color: colors.primary }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${colors.primary}15`, color: colors.primary }} aria-hidden="true">
               {icon}
             </div>
           )}
@@ -42,7 +43,7 @@ export function FormField({
   required?: boolean;
   error?: string;
   hint?: string;
-  children: React.ReactNode;
+  children: React.ReactElement;
 }) {
   const { colors } = useTheme();
   const baseId = useId();
@@ -50,6 +51,16 @@ export function FormField({
   const hintId = hint ? `${id}-hint` : undefined;
   const errorId = error ? `${id}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(' ') || undefined;
+
+  // Clone the child element to inject id, aria-describedby, aria-invalid
+  const child = React.isValidElement(children)
+    ? React.cloneElement(children, {
+        id,
+        'aria-describedby': describedBy,
+        'aria-invalid': !!error || undefined,
+        'aria-required': required || undefined,
+      } as React.HTMLAttributes<HTMLElement>)
+    : children;
 
   return (
     <div>
@@ -61,11 +72,9 @@ export function FormField({
         {label} {required && <span style={{ color: '#22c55e' }} aria-hidden="true">*</span>}
       </label>
       <div className="relative">
-        {children && (
-          <div id={id} aria-describedby={describedBy} aria-invalid={!!error || undefined}>
-            {children}
-          </div>
-        )}
+        <div id={id} aria-describedby={describedBy} aria-invalid={!!error || undefined}>
+          {child}
+        </div>
       </div>
       {hint && !error && (
         <p id={hintId} className="text-[11px] font-mono mt-1.5" style={{ color: colors.textDim }}>
@@ -110,15 +119,17 @@ export function Toggle({ checked, onChange, label }: {
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="relative w-12 h-6 rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer"
-      style={{ background: checked ? 'linear-gradient(135deg, #22c55e, #3b82f6)' : 'rgba(255,255,255,0.1)' }}
+      className="relative w-12 h-6 rounded-full transition-all duration-200 flex-shrink-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] focus-visible:ring-primary"
+      style={{ background: checked ? 'linear-gradient(135deg, #22c55e, #3b82f6)' : 'rgba(255,255,255,0.1)', touchAction: 'manipulation' }}
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onChange(!checked); }}}
     >
       <span
         className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full transition-transform duration-200"
         style={{ background: '#0f172a', transform: checked ? 'translateX(24px)' : 'translateX(0)' }}
+        aria-hidden="true"
       />
     </button>
   );
@@ -135,8 +146,8 @@ export function FormActions({ children }: { children: React.ReactNode }) {
 
 export function SaveButton({ loading, onClick, children }: { loading?: boolean; onClick?: (e: React.MouseEvent<HTMLButtonElement>) => Promise<void> | void; children: React.ReactNode }) {
   return (
-    <button type="submit" onClick={onClick} disabled={loading} className="btn btn-primary text-xs">
-      {loading && <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M18 12v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>}
+    <button type="submit" onClick={onClick} disabled={loading} className="btn btn-primary text-xs" aria-busy={loading}>
+      {loading && <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M12 2v4M18 12v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>}
       {children}
     </button>
   );

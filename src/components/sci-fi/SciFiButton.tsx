@@ -1,4 +1,4 @@
-import { ReactNode, ButtonHTMLAttributes, forwardRef } from 'react';
+import { ReactNode, ButtonHTMLAttributes, forwardRef, useEffect, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
 interface SciFiButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -22,8 +22,17 @@ export const SciFiButton = forwardRef<HTMLButtonElement, SciFiButtonProps>(
     ...props 
   }, ref) => {
     const { colors } = useTheme();
+    const [reducedMotion, setReducedMotion] = useState(false);
     const showHover = !disabled;
     
+    useEffect(() => {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      setReducedMotion(mediaQuery.matches);
+      const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }, []);
+
     const variants = {
       primary: { 
         bg: colors.primary, 
@@ -91,10 +100,10 @@ export const SciFiButton = forwardRef<HTMLButtonElement, SciFiButtonProps>(
         className={`
           relative inline-flex items-center justify-center font-mono font-semibold
           rounded-xl transition-all duration-200
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--bg)]
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] focus-visible:ring-primary
           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:transform-none
           ${showHover ? 'hover:scale-105 active:scale-95' : ''}
-          ${pulse && !disabled ? 'animate-pulse-glow' : ''}
+          ${pulse && !disabled && !reducedMotion ? 'animate-pulse-glow' : ''}
           ${sizes[size]} ${className}
         `}
         style={{
@@ -109,7 +118,7 @@ export const SciFiButton = forwardRef<HTMLButtonElement, SciFiButtonProps>(
         {...props}
       >
         <span className="relative z-10">{children}</span>
-        {glow && !disabled && (
+        {glow && !disabled && !reducedMotion && (
           <span 
             className="absolute inset-0 rounded-xl"
             style={{
@@ -126,6 +135,9 @@ export const SciFiButton = forwardRef<HTMLButtonElement, SciFiButtonProps>(
             50% { box-shadow: 0 0 30px var(--glow), 0 0 60px var(--glow), inset 0 1px 0 rgba(255,255,255,0.2); }
           }
           .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+          @media (prefers-reduced-motion: reduce) {
+            .animate-pulse-glow { animation: none; }
+          }
         `}</style>
       </button>
     );

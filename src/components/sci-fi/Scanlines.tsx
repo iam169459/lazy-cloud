@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
 export default function Scanlines({ 
@@ -11,7 +11,16 @@ export default function Scanlines({
   opacity?: number;
 }) {
   const { colors } = useTheme();
+  const [reducedMotion, setReducedMotion] = useState(false);
   const styleRef = useRef<HTMLStyleElement>(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   useEffect(() => {
     if (styleRef.current) {
@@ -23,6 +32,8 @@ export default function Scanlines({
       `;
     }
   }, [colors.scanline]);
+
+  if (reducedMotion) return null;
 
   return (
     <>

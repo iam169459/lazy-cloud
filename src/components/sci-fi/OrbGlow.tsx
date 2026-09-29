@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
 interface OrbGlowProps {
@@ -16,7 +17,16 @@ export default function OrbGlow({
   animate = true
 }: OrbGlowProps) {
   const { colors } = useTheme();
+  const [reducedMotion, setReducedMotion] = useState(false);
   const orbColor = colors[variant];
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   return (
     <div
@@ -28,7 +38,7 @@ export default function OrbGlow({
         background: `radial-gradient(circle at center, ${orbColor} 0%, transparent 70%)`,
         filter: `blur(${blur}px)`,
         opacity: 0.6,
-        animation: animate ? 'orb-float 20s ease-in-out infinite' : 'none',
+        animation: animate && !reducedMotion ? 'orb-float 20s ease-in-out infinite' : 'none',
         pointerEvents: 'none',
       }}
     >
@@ -38,6 +48,9 @@ export default function OrbGlow({
           25% { transform: translate(30px, -20px) scale(1.1); opacity: 0.6; }
           50% { transform: translate(-20px, 30px) scale(0.9); opacity: 0.5; }
           75% { transform: translate(-30px, -30px) scale(1.05); opacity: 0.55; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-orb-float { animation: none; }
         }
       `}</style>
     </div>

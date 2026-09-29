@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/lib/theme';
 
 export default function GridBackground({ 
@@ -12,16 +12,25 @@ export default function GridBackground({
 }) {
   const { colors } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
-    // Read ref once and narrow type
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReducedMotion(mediaQuery.matches);
+    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // These are now properly narrowed as non-null
+    // Use local variables for TypeScript narrowing
     const c = canvas;
     const x = ctx;
 
@@ -54,12 +63,12 @@ export default function GridBackground({
         x.stroke();
       }
       
-      for (let i = -time % gridSize; i < height; i += gridSize) {
-        const opacity = 0.3 + 0.4 * Math.sin((i + time * 0.3) * 0.02);
+      for (let j = -time % gridSize; j < height; j += gridSize) {
+        const opacity = 0.3 + 0.4 * Math.sin((j + time * 0.3) * 0.02);
         x.globalAlpha = opacity;
         x.beginPath();
-        x.moveTo(0, i);
-        x.lineTo(width, i);
+        x.moveTo(0, j);
+        x.lineTo(width, j);
         x.stroke();
       }
       
@@ -86,13 +95,14 @@ export default function GridBackground({
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
     };
-  }, [colors.gridLine, animate, intensity]);
+  }, [colors.gridLine, animate, intensity, reducedMotion]);
 
   return (
     <canvas 
       ref={canvasRef} 
       className={`fixed inset-0 pointer-events-none ${className}`}
       style={{ zIndex: -1 }}
+      aria-hidden="true"
     />
   );
 }
