@@ -1,17 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ThemeId = 
-  | 'black' 
-  | 'dark' 
-  | 'light' 
-  | 'bw' 
-  | 'purple' 
-  | 'neon' 
-  | 'cyber'
-  | 'void'        // Deep space void
-  | 'matrix'      // Green matrix
-  | 'synthwave'   // Retro-futuristic
-  | 'hologram';   // Holographic UI
+export type ThemeId = 'black' | 'dark' | 'light' | 'bw' | 'purple' | 'neon' | 'cyber';
 
 interface ThemeColors {
   bg: string;
@@ -42,19 +31,9 @@ interface ThemeColors {
   orb1: string;
   orb2: string;
   orb3: string;
-  // New sci-fi specific
-  hologram: string;
-  hologramGlow: string;
-  terminal: string;
-  terminalGlow: string;
-  energy: string;
-  energyGlow: string;
-  void: string;
-  voidGlow: string;
 }
 
 const themes: Record<ThemeId, ThemeColors> = {
-  // Original themes preserved
   black: {
     bg: '#06060c',
     bgCard: 'rgba(255,255,255,0.02)',
@@ -84,14 +63,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(52,211,153,0.08)',
     orb2: 'rgba(34,211,238,0.06)',
     orb3: 'rgba(168,85,247,0.04)',
-    hologram: '#00ffff',
-    hologramGlow: 'rgba(0,255,255,0.2)',
-    terminal: '#34d399',
-    terminalGlow: 'rgba(52,211,153,0.15)',
-    energy: '#34d399',
-    energyGlow: 'rgba(52,211,153,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(52,211,153,0.05)',
   },
   dark: {
     bg: '#0f172a',
@@ -122,14 +93,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(129,140,248,0.08)',
     orb2: 'rgba(56,189,248,0.06)',
     orb3: 'rgba(167,139,250,0.05)',
-    hologram: '#38bdf8',
-    hologramGlow: 'rgba(56,189,248,0.2)',
-    terminal: '#818cf8',
-    terminalGlow: 'rgba(129,140,248,0.15)',
-    energy: '#38bdf8',
-    energyGlow: 'rgba(56,189,248,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(129,140,248,0.05)',
   },
   light: {
     bg: '#f8fafc',
@@ -160,14 +123,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(16,185,129,0.06)',
     orb2: 'rgba(6,182,212,0.06)',
     orb3: 'rgba(99,102,241,0.04)',
-    hologram: '#06b6d4',
-    hologramGlow: 'rgba(6,182,212,0.15)',
-    terminal: '#10b981',
-    terminalGlow: 'rgba(16,185,129,0.1)',
-    energy: '#06b6d4',
-    energyGlow: 'rgba(6,182,212,0.1)',
-    void: '#000000',
-    voidGlow: 'rgba(16,185,129,0.05)',
   },
   bw: {
     bg: '#111111',
@@ -198,14 +153,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(255,255,255,0.04)',
     orb2: 'rgba(163,163,163,0.04)',
     orb3: 'rgba(212,212,212,0.03)',
-    hologram: '#ffffff',
-    hologramGlow: 'rgba(255,255,255,0.15)',
-    terminal: '#ffffff',
-    terminalGlow: 'rgba(255,255,255,0.1)',
-    energy: '#ffffff',
-    energyGlow: 'rgba(255,255,255,0.1)',
-    void: '#000000',
-    voidGlow: 'rgba(255,255,255,0.05)',
   },
   purple: {
     bg: '#0c0614',
@@ -236,14 +183,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(168,85,247,0.1)',
     orb2: 'rgba(232,121,249,0.06)',
     orb3: 'rgba(192,132,252,0.05)',
-    hologram: '#c084fc',
-    hologramGlow: 'rgba(192,132,252,0.2)',
-    terminal: '#a855f7',
-    terminalGlow: 'rgba(168,85,247,0.15)',
-    energy: '#e879f9',
-    energyGlow: 'rgba(232,121,249,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(168,85,247,0.05)',
   },
   neon: {
     bg: '#020208',
@@ -274,14 +213,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(0,255,136,0.12)',
     orb2: 'rgba(0,255,204,0.08)',
     orb3: 'rgba(255,0,255,0.06)',
-    hologram: '#00ffcc',
-    hologramGlow: 'rgba(0,255,204,0.3)',
-    terminal: '#00ff88',
-    terminalGlow: 'rgba(0,255,136,0.2)',
-    energy: '#ff00ff',
-    energyGlow: 'rgba(255,0,255,0.2)',
-    void: '#000000',
-    voidGlow: 'rgba(0,255,136,0.05)',
   },
   cyber: {
     bg: '#0a0e1a',
@@ -312,167 +243,6 @@ const themes: Record<ThemeId, ThemeColors> = {
     orb1: 'rgba(0,200,255,0.1)',
     orb2: 'rgba(0,255,200,0.06)',
     orb3: 'rgba(255,107,53,0.04)',
-    hologram: '#00ffc8',
-    hologramGlow: 'rgba(0,255,200,0.25)',
-    terminal: '#00d4ff',
-    terminalGlow: 'rgba(0,212,255,0.15)',
-    energy: '#ff6b35',
-    energyGlow: 'rgba(255,107,53,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(0,212,255,0.05)',
-  },
-  // NEW SCI-FI THEMES
-  void: {
-    bg: '#030305',
-    bgCard: 'rgba(255,255,255,0.015)',
-    bgHover: 'rgba(168,85,247,0.04)',
-    border: 'rgba(255,255,255,0.04)',
-    borderActive: 'rgba(168,85,247,0.3)',
-    text: '#faf5ff',
-    textMuted: '#8b5cf6',
-    textDim: '#3c096c',
-    primary: '#a855f7',
-    primaryGlow: 'rgba(168,85,247,0.18)',
-    secondary: '#7c3aed',
-    accent: '#ec4899',
-    accentGlow: 'rgba(236,72,153,0.15)',
-    danger: '#f43f5e',
-    warning: '#fbbf24',
-    success: '#a855f7',
-    gradient: 'linear-gradient(135deg, #a855f7, #7c3aed, #ec4899)',
-    cardBg: 'rgba(255,255,255,0.015)',
-    cardBorder: 'rgba(255,255,255,0.04)',
-    cardHover: 'rgba(168,85,247,0.05)',
-    inputBg: 'rgba(255,255,255,0.02)',
-    inputBorder: 'rgba(255,255,255,0.06)',
-    inputFocus: 'rgba(168,85,247,0.35)',
-    scanline: 'rgba(168,85,247,0.01)',
-    gridLine: 'rgba(168,85,247,0.02)',
-    orb1: 'rgba(168,85,247,0.08)',
-    orb2: 'rgba(124,58,237,0.05)',
-    orb3: 'rgba(236,72,153,0.03)',
-    hologram: '#d946ef',
-    hologramGlow: 'rgba(217,70,239,0.2)',
-    terminal: '#a855f7',
-    terminalGlow: 'rgba(168,85,247,0.12)',
-    energy: '#ec4899',
-    energyGlow: 'rgba(236,72,153,0.12)',
-    void: '#000000',
-    voidGlow: 'rgba(168,85,247,0.03)',
-  },
-  matrix: {
-    bg: '#000d00',
-    bgCard: 'rgba(0,255,65,0.02)',
-    bgHover: 'rgba(0,255,65,0.04)',
-    border: 'rgba(0,255,65,0.12)',
-    borderActive: 'rgba(0,255,65,0.5)',
-    text: '#c8ffc8',
-    textMuted: '#00ff41',
-    textDim: '#003300',
-    primary: '#00ff41',
-    primaryGlow: 'rgba(0,255,65,0.25)',
-    secondary: '#00cc33',
-    accent: '#00ff99',
-    accentGlow: 'rgba(0,255,153,0.15)',
-    danger: '#ff0033',
-    warning: '#ffff00',
-    success: '#00ff41',
-    gradient: 'linear-gradient(135deg, #00ff41, #00cc33, #00ff99)',
-    cardBg: 'rgba(0,255,65,0.02)',
-    cardBorder: 'rgba(0,255,65,0.12)',
-    cardHover: 'rgba(0,255,65,0.06)',
-    inputBg: 'rgba(0,255,65,0.03)',
-    inputBorder: 'rgba(0,255,65,0.15)',
-    inputFocus: 'rgba(0,255,65,0.5)',
-    scanline: 'rgba(0,255,65,0.025)',
-    gridLine: 'rgba(0,255,65,0.04)',
-    orb1: 'rgba(0,255,65,0.1)',
-    orb2: 'rgba(0,204,51,0.06)',
-    orb3: 'rgba(0,255,153,0.04)',
-    hologram: '#00ff99',
-    hologramGlow: 'rgba(0,255,153,0.3)',
-    terminal: '#00ff41',
-    terminalGlow: 'rgba(0,255,65,0.2)',
-    energy: '#00ff99',
-    energyGlow: 'rgba(0,255,153,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(0,255,65,0.05)',
-  },
-  synthwave: {
-    bg: '#1a0033',
-    bgCard: 'rgba(255,0,128,0.03)',
-    bgHover: 'rgba(0,255,255,0.04)',
-    border: 'rgba(255,0,128,0.15)',
-    borderActive: 'rgba(0,255,255,0.5)',
-    text: '#ffe6ff',
-    textMuted: '#ff0080',
-    textDim: '#4d0026',
-    primary: '#ff0080',
-    primaryGlow: 'rgba(255,0,128,0.25)',
-    secondary: '#00ffff',
-    accent: '#ffff00',
-    accentGlow: 'rgba(255,255,0,0.2)',
-    danger: '#ff0033',
-    warning: '#ffff00',
-    success: '#00ff80',
-    gradient: 'linear-gradient(135deg, #ff0080, #00ffff, #ffff00)',
-    cardBg: 'rgba(255,0,128,0.03)',
-    cardBorder: 'rgba(255,0,128,0.15)',
-    cardHover: 'rgba(0,255,255,0.06)',
-    inputBg: 'rgba(255,0,128,0.04)',
-    inputBorder: 'rgba(255,0,128,0.2)',
-    inputFocus: 'rgba(0,255,255,0.5)',
-    scanline: 'rgba(255,0,128,0.02)',
-    gridLine: 'rgba(0,255,255,0.04)',
-    orb1: 'rgba(255,0,128,0.12)',
-    orb2: 'rgba(0,255,255,0.08)',
-    orb3: 'rgba(255,255,0,0.06)',
-    hologram: '#00ffff',
-    hologramGlow: 'rgba(0,255,255,0.3)',
-    terminal: '#ff0080',
-    terminalGlow: 'rgba(255,0,128,0.2)',
-    energy: '#00ffff',
-    energyGlow: 'rgba(0,255,255,0.2)',
-    void: '#000000',
-    voidGlow: 'rgba(255,0,128,0.05)',
-  },
-  hologram: {
-    bg: '#000814',
-    bgCard: 'rgba(0,255,255,0.025)',
-    bgHover: 'rgba(0,255,255,0.05)',
-    border: 'rgba(0,255,255,0.1)',
-    borderActive: 'rgba(0,255,255,0.5)',
-    text: '#e0ffff',
-    textMuted: '#00ffff',
-    textDim: '#006666',
-    primary: '#00ffff',
-    primaryGlow: 'rgba(0,255,255,0.25)',
-    secondary: '#00ff88',
-    accent: '#ff00ff',
-    accentGlow: 'rgba(255,0,255,0.15)',
-    danger: '#ff3366',
-    warning: '#ffff00',
-    success: '#00ffff',
-    gradient: 'linear-gradient(135deg, #00ffff, #00ff88, #ff00ff)',
-    cardBg: 'rgba(0,255,255,0.025)',
-    cardBorder: 'rgba(0,255,255,0.1)',
-    cardHover: 'rgba(0,255,255,0.08)',
-    inputBg: 'rgba(0,255,255,0.03)',
-    inputBorder: 'rgba(0,255,255,0.15)',
-    inputFocus: 'rgba(0,255,255,0.5)',
-    scanline: 'rgba(0,255,255,0.02)',
-    gridLine: 'rgba(0,255,255,0.035)',
-    orb1: 'rgba(0,255,255,0.1)',
-    orb2: 'rgba(0,255,136,0.06)',
-    orb3: 'rgba(255,0,255,0.04)',
-    hologram: '#00ffff',
-    hologramGlow: 'rgba(0,255,255,0.4)',
-    terminal: '#00ffff',
-    terminalGlow: 'rgba(0,255,255,0.2)',
-    energy: '#ff00ff',
-    energyGlow: 'rgba(255,0,255,0.15)',
-    void: '#000000',
-    voidGlow: 'rgba(0,255,255,0.05)',
   },
 };
 
@@ -483,14 +253,14 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'cyber',
-  colors: themes.cyber,
+  theme: 'black',
+  colors: themes.black,
   setTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
-    return (localStorage.getItem('lazydrop-theme') as ThemeId) || 'cyber';
+    return (localStorage.getItem('lazydrop-theme') as ThemeId) || 'black';
   });
 
   function setTheme(t: ThemeId) {
