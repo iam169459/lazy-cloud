@@ -589,6 +589,12 @@ export async function deleteFileRecord(id: string): Promise<FileRecord | null> {
   return (rows[0] as FileRecord) ?? null;
 }
 
+export async function decrementUserStorageUsed(userId: string, delta: number): Promise<void> {
+  if (delta <= 0) return;
+  const sql = getSql();
+  await sql`UPDATE users SET storage_used = GREATEST(storage_used - ${delta}, 0) WHERE id = ${userId}`;
+}
+
 export async function incrementDownloadCount(id: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE files SET download_count = download_count + 1 WHERE id = ${id}`;
@@ -814,6 +820,12 @@ export async function updateUserStorageUsed(userId: string): Promise<void> {
   const rows = await sql`SELECT COALESCE(SUM(file_size), 0)::BIGINT AS total FROM files WHERE user_id = ${userId}` as unknown[];
   const total = Number((rows[0] as { total?: string | number }).total);
   await sql`UPDATE users SET storage_used = ${total} WHERE id = ${userId}`;
+}
+
+export async function incrementUserStorageUsed(userId: string, delta: number): Promise<void> {
+  if (delta <= 0) return;
+  const sql = getSql();
+  await sql`UPDATE users SET storage_used = storage_used + ${delta} WHERE id = ${userId}`;
 }
 
 export async function countUsers(): Promise<number> {

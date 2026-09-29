@@ -8,13 +8,19 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, updateUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD, DEFAULT_USER_STORAGE_LIMIT } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, incrementUserStorageUsed, decrementUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD, DEFAULT_USER_STORAGE_LIMIT } from './db';
 import type { AppSettings } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, getEncryptionStatus } from './encryption';
 import { errMsg } from './errors';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lazydrop-jwt-secret-change-in-production';
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidId(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
 
 interface JwtPayload {
   userId?: string;
@@ -175,16 +181,19 @@ function getWebAuthnConfig(req: IncomingMessage): { rpID: string; expectedOrigin
   if (referer) {
     try { origins.add(new URL(referer).origin); } catch { /* ignore */ }
   }
+  // Common development and production origins
   origins.add('http://localhost:5173');
   origins.add('http://localhost:3000');
   origins.add('https://lazy-cloud.vercel.app');
 
-  const originList = [...origins];
+  const originList = [...origins].filter(Boolean);
   const primary = originList[0] || 'http://localhost:5173';
   let rpID = envRpId;
   if (!rpID) {
     try { rpID = new URL(primary).hostname; } catch { rpID = 'localhost'; }
   }
+  // Ensure rpID is a valid domain (no port, no scheme)
+  rpID = rpID.replace(/^https?:\/\//, '').split(':')[0];
   return { rpID, expectedOrigin: originList.length > 1 ? originList : primary };
 }
 
@@ -227,6 +236,8 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+// NOTE: In-memory rate limiting resets on cold starts in serverless environments.
+// For production, use a distributed store (Redis, Upstash, etc.) or Vercel's KV.
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 60; // 60 requests per minute
 
@@ -359,16 +370,19 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
         const fileId = generateId();
         const fileKey = `${fileId}/${fileName}`;
 
+            let fileSize = 0;
+        const fileStream = file;
+        fileStream.on('data', (chunk: Buffer) => { fileSize += chunk.length; });
+
         // Stream directly to S3
-        await uploadToProvider(providerUsed, fileKey, file, mimeType);
+        await uploadToProvider(providerUsed, fileKey, fileStream, mimeType);
 
         if (!uploadError && !resolved) {
           resolved = true;
-          // File record created with size 0 — will be updated by background scan
           await createFileRecord({
             id: fileId,
             original_name: fileName,
-            file_size: 0,
+            file_size: fileSize,
             mime_type: mimeType,
             r2_key: fileKey,
             provider_id: providerUsed.id,
@@ -377,7 +391,9 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
             enc_iv: null,
             enc_auth_tag: null,
           });
-          sendJson(res, 200, { id: fileId, name: fileName, size: 0 });
+          // Update provider bytes and storage tracking
+          await updateProviderBytes(providerUsed.id, fileSize);
+          sendJson(res, 200, { id: fileId, name: fileName, size: fileSize });
         }
       } catch (e) {
         if (!resolved) {
@@ -660,8 +676,8 @@ export async function handleApiRequest(
       const body = await parseJsonBody(req);
 
       const inputUser = sanitize(body.username);
-      const inputPass = sanitize(body.password);
-      const inputTotp = sanitize(body.totp);
+      const inputPass = body.password;
+      const inputTotp = body.totp ? sanitize(body.totp) : '';
 
       if (!inputUser || !inputPass) {
         sendError(res, 400, 'Username and password are required');
@@ -743,7 +759,40 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       if (!applyRateLimit(req, res, 30, 60000)) return true;
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
-      if (!fileId) { sendError(res, 400, 'Missing file id'); return true; }
+      if (!fileId || !isValidId(fileId)) { sendError(res, 400, 'Invalid file id'); return true; }
+      const file = await getFileRecord(fileId);
+      if (!file) { sendError(res, 404, 'File not found'); return true; }
+      if (!file.encrypted) { sendError(res, 400, 'File is not encrypted'); return true; }
+      const providers = await listProviders();
+      const provider = providers.find((p) => p.id === file.provider_id);
+      if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
+      const settings = await getAppSettings();
+      if (settings.enableDownloadCounter !== false) {
+        await incrementDownloadCount(fileId);
+      }
+      // Generate a short-lived token for the streaming endpoint (valid for 5 minutes)
+      const token = jwtSign({ fileId, type: 'encrypted_download', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 });
+      const streamUrl = `${new URL(req.url || '', 'http://localhost').origin}/api/download/encrypted/stream?token=${encodeURIComponent(token)}`;
+      sendJson(res, 200, { url: streamUrl, name: file.original_name, size: file.file_size });
+      return true;
+    }
+
+    // Stream encrypted file (token-based, short-lived)
+    if (path === '/api/download/encrypted/stream' && req.method === 'GET') {
+      const tokenParam = new URL(req.url || '', 'http://localhost').searchParams.get('token');
+      if (!tokenParam) { sendError(res, 400, 'Missing token'); return true; }
+      let payload: { fileId?: string; type?: string; exp?: number } | null = null;
+      try {
+        payload = jwtVerify(tokenParam);
+      } catch {
+        sendError(res, 401, 'Invalid or expired token');
+        return true;
+      }
+      if (!payload || payload.type !== 'encrypted_download' || !payload.fileId || !isValidId(payload.fileId)) {
+        sendError(res, 401, 'Invalid token');
+        return true;
+      }
+      const fileId = payload.fileId;
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
       if (!file.encrypted) { sendError(res, 400, 'File is not encrypted'); return true; }
@@ -758,9 +807,10 @@ export async function handleApiRequest(
         const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
         if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
         const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
-        const blob = new Blob([decrypted]);
-        const url = URL.createObjectURL(blob);
-        sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
+        res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${file.original_name}"`);
+        res.setHeader('Content-Length', String(decrypted.length));
+        res.end(decrypted);
       } catch (e) {
         sendError(res, 500, `Decryption failed: ${errMsg(e)}`);
       }
@@ -928,10 +978,10 @@ export async function handleApiRequest(
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const { writeFileSync, mkdirSync, existsSync, unlinkSync } = await import('fs');
       const { join } = await import('path');
+      const { tmpdir } = await import('os');
       const bb = busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
       const bgDirs = [
-        join(process.cwd(), 'public', 'bg'),
-        join(process.cwd(), 'dist', 'bg'),
+        join(tmpdir(), 'lazy-cloud-bg'),
       ];
       for (const d of bgDirs) { if (!existsSync(d)) mkdirSync(d, { recursive: true }); }
 
@@ -1362,7 +1412,7 @@ export async function handleApiRequest(
     // ── Shares ──
     if (path === '/api/share' && req.method === 'GET') {
       const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
-      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      if (!shareId || !isValidId(shareId)) { sendError(res, 400, 'Invalid share id'); return true; }
       const share = await getShareById(shareId);
       if (!share) { sendError(res, 404, 'Share not found'); return true; }
       const file = await getFileRecord(share.file_id);
@@ -1404,7 +1454,7 @@ export async function handleApiRequest(
     if (path === '/api/share/download' && req.method === 'GET') {
       const shareId = new URL(req.url || '', 'http://localhost').searchParams.get('id');
       const password = new URL(req.url || '', 'http://localhost').searchParams.get('password');
-      if (!shareId) { sendError(res, 400, 'Missing share id'); return true; }
+      if (!shareId || !isValidId(shareId)) { sendError(res, 400, 'Invalid share id'); return true; }
       const share = await validateShare(shareId, password ?? undefined);
       if (!share) { sendError(res, 403, share ? 'Share expired or limit reached' : 'Invalid share or password'); return true; }
       const file = await getFileRecord(share.file_id);
@@ -1891,7 +1941,7 @@ export async function handleApiRequest(
       if (!applyRateLimit(req, res, 20, 60000)) return true;
       const body = await parseJsonBody(req);
       const fileId = body.fileId;
-      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      if (!fileId || !isValidId(fileId)) { sendError(res, 400, 'Invalid file id'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
       const price = file.price_coins || 0;
@@ -2243,14 +2293,16 @@ export async function handleApiRequest(
             if (!provider) { uploadError = 'No storage available'; file.resume(); return; }
             const id = generateId();
             const fileKey = `${id}/${filename}`;
+            let fileSize = 0;
+            file.on('data', (chunk: Buffer) => { fileSize += chunk.length; });
             await uploadToProvider(provider, fileKey, file, mimeType);
             if (uploadError || responded) return;
             const record = await createFileRecord({
-              id, original_name: filename, file_size: 0,
+              id, original_name: filename, file_size: fileSize,
               mime_type: mimeType, r2_key: fileKey, provider_id: provider.id,
               user_id: userAuth.id, encrypted: false, enc_iv: null, enc_auth_tag: null,
             });
-            await updateUserStorageUsed(userAuth.id);
+            await incrementUserStorageUsed(userAuth.id, fileSize);
             if (responded) return;
             responded = true;
             sendJson(res, 200, { success: true, file: record });
@@ -2281,7 +2333,7 @@ export async function handleApiRequest(
       if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
       const fileId = body.fileId;
-      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      if (!fileId || !isValidId(fileId)) { sendError(res, 400, 'Invalid file id'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
       if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
@@ -2294,7 +2346,7 @@ export async function handleApiRequest(
         await updateProviderBytes(file.provider_id, -file.file_size);
       }
       await deleteFileRecord(fileId);
-      await updateUserStorageUsed(userAuth.id);
+      await decrementUserStorageUsed(userAuth.id, file.file_size);
       sendJson(res, 200, { success: true });
       return true;
     }
@@ -2305,7 +2357,7 @@ export async function handleApiRequest(
       if (!userAuth) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
       const fileId = body.fileId;
-      if (!fileId) { sendError(res, 400, 'fileId required'); return true; }
+      if (!fileId || !isValidId(fileId)) { sendError(res, 400, 'Invalid file id'); return true; }
       const file = await getFileRecord(fileId);
       if (!file) { sendError(res, 404, 'File not found'); return true; }
       if (file.user_id !== userAuth.id) { sendError(res, 403, 'Not your file'); return true; }
