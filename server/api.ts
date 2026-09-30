@@ -2284,7 +2284,8 @@ export async function handleApiRequest(
               file.resume();
               return;
             }
-            if (user.storage_used >= user.storage_limit) {
+            // Neon returns BIGINT as string; coerce before comparing (string >= string is lexicographic)
+            if (Number(user.storage_used) >= Number(user.storage_limit)) {
               uploadError = 'Storage limit reached.';
               file.resume();
               return;

@@ -66,6 +66,21 @@ export interface UserRecord {
   last_daily_claim: string | null;
 }
 
+/**
+ * Neon's serverless driver returns BIGINT columns as strings. Comparing them with
+ * `>=` would be lexicographic ("21497455" >= "2147483648" is true), so coerce the
+ * numeric columns back to numbers at the DB boundary.
+ */
+function normalizeUser(row: UserRecord | undefined): UserRecord | null {
+  if (!row) return null;
+  return {
+    ...row,
+    storage_used: Number(row.storage_used) || 0,
+    storage_limit: Number(row.storage_limit) || 0,
+    coins: Number(row.coins) || 0,
+  };
+}
+
 export interface CoinTransaction {
   id: string;
   user_id: string;
@@ -773,24 +788,25 @@ export async function createUser(username: string, email: string, passwordHash: 
     VALUES (${id}, ${username}, ${email || null}, ${passwordHash}, ${role}, ${limit})
     RETURNING *
   ` as unknown[];
-  return rows[0] as UserRecord;
+  return normalizeUser(rows[0] as UserRecord)!;
 }
 
 export async function getUserByUsername(username: string): Promise<UserRecord | null> {
   const sql = getSql();
   const rows = await sql`SELECT * FROM users WHERE username = ${username}` as unknown[];
-  return (rows[0] as UserRecord) || null;
+  return normalizeUser(rows[0] as UserRecord);
 }
 
 export async function getUserById(id: string): Promise<UserRecord | null> {
   const sql = getSql();
   const rows = await sql`SELECT * FROM users WHERE id = ${id}` as unknown[];
-  return (rows[0] as UserRecord) || null;
+  return normalizeUser(rows[0] as UserRecord);
 }
 
 export async function listUsers(limit: number = 100, offset: number = 0): Promise<UserRecord[]> {
   const sql = getSql();
-  return (await sql`SELECT * FROM users ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}`) as unknown[] as UserRecord[];
+  const rows = await sql`SELECT * FROM users ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}` as unknown[];
+  return rows.map((r) => normalizeUser(r as UserRecord)).filter((r): r is UserRecord => r !== null);
 }
 
 export async function updateUser(id: string, patch: Partial<Pick<UserRecord, 'username' | 'email' | 'role' | 'is_active' | 'storage_limit' | 'totp_secret' | 'totp_enabled' | 'password_hash' | 'last_login'>>): Promise<UserRecord | null> {
@@ -807,7 +823,7 @@ export async function updateUser(id: string, patch: Partial<Pick<UserRecord, 'us
     `UPDATE users SET ${setClauses} WHERE id = $1 RETURNING *`,
     [id, ...values]
   )) as unknown[];
-  return (rows[0] as UserRecord) || null;
+  return normalizeUser(rows[0] as UserRecord);
 }
 
 export async function deleteUser(id: string): Promise<void> {
@@ -944,7 +960,7 @@ function safeParseTransports(raw: unknown): string[] {
 export async function getUserByEmail(email: string): Promise<UserRecord | null> {
   const sql = getSql();
   const rows = await sql`SELECT * FROM users WHERE email = ${email}` as unknown[];
-  return (rows[0] as UserRecord) || null;
+  return normalizeUser(rows[0] as UserRecord);
 }
 
 export async function listUserFiles(userId: string, limit: number = 100, offset: number = 0): Promise<FileRecord[]> {
