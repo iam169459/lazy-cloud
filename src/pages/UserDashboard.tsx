@@ -7,6 +7,7 @@ import { api, formatBytes, formatDate, FileInfo, ShareRecord as ApiShareRecord }
 import { sounds } from '@/lib/sounds';
 import { enableBiometrics, getBiometricsSupport, friendlyBiometricsError, BiometricsSupport } from '@/lib/biometrics';
 import { errMsg } from '@/lib/errors';
+import { GlassCard, SciFiButton } from '@/components/sci-fi';
 import type { CreateShareOptions } from '@/lib/api';
 
 type FileRecord = FileInfo;
@@ -174,7 +175,7 @@ export default function UserDashboard() {
       {/* Header */}
       <header className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between" style={{ background: `${colors.bg}cc`, borderBottom: `1px solid ${colors.border}`, backdropFilter: 'blur(16px)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.gradient, boxShadow: `0 0 14px ${colors.primaryGlow}` }}>
             <FolderOpen className="w-4 h-4" style={{ color: colors.bg }} />
           </div>
           <h1 className="text-sm font-bold" style={{ color: colors.text }}>LazyDrop</h1>
@@ -192,24 +193,24 @@ export default function UserDashboard() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-          <div className="glass-card p-4" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          <GlassCard padding="p-4">
             <File className="w-5 h-5 mb-2" style={{ color: colors.primary }} />
             <p className="text-2xl font-bold" style={{ color: colors.text }}>{stats.fileCount}</p>
             <p className="text-xs" style={{ color: colors.textDim }}>Files</p>
-          </div>
-          <div className="glass-card p-4" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          </GlassCard>
+          <GlassCard padding="p-4">
             <Share2 className="w-5 h-5 mb-2" style={{ color: colors.accent }} />
             <p className="text-2xl font-bold" style={{ color: colors.text }}>{stats.shareCount}</p>
             <p className="text-xs" style={{ color: colors.textDim }}>Shares</p>
-          </div>
-          <div className="glass-card p-4 col-span-2 md:col-span-1" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          </GlassCard>
+          <GlassCard padding="p-4" className="col-span-2 md:col-span-1">
             <HardDrive className="w-5 h-5 mb-2" style={{ color: colors.success }} />
             <p className="text-2xl font-bold" style={{ color: colors.text }}>{formatBytes(stats.storageUsed)}</p>
             <p className="text-xs" style={{ color: colors.textDim }}>of {formatBytes(stats.storageLimit)}</p>
             <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}10` }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${storagePct}%`, background: storagePct > 90 ? colors.danger : colors.primary }} />
             </div>
-          </div>
+          </GlassCard>
         </div>
 
         {/* Coins banner */}
@@ -239,7 +240,7 @@ export default function UserDashboard() {
         {/* Tabs */}
         <div className="flex gap-1 mb-6 p-1 rounded-xl" style={{ background: `${colors.text}08` }}>
           {([['files', 'My Files', File], ['shares', 'Shares', Share2], ['profile', 'Profile', User]] as const).map(([key, label, Icon]) => (
-            <button key={key} onClick={() => setTab(key)} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium transition-all" style={{ background: tab === key ? colors.cardBg : 'transparent', color: tab === key ? colors.primary : colors.textDim, boxShadow: tab === key ? `0 1px 3px ${colors.text}10` : 'none' }}>
+            <button key={key} onClick={() => setTab(key)} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium transition-all" style={{ background: tab === key ? colors.cardBg : 'transparent', color: tab === key ? colors.primary : colors.textDim, boxShadow: tab === key ? `0 0 16px ${colors.primaryGlow}, 0 1px 3px ${colors.text}10` : 'none' }}>
               <Icon className="w-3.5 h-3.5" />{label}
             </button>
           ))}
@@ -250,15 +251,15 @@ export default function UserDashboard() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold" style={{ color: colors.text }}>My Files</h2>
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn btn-primary flex items-center gap-2 text-xs" style={{ background: colors.gradient, color: colors.bg }}>
+              <SciFiButton type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} variant="primary" size="sm" className="flex items-center gap-2">
                 {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Upload className="w-3.5 h-3.5" aria-hidden="true" />}
                 {uploading ? `Uploading… ${progress}%` : 'Upload'}
-              </button>
+              </SciFiButton>
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
             </div>
 
             {files.length === 0 ? (
-              <div className="text-center py-16 glass-card" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+              <div className="text-center py-16 glass-card hud-corners" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
                 <FolderOpen className="w-12 h-12 mx-auto mb-3" style={{ color: `${colors.text}30` }} />
                 <p className="text-sm" style={{ color: colors.textDim }}>No files yet</p>
                 <p className="text-xs mt-1" style={{ color: `${colors.text}40` }}>Upload your first file to get started</p>
@@ -299,9 +300,8 @@ export default function UserDashboard() {
         {tab === 'shares' && (
           <div>
             <h2 className="text-sm font-semibold mb-4" style={{ color: colors.text }}>Active Shares</h2>
-            {shares.length === 0 ? (
-              <div className="text-center py-16 glass-card" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
-                <Share2 className="w-12 h-12 mx-auto mb-3" style={{ color: `${colors.text}30` }} />
+            {shares.length === 0 ? (                <div className="text-center py-16 glass-card hud-corners" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+                  <Share2 className="w-12 h-12 mx-auto mb-3" style={{ color: `${colors.text}30` }} />
                 <p className="text-sm" style={{ color: colors.textDim }}>No shares yet</p>
                 <p className="text-xs mt-1" style={{ color: `${colors.text}40` }}>Create a share from your files</p>
               </div>
@@ -332,7 +332,7 @@ export default function UserDashboard() {
 
         {/* Profile Tab */}
         {tab === 'profile' && (
-          <div className="glass-card p-6 max-w-md" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          <div className="glass-card hud-corners p-6 max-w-md" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
             <h2 className="text-sm font-semibold mb-4" style={{ color: colors.text }}>Profile</h2>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span style={{ color: colors.textDim }}>Username</span><span className="font-mono" style={{ color: colors.text }}>{user?.username}</span></div>
@@ -383,7 +383,7 @@ export default function UserDashboard() {
           aria-modal="true"
           aria-label="Create share link"
         >
-          <div className="glass-card modal-panel w-full max-w-sm p-6 animate-scale-in" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+          <div className="glass-card modal-panel hud-corners w-full max-w-sm p-6 animate-scale-in" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold" style={{ color: colors.text }}>Create Share Link</h3>
               <button type="button" onClick={() => setShareModal(null)} className="p-1 rounded-md" style={{ color: colors.textDim }} aria-label="Close">
@@ -408,9 +408,9 @@ export default function UserDashboard() {
                   <input id="share-download-limit" type="number" inputMode="numeric" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
                 </div>
               </div>
-              <button onClick={handleCreateShare} className="btn btn-primary w-full text-xs" style={{ background: colors.gradient, color: colors.bg }}>
-                Create & Copy Link
-              </button>
+              <SciFiButton onClick={handleCreateShare} variant="primary" size="md" className="w-full">
+                Create &amp; Copy Link
+              </SciFiButton>
             </div>
           </div>
         </div>

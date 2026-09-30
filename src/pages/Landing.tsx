@@ -7,12 +7,22 @@ import {
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
 import { api, AppSettings } from '@/lib/api';
+import { GlassCard, HologramDisplay, TerminalText } from '@/components/sci-fi';
 
 const faqs = [
   { q: 'How does file sharing work?', a: 'Upload a file, get a unique link. Anyone with the link can download. No accounts needed on the recipient side.' },
   { q: 'Is there a file size limit?', a: 'No hard limit. Files are streamed directly. Practical limits depend on your internet connection.' },
   { q: 'Are files encrypted?', a: 'Yes. All files are encrypted at rest and transferred over HTTPS. Your files stay private.' },
   { q: 'Do recipients need an account?', a: 'No. Recipients just click the link and download. No signup, no captchas, no waiting.' },
+];
+
+const features = [
+  { icon: <Shield className="w-4 h-4" />, title: 'Private by design', desc: 'No public directory. Files only accessible via unique, unguessable links.' },
+  { icon: <Upload className="w-4 h-4" />, title: 'Drag & drop', desc: 'Drag files onto the upload zone or click to browse. Done in one step.' },
+  { icon: <Download className="w-4 h-4" />, title: 'Instant downloads', desc: 'Direct download link. No signup, no waiting, no captchas.' },
+  { icon: <Smartphone className="w-4 h-4" />, title: 'Mobile friendly', desc: 'Upload and download from any device. Works in any modern browser.' },
+  { icon: <Clock className="w-4 h-4" />, title: 'Auto-expire', desc: 'Files auto-delete after configurable TTL. Set it once, forget about it.' },
+  { icon: <Zap className="w-4 h-4" />, title: 'Lightning fast', desc: 'Files served directly. No bottleneck, no slowdowns.' },
 ];
 
 
@@ -68,21 +78,30 @@ export default function Landing() {
 
       <main>
         {/* Hero */}
-        <section className="max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
-          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100 text-balance">
-            Fast, private,
-            <br />
-            <span className="text-gradient">link-only file sharing</span>
-          </h1>
-          <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
-            Upload once, share with a link. Simple, secure, and instant.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
-            <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()}>
-              Create account
-              <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
-            <a href="#features" className="btn btn-secondary">See features</a>
+        <section className="relative max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
+          <div className="hero-glow" aria-hidden="true" />
+          <div className="relative">
+            <div className="flex justify-center mb-6 animate-fade-up">
+              <span className="status-badge status-success live" role="status">All systems online</span>
+            </div>
+            <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100 text-balance">
+              Fast, private,
+              <br />
+              <span className="text-gradient">link-only file sharing</span>
+            </h1>
+            <p className="text-base sm:text-lg max-w-xl mx-auto mb-4 leading-relaxed animate-fade-up delay-200" style={{ color: colors.textMuted }}>
+              Upload once, share with a link. Simple, secure, and instant.
+            </p>
+            <div className="flex justify-center mb-8 animate-fade-up delay-200">
+              <TerminalText text="> secure_channel: established" speed={45} />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-up delay-300">
+              <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()}>
+                Create account
+                <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              </Link>
+              <a href="#features" className="btn btn-secondary">See features</a>
+            </div>
           </div>
         </section>
 
@@ -105,36 +124,9 @@ export default function Landing() {
             desc="Simple file sharing without the bloat."
           />
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-10" role="list">
-            <Feature
-              icon={<Shield className="w-4 h-4" />}
-              title="Private by design"
-              desc="No public directory. Files only accessible via unique, unguessable links."
-            />
-            <Feature
-              icon={<Upload className="w-4 h-4" />}
-              title="Drag & drop"
-              desc="Drag files onto the upload zone or click to browse. Done in one step."
-            />
-            <Feature
-              icon={<Download className="w-4 h-4" />}
-              title="Instant downloads"
-              desc="Direct download link. No signup, no waiting, no captchas."
-            />
-            <Feature
-              icon={<Smartphone className="w-4 h-4" />}
-              title="Mobile friendly"
-              desc="Upload and download from any device. Works in any modern browser."
-            />
-            <Feature
-              icon={<Clock className="w-4 h-4" />}
-              title="Auto-expire"
-              desc="Files auto-delete after configurable TTL. Set it once, forget about it."
-            />
-            <Feature
-              icon={<Zap className="w-4 h-4" />}
-              title="Lightning fast"
-              desc="Files served directly. No bottleneck, no slowdowns."
-            />
+            {features.map((f, i) => (
+              <Feature key={f.title} icon={f.icon} title={f.title} desc={f.desc} index={i + 1} />
+            ))}
           </div>
         </section>
 
@@ -181,10 +173,7 @@ export default function Landing() {
 
         {/* Final CTA */}
         <section className="max-w-3xl mx-auto px-5 pb-20" aria-label="Call to action">
-          <div
-            className="card p-10 sm:p-14 text-center rounded-xl"
-            style={{ background: `${colors.primary}08`, border: `1px solid ${colors.primary}20` }}
-          >
+          <HologramDisplay variant="scan" className="p-10 sm:p-14 text-center">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
               Ready to share your first file?
             </h2>
@@ -195,7 +184,7 @@ export default function Landing() {
               Get Started Free
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
-          </div>
+          </HologramDisplay>
         </section>
       </main>
 
@@ -228,20 +217,23 @@ function SectionHeader({ id, eyebrow, title, desc }: { id: string; eyebrow: stri
 function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
   const { colors } = useTheme();
   return (
-    <div className="card p-4 text-center">
+    <GlassCard padding="p-4" className="text-center">
       <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }} aria-hidden="true">
         {icon}
       </div>
       <div className="text-xl font-bold">{value}</div>
       <div className="text-xs mt-0.5" style={{ color: colors.textDim }}>{label}</div>
-    </div>
+    </GlassCard>
   );
 }
 
-function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function Feature({ icon, title, desc, index }: { icon: React.ReactNode; title: string; desc: string; index: number }) {
   const { colors } = useTheme();
   return (
-    <div className="card p-5" role="listitem">
+    <div className="card p-5 hud-corners" role="listitem">
+      <span className="absolute top-4 right-4 text-[10px] font-mono" style={{ color: colors.textDim }} aria-hidden="true">
+        {String(index).padStart(2, '0')}
+      </span>
       <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }} aria-hidden="true">
         {icon}
       </div>

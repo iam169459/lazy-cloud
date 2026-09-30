@@ -25,9 +25,11 @@ export default function HologramDisplay({
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
+  // The container itself must stay still — motion lives in the scanline overlay
+  // below (and a gentle opacity flicker), so the card never flies around.
   const animations = {
-    scan: `hologram-scan ${2 / intensity}s linear infinite`,
-    flicker: `hologram-flicker ${0.1 / intensity}s ease-in-out infinite`,
+    scan: 'none',
+    flicker: `hologram-flicker ${1.6 / intensity}s ease-in-out infinite`,
     stable: 'none',
   };
 

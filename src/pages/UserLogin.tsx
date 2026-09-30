@@ -4,6 +4,7 @@ import { User, Mail, Lock, Eye, EyeOff, Loader2, ArrowRight, Fingerprint } from 
 import { useTheme } from '@/lib/theme';
 import { useUserAuth } from '@/lib/userAuth';
 import { sounds } from '@/lib/sounds';
+import { TerminalText } from '@/components/sci-fi';
 
 export default function UserLogin() {
   const { colors } = useTheme();
@@ -57,7 +58,7 @@ export default function UserLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: colors.bg }}>
       <div className="w-full max-w-md animate-fade-up">
-        <div className="glass-card p-8" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+        <div className="glass-card hud-corners p-8" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
           <div className="text-center mb-8">
             <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: colors.gradient }}>
               <User className="w-7 h-7" style={{ color: colors.bg }} />
@@ -68,6 +69,9 @@ export default function UserLogin() {
             <p className="text-sm mt-1" style={{ color: colors.textDim }}>
               {mode === 'login' ? 'Sign in to your account' : 'Join LazyDrop to start sharing'}
             </p>
+            <div className="mt-2 flex justify-center">
+              <TerminalText text="> secure access portal" speed={40} />
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

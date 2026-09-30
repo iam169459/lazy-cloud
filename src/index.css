@@ -69,6 +69,8 @@
   }
 
   .btn-primary {
+    position: relative;
+    overflow: hidden;
     background: var(--gradient, linear-gradient(135deg, #34d399, #22d3ee, #3b82f6));
     color: #ffffff;
     border: none;
@@ -78,6 +80,19 @@
     box-shadow: 0 0 28px var(--primary-glow, rgba(52,211,153,0.3));
     filter: brightness(1.1);
   }
+  /* Sweep highlight that crosses the button on hover/focus */
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+    transform: translateX(-130%);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+  }
+  .btn-primary:hover:not(:disabled)::after,
+  .btn-primary:focus-visible::after { transform: translateX(130%); }
+  .btn-primary > * { position: relative; z-index: 1; }
 
   .btn-secondary {
     background: var(--card-bg, rgba(255,255,255,0.03));
@@ -153,6 +168,15 @@
   .text-gradient {
     color: var(--primary, #34d399);
     font-weight: 700;
+  }
+  @supports ((-webkit-background-clip: text) or (background-clip: text)) {
+    .text-gradient {
+      background-image: var(--gradient, linear-gradient(135deg, #34d399, #22d3ee, #3b82f6));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+    }
   }
 
   .badge {
@@ -257,6 +281,51 @@
     border: 1px solid rgba(148, 163, 184, 0.15);
   }
   .status-neutral::before { background: #94a3b8; }
+
+  /* Pulsing "live" status dot */
+  .status-badge.live::before {
+    animation: statusPulse 1.8s ease-in-out infinite;
+    box-shadow: 0 0 6px currentColor;
+  }
+
+  /* HUD-style corner brackets for panels and cards */
+  .hud-corners {
+    position: relative;
+  }
+  .hud-corners::before,
+  .hud-corners::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-color: var(--primary, #34d399);
+    border-style: solid;
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .hud-corners::before {
+    top: -1px;
+    left: -1px;
+    border-width: 2px 0 0 2px;
+    border-top-left-radius: inherit;
+  }
+  .hud-corners::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 2px 2px 0;
+    border-bottom-right-radius: inherit;
+  }
+  .hud-corners:hover::before,
+  .hud-corners:hover::after { opacity: 1; }
+
+  /* Soft radial glow behind hero sections */
+  .hero-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(55% 45% at 50% 30%, var(--primary-glow, rgba(52,211,153,0.15)), transparent 70%);
+    pointer-events: none;
+  }
 }
 
 @layer utilities {
@@ -361,6 +430,11 @@
 @keyframes spinSlow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
 }
 
 @keyframes rocketFlameFlicker {

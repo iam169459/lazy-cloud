@@ -117,7 +117,7 @@ export const SciFiButton = forwardRef<HTMLButtonElement, SciFiButtonProps>(
         }}
         {...props}
       >
-        <span className="relative z-10">{children}</span>
+        <span className="relative z-10 inline-flex items-center gap-2">{children}</span>
         {glow && !disabled && !reducedMotion && (
           <span 
             className="absolute inset-0 rounded-xl"
