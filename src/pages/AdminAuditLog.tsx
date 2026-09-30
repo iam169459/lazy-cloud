@@ -82,11 +82,13 @@ export default function AdminAuditLog({ token, onNotify }: Props) {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          <label htmlFor="audit-page-size" className="sr-only">Rows per page</label>
           <select
+            id="audit-page-size"
             value={pageSize}
             onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
             className="input py-1.5 px-3 text-xs"
-            style={{ width: 'auto' }}
+            style={{ width: 'auto', background: colors.inputBg, color: colors.text }}
           >
             <option value="25">25 per page</option>
             <option value="50">50 per page</option>
@@ -119,15 +121,17 @@ export default function AdminAuditLog({ token, onNotify }: Props) {
             onClick={() => setPage(p => Math.max(0, p - 1))}
             disabled={page === 0 || loading}
             className="btn btn-secondary text-xs p-1.5"
+            aria-label="Previous page"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={() => setPage(p => p + 1)}
             disabled={logs.length < pageSize || loading}
             className="btn btn-secondary text-xs p-1.5"
+            aria-label="Next page"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>

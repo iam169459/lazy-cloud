@@ -32,6 +32,7 @@ export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps)
     return (
       <div className="relative">
         <button
+          type="button"
           onClick={() => { setOpen(!open); sounds.click(); }}
           className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all text-left"
           style={{
@@ -41,9 +42,11 @@ export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps)
             color: colors.textMuted,
           }}
           aria-label="Select theme"
+          aria-expanded={open}
+          aria-haspopup="menu"
           title={iconOnly ? 'Theme' : undefined}
         >
-          <span style={{ color: colors.textDim }}><Palette className="w-[18px] h-[18px]" /></span>
+          <span style={{ color: colors.textDim }}><Palette className="w-[18px] h-[18px]" aria-hidden="true" /></span>
           {!iconOnly && <span>Theme</span>}
         </button>
 
@@ -97,10 +100,13 @@ export default function ThemeSwitcher({ compact, iconOnly }: ThemeSwitcherProps)
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => { setOpen(!open); sounds.click(); }}
         className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all btn-ghost"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
-        <Palette className="w-4 h-4" />
+        <Palette className="w-4 h-4" aria-hidden="true" />
         Theme
       </button>
 

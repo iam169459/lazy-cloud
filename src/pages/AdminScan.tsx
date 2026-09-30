@@ -225,7 +225,7 @@ export default function AdminScan({ token, onNotify }: Props) {
           </p>
           <button onClick={handleStorageScan} disabled={scanningStorage} className="btn btn-primary text-xs w-full">
             {scanningStorage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scan className="w-3.5 h-3.5" />}
-            {scanningStorage ? 'Scanning...' : 'Scan Storage'}
+            {scanningStorage ? 'Scanning…' : 'Scan Storage'}
           </button>
         </div>
 
@@ -245,7 +245,7 @@ export default function AdminScan({ token, onNotify }: Props) {
           </p>
           <button onClick={handleDbScan} disabled={scanningDb} className="btn btn-secondary text-xs w-full">
             {scanningDb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-            {scanningDb ? 'Scanning...' : 'Scan Database'}
+            {scanningDb ? 'Scanning…' : 'Scan Database'}
           </button>
         </div>
 
@@ -265,7 +265,7 @@ export default function AdminScan({ token, onNotify }: Props) {
           </p>
           <button onClick={handleAutoFix} disabled={autoFixing} className="btn btn-primary text-xs w-full" style={{ background: `linear-gradient(135deg, ${colors.accent}, ${colors.primary})` }}>
             {autoFixing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-            {autoFixing ? 'Fixing...' : 'Auto Fix All'}
+            {autoFixing ? 'Fixing…' : 'Auto Fix All'}
           </button>
         </div>
       </div>

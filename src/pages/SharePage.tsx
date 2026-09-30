@@ -92,9 +92,13 @@ export default function SharePage() {
   const copyLink = async () => {
     if (!share) return;
     const url = `${window.location.origin}/s/${share.shareId}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Copy failed — your browser blocked clipboard access. Copy the URL manually.');
+    }
   };
 
   if (loading) {
@@ -182,7 +186,7 @@ export default function SharePage() {
                       className="w-full py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
                       style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
                     >
-                      {buying ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</> : <><ShoppingBag className="w-4 h-4" /> Buy for {price} coins</>}
+                      {buying ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Processing…</> : <><ShoppingBag className="w-4 h-4" aria-hidden="true" /> Buy for {price} coins</>}
                     </button>
                   ) : (
                     <Link
@@ -220,7 +224,7 @@ export default function SharePage() {
                   disabled={downloading || !password || needsPurchase}
                   className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
                 >
-                  {downloading ? 'Downloading...' : 'Download'}
+                  {downloading ? 'Downloading…' : 'Download'}
                   <Download className="w-4 h-4" />
                 </button>
               </form>
@@ -234,7 +238,7 @@ export default function SharePage() {
                 disabled={downloading}
                 className="w-full py-3 rounded-lg text-base font-medium flex items-center justify-center gap-2" style={{ background: 'var(--primary)', color: 'var(--primary-fg)' }}
               >
-                {downloading ? 'Preparing download...' : 'Download File'}
+                {downloading ? 'Preparing download…' : 'Download File'}
                 <Download className="w-5 h-5" />
               </button>
             </form>

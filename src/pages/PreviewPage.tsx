@@ -128,8 +128,8 @@ export default function PreviewPage() {
       {!fullscreen && (
         <header className="px-5 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: `1px solid var(--border)`, background: 'var(--bg)' }}>
           <div className="flex items-center gap-3">
-            <Link to="/" className="p-2 rounded-lg flex items-center justify-center" style={{ color: 'var(--text-muted)' }}>
-              <X className="w-5 h-5" />
+            <Link to="/" className="p-2 rounded-lg flex items-center justify-center" style={{ color: 'var(--text-muted)' }} aria-label="Close preview">
+              <X className="w-5 h-5" aria-hidden="true" />
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-semibold truncate">{file.original_name}</h1>
@@ -140,7 +140,7 @@ export default function PreviewPage() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={handleDownload} disabled={downloading} className="btn btn-primary text-xs">
-              {downloading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading</> : <><Download className="w-3.5 h-3.5" /> Download</>}
+              {downloading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> Downloading…</> : <><Download className="w-3.5 h-3.5" aria-hidden="true" /> Download</>}
             </button>
             <button
               onClick={() => setFullscreen(true)}
@@ -171,6 +171,8 @@ export default function PreviewPage() {
                 className={`max-w-full max-h-full ${fullscreen ? 'w-full h-full' : ''}`}
                 style={{ background: '#000' }}
                 autoPlay
+                muted
+                playsInline
               />
             )}
             {mime.startsWith('audio/') && (
@@ -202,8 +204,8 @@ export default function PreviewPage() {
                   <h2 className="text-lg font-semibold mb-2">Preview not available</h2>
                   <p className="text-sm opacity-70 mb-6">Could not load text content for this file.</p>
                   <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
-                    {downloading ? 'Downloading...' : 'Download File'}
-                    <Download className="w-4 h-4" />
+                    {downloading ? 'Downloading…' : 'Download File'}
+                    <Download className="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               )
@@ -215,8 +217,8 @@ export default function PreviewPage() {
             <h2 className="text-lg font-semibold mb-2">Preview not available</h2>
             <p className="text-sm opacity-70 mb-6">This file type ({mime}) cannot be previewed in the browser.</p>
             <button onClick={handleDownload} disabled={downloading} className="btn btn-primary">
-              {downloading ? 'Downloading...' : 'Download File'}
-              <Download className="w-4 h-4" />
+              {downloading ? 'Downloading…' : 'Download File'}
+              <Download className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         )}

@@ -78,7 +78,7 @@ export default function CoinsPage() {
   return (
     <div className="min-h-screen" style={{ background: colors.bg, color: colors.text }}>
       {notif && (
-        <div className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
+        <div role={notif.type === 'error' ? 'alert' : 'status'} aria-live="polite" className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
           {notif.msg}
         </div>
       )}
@@ -188,8 +188,8 @@ export default function CoinsPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold" style={{ color: colors.text }}>Transaction history</h2>
-            <button onClick={load} className="p-1.5 rounded-lg" style={{ color: colors.textDim }} title="Refresh">
-              <RefreshCw className="w-3.5 h-3.5" />
+            <button type="button" onClick={load} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Refresh" aria-label="Refresh transactions">
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           </div>
           {!coins || coins.transactions.length === 0 ? (

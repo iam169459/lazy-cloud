@@ -15,6 +15,7 @@ const faqs = [
   { q: 'Do recipients need an account?', a: 'No. Recipients just click the link and download. No signup, no captchas, no waiting.' },
 ];
 
+
 export default function Landing() {
   const { colors } = useTheme();
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -68,7 +69,7 @@ export default function Landing() {
       <main>
         {/* Hero */}
         <section className="max-w-4xl mx-auto text-center px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
-          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100">
+          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 animate-fade-up delay-100 text-balance">
             Fast, private,
             <br />
             <span className="text-gradient">link-only file sharing</span>
@@ -190,8 +191,8 @@ export default function Landing() {
             <p className="text-sm max-w-md mx-auto mb-6" style={{ color: colors.textMuted }}>
               No accounts, no limits, no tracking.
             </p>
-            <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
-              Open Admin Panel
+            <Link to="/login" className="btn btn-primary" onClick={() => sounds.click()}>
+              Get Started Free
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
           </div>

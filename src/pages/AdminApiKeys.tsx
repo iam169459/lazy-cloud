@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Copy, Check, Key, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, Key, AlertCircle, X } from 'lucide-react';
 import { api, ApiKey } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { sounds } from '@/lib/sounds';
@@ -206,7 +206,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
           onClick={() => { setShowForm(!showForm); sounds.click(); }}
           className="btn btn-primary text-xs"
         >
-          {showForm ? <AlertCircle className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+          {showForm ? <X className="w-3.5 h-3.5" aria-hidden="true" /> : <Plus className="w-3.5 h-3.5" aria-hidden="true" />}
           {showForm ? 'Cancel' : 'Create API key'}
         </button>
       </div>
@@ -237,7 +237,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
               </div>
             </FormSection>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+              <p className="text-xs font-mono" style={{ color: Object.keys(formErrors).length > 0 ? colors.danger : colors.textDim }} role="status">
                 {Object.keys(formErrors).length > 0 ? `${Object.keys(formErrors).length} error(s) to fix` : 'Ready to save'}
               </p>
               <FormActions>
@@ -246,7 +246,7 @@ export default function AdminApiKeys({ token, onNotify }: Props) {
                   Create Key
                 </SaveButton>
                 <CancelButton onClick={() => { setShowForm(false); sounds.click(); }}>
-                  <AlertCircle className="w-3.5 h-3.5" />
+                  <X className="w-3.5 h-3.5" aria-hidden="true" />
                   Cancel
                 </CancelButton>
               </FormActions>

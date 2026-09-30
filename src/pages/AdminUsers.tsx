@@ -101,8 +101,9 @@ export default function AdminUsers({ token, onNotify }: Props) {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: colors.textDim }} />
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users..." className="input w-full pl-10 text-sm" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: colors.textDim }} aria-hidden="true" />
+        <label htmlFor="users-search" className="sr-only">Search Users</label>
+        <input id="users-search" type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users…" className="input w-full pl-10 text-sm" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} />
       </div>
 
       {/* User List */}
@@ -132,14 +133,36 @@ export default function AdminUsers({ token, onNotify }: Props) {
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button onClick={() => { setEditing(editing === u.id ? null : u.id); setEditRole(u.role); setEditLimit(String(u.storage_limit)); }} className="p-1.5 rounded-lg text-xs" style={{ color: colors.textDim }} title="Edit">
-                  <Save className="w-3.5 h-3.5" />
+                <button
+                  type="button"
+                  onClick={() => { setEditing(editing === u.id ? null : u.id); setEditRole(u.role); setEditLimit(String(u.storage_limit)); }}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: colors.textDim }}
+                  title="Edit"
+                  aria-label={`Edit ${u.username}`}
+                  aria-expanded={editing === u.id}
+                >
+                  <Save className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
-                <button onClick={() => handleToggleActive(u.id, u.is_active)} className="p-1.5 rounded-lg text-xs" style={{ color: u.is_active ? colors.warning : colors.success }} title={u.is_active ? 'Disable' : 'Enable'}>
-                  {u.is_active ? <ShieldOff className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
+                <button
+                  type="button"
+                  onClick={() => handleToggleActive(u.id, u.is_active)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: u.is_active ? colors.warning : colors.success }}
+                  title={u.is_active ? 'Disable' : 'Enable'}
+                  aria-label={u.is_active ? `Disable ${u.username}` : `Enable ${u.username}`}
+                >
+                  {u.is_active ? <ShieldOff className="w-3.5 h-3.5" aria-hidden="true" /> : <Shield className="w-3.5 h-3.5" aria-hidden="true" />}
                 </button>
-                <button onClick={() => handleDelete(u.id, u.username)} className="p-1.5 rounded-lg text-xs" style={{ color: colors.danger }} title="Delete">
-                  <Trash2 className="w-3.5 h-3.5" />
+                <button
+                  type="button"
+                  onClick={() => handleDelete(u.id, u.username)}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: colors.danger }}
+                  title="Delete"
+                  aria-label={`Delete ${u.username}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -148,15 +171,16 @@ export default function AdminUsers({ token, onNotify }: Props) {
             {editing === u.id && (
               <div className="mt-3 pt-3 flex flex-wrap items-end gap-3" style={{ borderTop: `1px solid ${colors.border}` }}>
                 <div>
-                  <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Role</label>
-                  <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="input text-xs py-1.5" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}>
+                  <label htmlFor={`role-${u.id}`} className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Role</label>
+                  <select id={`role-${u.id}`} value={editRole} onChange={(e) => setEditRole(e.target.value)} className="input text-xs py-1.5" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}>
                     <option value="user">User</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Storage limit (GB) · {formatBytes(Number(editLimit) || 0)}</label>
+                  <label htmlFor={`limit-${u.id}`} className="block text-[10px] font-mono mb-1" style={{ color: colors.textDim }}>Storage limit (GB) · {formatBytes(Number(editLimit) || 0)}</label>
                   <input
+                    id={`limit-${u.id}`}
                     type="number"
                     min="0"
                     step="0.5"
@@ -169,7 +193,7 @@ export default function AdminUsers({ token, onNotify }: Props) {
                     style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
                   />
                 </div>
-                <button onClick={() => handleUpdate(u.id)} className="btn btn-primary text-xs py-1.5" style={{ background: colors.gradient, color: colors.bg }}>
+                <button type="button" onClick={() => handleUpdate(u.id)} className="btn btn-primary text-xs py-1.5" style={{ background: colors.gradient, color: colors.bg }}>
                   Save
                 </button>
               </div>

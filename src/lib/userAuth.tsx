@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { loginWithBiometrics, getBiometricsSupport, BiometricsSupport } from './biometrics';
 import { readJson } from './api';
 import { errMsg } from '@/lib/errors';
@@ -44,9 +44,11 @@ export function UserAuthProvider({ children }: { children: ReactNode }) {
   });
   const [biometricsSupport, setBiometricsSupport] = useState<BiometricsSupport | null>(null);
 
-  useState(() => {
-    getBiometricsSupport().then(setBiometricsSupport).catch(() => setBiometricsSupport({ supported: false, platformAvailable: false }));
-  });
+  useEffect(() => {
+    getBiometricsSupport()
+      .then(setBiometricsSupport)
+      .catch(() => setBiometricsSupport({ supported: false, platformAvailable: false }));
+  }, []);
 
   async function login(username: string, password: string) {
     try {

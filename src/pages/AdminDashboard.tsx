@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, FileText, Trash2, Loader2, Link2, Share2, Lock, Clock, Copy, X, Download, Grid, Eye, Coins } from 'lucide-react';
 import { api, formatBytes, formatDate, FileWithProvider, ShareRecord } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
@@ -71,6 +71,16 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
       setSharingId(null);
     }
   }
+
+  // Close the open modal on Escape for keyboard users
+  useEffect(() => {
+    if (!priceModal && !shareModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { closeShareModal(); setPriceModal(null); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [priceModal, shareModal]);
 
   async function createShare(e: React.FormEvent) {
     e.preventDefault();
@@ -261,145 +271,158 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     },
   ];
 
-  if (priceModal) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-        <div className="glass-card w-full max-w-sm animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-            <h3 className="text-sm font-semibold">Sell file</h3>
-            <button onClick={() => setPriceModal(null)} style={{ color: 'var(--text-muted)' }} title="Close">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="p-6 space-y-4">
-            <p className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{priceModal.name}</p>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Price in coins</label>
-              <input
-                type="number"
-                min={0}
-                value={priceModal.price}
-                onChange={(e) => setPriceModal((prev) => (prev ? { ...prev, price: e.target.value } : prev))}
-                className="input"
-                autoFocus
-              />
-              <p className="text-[11px] mt-2" style={{ color: 'var(--text-dim)' }}>
-                Listed in the user Shop. Set 0 to take it off sale.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button className="btn btn-secondary flex-1" onClick={() => setPriceModal(null)}>Cancel</button>
-              <button className="btn btn-primary flex-1" onClick={savePrice} disabled={priceSaving}>
-                {priceSaving ? 'Saving...' : 'Save price'}
-              </button>
-            </div>
-          </div>
+  const priceModalNode = priceModal ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sell file"
+    >
+      <div className="glass-card modal-panel w-full max-w-sm animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-semibold">Sell File</h3>
+          <button onClick={() => setPriceModal(null)} className="p-1 rounded-md" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </div>
-    );
-  }
-
-  if (shareModal) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-        <div className="glass-card w-full max-w-md animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
-            <h3 className="text-sm font-semibold">Share Link</h3>
-            <button onClick={closeShareModal} className="p-1 rounded-md" style={{ color: 'var(--text-muted)' }}><X className="w-4 h-4" /></button>
+        <form
+          onSubmit={(e) => { e.preventDefault(); savePrice(); }}
+          className="p-6 space-y-4"
+        >
+          <p className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{priceModal.name}</p>
+          <div>
+            <label htmlFor="price-input" className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Price in coins</label>
+            <input
+              id="price-input"
+              type="number"
+              min={0}
+              value={priceModal.price}
+              onChange={(e) => setPriceModal((prev) => (prev ? { ...prev, price: e.target.value } : prev))}
+              className="input"
+              autoFocus
+            />
+            <p className="text-[11px] mt-2" style={{ color: 'var(--text-dim)' }}>
+              Listed in the user Shop. Set 0 to take it off sale.
+            </p>
           </div>
-          <form onSubmit={createShare} className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Password (optional)</label>
-              <input
-                type="password"
-                value={shareForm.password}
-                onChange={(e) => setShareForm(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Leave empty for no password"
-                className="input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Expires in days (optional)</label>
-              <input
-                type="number"
-                value={shareForm.expiresInDays}
-                onChange={(e) => setShareForm(prev => ({ ...prev, expiresInDays: e.target.value }))}
-                placeholder="e.g. 7"
-                min="1"
-                max="365"
-                className="input"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Download limit (optional)</label>
-              <input
-                type="number"
-                value={shareForm.downloadLimit}
-                onChange={(e) => setShareForm(prev => ({ ...prev, downloadLimit: e.target.value }))}
-                placeholder="e.g. 10"
-                min="1"
-                className="input"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={shareLoading}
-              className="btn btn-primary w-full"
-            >
-              {shareLoading ? 'Creating...' : 'Create Share Link'}
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-secondary flex-1" onClick={() => setPriceModal(null)}>Cancel</button>
+            <button type="submit" className="btn btn-primary flex-1" disabled={priceSaving}>
+              {priceSaving ? 'Saving…' : 'Save Price'}
             </button>
-          </form>
+          </div>
+        </form>
+      </div>
+    </div>
+  ) : null;
 
-          {shareModal.shares.length > 0 && (
-            <div className="px-6 pb-6">
-              <h4 className="text-xs font-medium mb-3" style={{ color: 'var(--text-muted)' }}>Existing Shares</h4>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {shareModal.shares.map((s) => (
-                  <div key={s.id} className="p-3 rounded-lg" style={{ background: 'var(--input)', border: '1px solid var(--border)' }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{s.id.slice(0, 8)}...</span>
-                      <button
-                        onClick={() => copyShareLink(`${window.location.origin}/s/${s.id}`)}
-                        className="p-1.5 rounded text-xs" style={{ color: 'var(--text-muted)' }}
-                        title="Copy link"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-[10px] font-mono mb-2" style={{ color: 'var(--text-dim)' }}>
-                      {s.password_hash && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}><Lock className="w-3 h-3" />Password</span>}
-                      {s.expires_at && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: colors.danger }}><Clock className="w-3 h-3" />Expires {formatDate(s.expires_at)}</span>}
-                      {s.download_limit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>{s.download_limit - s.download_count}/{s.download_limit}</span>}
-                    </div>
+  const shareModalNode = shareModal ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Share link"
+    >
+      <div className="glass-card modal-panel w-full max-w-md animate-scale-in" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-semibold">Share Link</h3>
+          <button onClick={closeShareModal} className="p-1 rounded-md" style={{ color: 'var(--text-muted)' }} aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={createShare} className="p-6 space-y-4">
+          <div>
+            <label htmlFor="share-pass" className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Password (optional)</label>
+            <input
+              id="share-pass"
+              type="password"
+              value={shareForm.password}
+              onChange={(e) => setShareForm(prev => ({ ...prev, password: e.target.value }))}
+              placeholder="Leave empty for no password"
+              className="input"
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label htmlFor="share-expiry" className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Expires in days (optional)</label>
+            <input
+              id="share-expiry"
+              type="number"
+              value={shareForm.expiresInDays}
+              onChange={(e) => setShareForm(prev => ({ ...prev, expiresInDays: e.target.value }))}
+              placeholder="e.g. 7"
+              min="1"
+              max="365"
+              className="input"
+            />
+          </div>
+          <div>
+            <label htmlFor="share-limit" className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Download limit (optional)</label>
+            <input
+              id="share-limit"
+              type="number"
+              value={shareForm.downloadLimit}
+              onChange={(e) => setShareForm(prev => ({ ...prev, downloadLimit: e.target.value }))}
+              placeholder="e.g. 10"
+              min="1"
+              className="input"
+            />
+          </div>
+          <button type="submit" disabled={shareLoading} className="btn btn-primary w-full">
+            {shareLoading ? 'Creating…' : 'Create Share Link'}
+          </button>
+        </form>
+
+        {shareModal.shares.length > 0 && (
+          <div className="px-6 pb-6">
+            <h4 className="text-xs font-medium mb-3" style={{ color: 'var(--text-muted)' }}>Existing Shares</h4>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {shareModal.shares.map((s) => (
+                <div key={s.id} className="p-3 rounded-lg" style={{ background: 'var(--input)', border: '1px solid var(--border)' }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono truncate" style={{ color: 'var(--text-muted)' }}>{s.id.slice(0, 8)}…</span>
                     <button
-                      onClick={() => deleteShare(s.id)}
-                      className="text-xs font-medium text-right" style={{ color: colors.danger }}
+                      onClick={() => copyShareLink(`${window.location.origin}/s/${s.id}`)}
+                      className="p-1.5 rounded text-xs" style={{ color: 'var(--text-muted)' }}
+                      title="Copy link"
+                      aria-label={`Copy link for share ${s.id.slice(0, 8)}`}
                     >
-                      Delete share
+                      <Copy className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-2 text-[10px] font-mono mb-2" style={{ color: 'var(--text-dim)' }}>
+                    {s.password_hash && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24' }}><Lock className="w-3 h-3" />Password</span>}
+                    {s.expires_at && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.1)', color: colors.danger }}><Clock className="w-3 h-3" />Expires {formatDate(s.expires_at)}</span>}
+                    {s.download_limit && <span className="flex items-center gap-1 px-2 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.1)', color: colors.success }}>{s.download_limit - s.download_count}/{s.download_limit}</span>}
+                  </div>
+                  <button
+                    onClick={() => deleteShare(s.id)}
+                    className="text-xs font-medium text-right" style={{ color: colors.danger }}
+                  >
+                    Delete share
+                  </button>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-    );
-  }
+    </div>
+  ) : null;
 
-  if (showUploadQueue) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-end justify-center p-4 lg:items-center" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-        <div className="w-full max-w-2xl max-h-[80vh] lg:max-h-[600px] animate-slide-up" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <UploadQueue
-            token={token}
-            onClose={() => setShowUploadQueue(false)}
-            onComplete={() => { onRefresh(); onNotify('success', 'Uploads completed'); }}
-          />
-        </div>
+  const uploadQueueNode = showUploadQueue ? (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 lg:items-center" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }} role="dialog" aria-modal="true" aria-label="Upload queue">
+      <div className="w-full max-w-2xl max-h-[80vh] lg:max-h-[600px] animate-slide-up" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <UploadQueue
+          token={token}
+          onClose={() => setShowUploadQueue(false)}
+          onComplete={() => { onRefresh(); onNotify('success', 'Uploads completed'); }}
+        />
       </div>
-    );
-  }
+    </div>
+  ) : null;
 
   return (
     <div className="space-y-6">
@@ -471,7 +494,7 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
         actions={rowActions}
         bulkActions={bulkActions}
         keyExtractor={(f) => f.id}
-        searchPlaceholder="Search files..."
+        searchPlaceholder="Search files…"
         searchKeys={['original_name', 'mime_type']}
         pageSize={10}
         selectable
@@ -479,6 +502,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
         emptyTitle="No files yet"
         emptyDescription="Upload your first file to get started"
       />
+      {priceModalNode}
+      {shareModalNode}
+      {uploadQueueNode}
     </div>
   );
 }

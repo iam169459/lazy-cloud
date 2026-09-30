@@ -68,7 +68,7 @@ export default function DownloadPage() {
       <div className="min-h-screen flex items-center justify-center grid-bg" style={{ color: colors.text }}>
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
-          <p className="text-xs font-mono" style={{ color: colors.textDim }}>LOCATING_FILE...</p>
+          <p className="text-xs font-mono" style={{ color: colors.textDim }}>LOCATING_FILE…</p>
         </div>
       </div>
     );
@@ -120,7 +120,7 @@ export default function DownloadPage() {
               <div className="space-y-2">
                 {token ? (
                   <button onClick={handleBuy} disabled={buying} className="btn btn-primary w-full">
-                    {buying ? <><Loader2 className="w-4 h-4 animate-spin" /> Processing...</> : <><ShoppingBag className="w-4 h-4" /> Buy for {price} coins</>}
+                    {buying ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Processing…</> : <><ShoppingBag className="w-4 h-4" aria-hidden="true" /> Buy for {price} coins</>}
                   </button>
                 ) : (
                   <button onClick={() => nav('/login')} className="btn btn-primary w-full">
@@ -134,7 +134,7 @@ export default function DownloadPage() {
               </div>
             ) : (
               <button onClick={handleDownload} disabled={downloading} className="btn btn-primary w-full">
-                {downloading ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing...</> : <><Download className="w-4 h-4" /> Download file</>}
+                {downloading ? <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Preparing…</> : <><Download className="w-4 h-4" aria-hidden="true" /> Download file</>}
               </button>
             )}
             {file && canPreview(file.mime_type) && (

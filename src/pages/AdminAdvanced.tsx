@@ -121,12 +121,14 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
       .finally(() => setSaving(false));
   }
 
+  function handleReset() {
     if (!confirm('Reset all settings to defaults?')) return;
     sounds.click(); setSaving(true);
     api.updateSettings(DEFAULT_SETTINGS, token)
       .then(() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); sounds.success(); onNotify('success', 'Settings reset'); })
       .catch((err: unknown) => { sounds.error(); onNotify('error', errMsg(err)); })
       .finally(() => setSaving(false));
+  }
 
   function handleClearLocal() {
     if (!confirm('Clear local preferences?')) return;
@@ -216,7 +218,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
-        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING...</p>
+        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING…</p>
       </div>
     );
   }
@@ -391,7 +393,7 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
             <Save className="w-3.5 h-3.5" />
             Save Settings
           </SaveButton>
-          <CancelButton onClick={() => { setSettings(DEFAULT_SETTINGS); setErrors({}); setTouched(new Set()); }}>
+          <CancelButton onClick={handleReset}>
             <RotateCcw className="w-3.5 h-3.5" />
             Reset
           </CancelButton>
@@ -445,12 +447,12 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
           {totpStep === 'idle' && (
             <div className="flex flex-col gap-3">
               {!totpEnabled ? (
-                <button onClick={handleSetup2fa} disabled={totpLoading} className="btn btn-primary text-xs w-fit">
-                  {totpLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Smartphone className="w-3.5 h-3.5" />}
+                <button type="button" onClick={handleSetup2fa} disabled={totpLoading} className="btn btn-primary text-xs w-fit">
+                  {totpLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />}
                   Enable 2FA
                 </button>
               ) : (
-                <button onClick={() => { setTotpStep('verify-disable'); setTotpCode(''); }} className="btn text-xs w-fit" style={{ background: `${colors.danger}1a`, color: colors.danger, border: `1px solid ${colors.danger}33` }}>
+                <button type="button" onClick={() => { setTotpStep('verify-disable'); setTotpCode(''); }} className="btn text-xs w-fit" style={{ background: `${colors.danger}1a`, color: colors.danger, border: `1px solid ${colors.danger}33` }}>
                   Disable 2FA
                 </button>
               )}
@@ -466,8 +468,8 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                   <p className="text-xs" style={{ color: colors.textDim }}>2. Or enter secret manually:</p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 px-3 py-2 rounded-lg text-xs font-mono break-all" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>{totpSecret}</code>
-                    <button onClick={copySecret} className="p-2 rounded-lg" style={{ color: colors.textDim }}>
-                      {totpCopied ? <Check className="w-4 h-4" style={{ color: colors.success }} /> : <Copy className="w-4 h-4" />}
+                    <button type="button" onClick={copySecret} className="p-2 rounded-lg" style={{ color: colors.textDim }} aria-label={totpCopied ? 'Secret copied' : 'Copy secret'}>
+                      {totpCopied ? <Check className="w-4 h-4" style={{ color: colors.success }} aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                     </button>
                   </div>
                   <p className="text-xs" style={{ color: colors.textDim }}>3. Enter 6-digit code:</p>

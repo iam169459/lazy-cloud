@@ -487,7 +487,13 @@ const ThemeContext = createContext<ThemeContextType>({
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
-    return 'matrix';
+    // Restore the persisted theme so it doesn't snap back to the default
+    try {
+      const stored = localStorage.getItem('lazydrop-theme') as ThemeId | null;
+      return stored && stored in themes ? stored : 'matrix';
+    } catch {
+      return 'matrix';
+    }
   });
 
   function setTheme(t: ThemeId) {
@@ -502,16 +508,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       root.style.setProperty(`--${k.replace(/([A-Z])/g, '-$1').toLowerCase()}`, v);
     });
     root.setAttribute('data-theme', theme);
+    // Keep native controls + browser chrome in sync with the active theme
+    root.style.colorScheme = theme === 'light' ? 'light' : 'dark';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', c.bg);
   }, [theme]);
-
-  useEffect(() => {
-    const c = themes[theme];
-    const root = document.documentElement;
-    Object.entries(c).forEach(([k, v]) => {
-      root.style.setProperty(`--${k.replace(/([A-Z])/g, '-$1').toLowerCase()}`, v);
-    });
-    root.setAttribute('data-theme', theme);
-  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, colors: themes[theme], setTheme }}>

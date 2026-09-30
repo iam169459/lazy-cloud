@@ -230,8 +230,8 @@ export default function AdminPanel() {
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Mobile Top Bar */}
         <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bg }}>
-          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }} aria-label="Open navigation">
-            <Menu className="w-5 h-5" />
+          <button type="button" onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }} aria-label="Open navigation" aria-expanded={mobileOpen}>
+            <Menu className="w-5 h-5" aria-hidden="true" />
           </button>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
@@ -297,7 +297,7 @@ export default function AdminPanel() {
             {loading ? (
               <div className="flex flex-col items-center py-24 gap-4">
                 <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
-                <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
+                <p className="text-sm" style={{ color: colors.textMuted }}>Loading…</p>
               </div>
             ) : <div key={tab} className="tab-content">
             <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.primary }} /></div>}>

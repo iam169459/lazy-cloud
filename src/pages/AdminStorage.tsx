@@ -187,13 +187,13 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         onNotify('success', `Connection OK — ${res.fileCount} file(s) in ${res.bucket}`);
       } else {
         onNotify('error', `Connection failed: ${res.error}`);
-      }
-    } catch (e) {
+      }      } catch (e) {
       onNotify('error', `Test failed: ${errMsg(e)}`);
     } finally {
       setTestingId(null);
     }
   }
+
 
   // Compute stats
   const totalUsed = providers.reduce((sum, p) => sum + Number(p.current_bytes || 0), 0);
@@ -360,11 +360,13 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
+          <label htmlFor="filter-type" className="sr-only">Filter by provider</label>
           <select
+            id="filter-type"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
             className="input py-1.5 px-3 text-xs"
-            style={{ width: 'auto' }}
+            style={{ width: 'auto', background: colors.inputBg, color: colors.text }}
           >
             <option value="all">All providers</option>
             {providerTypes.map((t) => {
@@ -372,11 +374,13 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
               return <option key={t} value={t}>{pInfo?.name || t}</option>;
             })}
           </select>
+          <label htmlFor="filter-status" className="sr-only">Filter by status</label>
           <select
+            id="filter-status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             className="input py-1.5 px-3 text-xs"
-            style={{ width: 'auto' }}
+            style={{ width: 'auto', background: colors.inputBg, color: colors.text }}
           >
             <option value="all">All status</option>
             <option value="active">Active</option>
@@ -407,7 +411,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
                 key={p.id}
                 type="button"
                 onClick={() => handleSelectProvider(p)}
-                className="relative p-3 rounded-xl border text-left transition-all duration-200"
+                className="provider-card relative p-3 rounded-xl border text-left"
+                aria-pressed={selectedProvider?.id === p.id}
                 style={{
                   background: selectedProvider?.id === p.id ? `${p.color}15` : colors.cardBg,
                   borderColor: selectedProvider?.id === p.id ? `${p.color}50` : colors.border,
@@ -428,7 +433,8 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             <button
               type="button"
               onClick={() => { setSelectedProvider(null); resetForm(); sounds.click(); }}
-              className="relative p-3 rounded-xl border text-left transition-all duration-200"
+              className="provider-card relative p-3 rounded-xl border text-left"
+              aria-pressed={!selectedProvider}
               style={{
                 background: !selectedProvider ? 'rgba(34,197,94,0.1)' : colors.cardBg,
                 borderColor: !selectedProvider ? 'rgba(34,197,94,0.4)' : colors.border,
@@ -509,7 +515,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
             )}
 
             <div className="glass-card p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <p className="text-xs font-mono" style={{ color: colors.textDim }}>
+              <p className="text-xs font-mono" style={{ color: Object.keys(formErrors).length > 0 ? colors.danger : colors.textDim }} role="status">
                 {Object.keys(formErrors).length > 0 ? `${Object.keys(formErrors).length} error(s) to fix` : 'Ready to save'}
               </p>
               <FormActions>
@@ -533,7 +539,7 @@ export default function AdminStorage({ providers, token, onRefresh, onNotify }: 
         data={filteredProviders}
         actions={rowActions}
         keyExtractor={(row) => row.id}
-        searchPlaceholder="Search buckets..."
+        searchPlaceholder="Search buckets…"
         searchKeys={['provider_name', 'bucket_name', 'provider_type', 'region']}
         pageSize={10}
         emptyIcon={<Cloud className="w-10 h-10" />}

@@ -152,7 +152,7 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.success }} />
-        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING...</p>
+        <p className="text-sm font-mono animate-pulse" style={{ color: colors.textDim }}>LOADING…</p>
       </div>
     );
   }
@@ -317,8 +317,8 @@ export default function AdminSecurity({ token, onNotify, onCredentialsChanged }:
                   <code className="flex-1 px-3 py-2 rounded-lg text-xs font-mono break-all" style={{ background: colors.cardBg, border: `1px solid ${colors.border}`, color: colors.text }}>
                     {totpSecret}
                   </code>
-                  <button onClick={copySecret} className="p-2 rounded-lg" style={{ color: colors.textDim }} title="Copy secret">
-                    {totpCopied ? <Check className="w-4 h-4" style={{ color: colors.success }} /> : <Copy className="w-4 h-4" />}
+                  <button type="button" onClick={copySecret} className="p-2 rounded-lg" style={{ color: colors.textDim }} title="Copy secret" aria-label={totpCopied ? 'Secret copied' : 'Copy secret'}>
+                    {totpCopied ? <Check className="w-4 h-4" style={{ color: colors.success }} aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
                 <p className="text-xs" style={{ color: colors.textDim }}>3. Enter the 6-digit code from your app:</p>

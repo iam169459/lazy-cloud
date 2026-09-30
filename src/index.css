@@ -5,7 +5,14 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Kill double-tap zoom delay on all interactive elements */
+  button, a, [role='button'] { touch-action: manipulation; }
+  /* Anchored sections clear the sticky header when scrolled to */
+  section[id] { scroll-margin-top: 5rem; }
   body {
     margin: 0;
     font-family: 'Fira Sans', system-ui, sans-serif;
@@ -32,7 +39,7 @@
     background: var(--card-bg, rgba(255,255,255,0.02));
     border: 1px solid var(--card-border, rgba(255,255,255,0.06));
     border-radius: 12px;
-    transition: all 0.25s ease;
+    transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   }
   .card:hover {
     background: var(--card-hover, rgba(52,211,153,0.05));
@@ -47,7 +54,7 @@
     border: 1px solid var(--border, rgba(255,255,255,0.08));
     border-radius: 8px;
     padding: 0.5rem 1rem;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease, filter 0.2s ease;
     font-family: 'Fira Sans', system-ui, sans-serif;
     font-size: 0.8125rem;
     font-weight: 500;
@@ -120,7 +127,7 @@
     font-size: 0.8125rem;
     font-family: 'Fira Sans', system-ui, sans-serif;
     outline: none;
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   }
   .input::placeholder { color: var(--text-dim, #4b5563); }
   .input:focus {
@@ -187,7 +194,7 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
-    transition: all 0.25s ease;
+    transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   }
   .glass-card:hover {
     background: rgba(27, 35, 54, 0.55);
@@ -279,6 +286,30 @@
     animation: fadeOut 0.3s ease both;
   }
 
+  .animate-slide-up {
+    animation: slideUp 0.25s ease both;
+  }
+
+  .animate-shake {
+    animation: shake 0.4s ease both;
+  }
+
+  .animate-scale-up {
+    animation: scaleIn 0.2s ease both;
+  }
+
+  /* Lets the standard focus-visible ring utilities pick up the theme accent */
+  .ring-primary { --tw-ring-color: var(--primary, #34d399); }
+
+  /* Provider picker cards */
+  .provider-card {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+  .provider-card:hover { border-color: var(--border-active, rgba(255,255,255,0.3)); }
+
+  /* Modal/drawer panels: keep scroll from chaining to the page behind */
+  .modal-panel { overscroll-behavior: contain; }
+
   .faq-content {
     display: grid;
     grid-template-rows: 0fr;
@@ -302,6 +333,19 @@
 @keyframes fadeOut {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
 }
 
 @keyframes scaleIn {
@@ -361,5 +405,6 @@
 
 @media (max-width: 640px) {
   html { font-size: 14px; }
-  button, a, input, select, textarea { min-height: 44px; }
+  /* Touch targets — inline text links excluded so copy flows normally */
+  button, input, select, textarea { min-height: 44px; }
 }

@@ -166,7 +166,7 @@ export default function UserDashboard() {
     <div className="min-h-screen" style={{ background: colors.bg, color: colors.text }}>
       {/* Notification */}
       {notif && (
-        <div className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
+        <div role={notif.type === 'error' ? 'alert' : 'status'} aria-live="polite" className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
           {notif.msg}
         </div>
       )}
@@ -181,10 +181,10 @@ export default function UserDashboard() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono hidden sm:block" style={{ color: colors.textDim }}>
-            <User className="w-3 h-3 inline mr-1" />{user?.username}
+            <User className="w-3 h-3 inline mr-1" aria-hidden="true" />{user?.username}
           </span>
-          <button onClick={handleLogout} className="p-1.5 rounded-lg" style={{ color: colors.textDim }}>
-            <LogOut className="w-4 h-4" />
+          <button type="button" onClick={handleLogout} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} aria-label="Sign out">
+            <LogOut className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </header>
@@ -250,9 +250,9 @@ export default function UserDashboard() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold" style={{ color: colors.text }}>My Files</h2>
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn btn-primary flex items-center gap-2 text-xs" style={{ background: colors.gradient, color: colors.bg }}>
-                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                {uploading ? `${progress}%` : 'Upload'}
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn btn-primary flex items-center gap-2 text-xs" style={{ background: colors.gradient, color: colors.bg }}>
+                {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Upload className="w-3.5 h-3.5" aria-hidden="true" />}
+                {uploading ? `Uploading… ${progress}%` : 'Upload'}
               </button>
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
             </div>
@@ -275,17 +275,17 @@ export default function UserDashboard() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <a href={`/preview/${f.id}`} target="_blank" rel="noopener" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Preview">
-                        <Eye className="w-4 h-4" />
+                      <a href={`/preview/${f.id}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Preview" aria-label={`Preview ${f.original_name}`}>
+                        <Eye className="w-4 h-4" aria-hidden="true" />
                       </a>
-                      <button onClick={() => setShareModal(f.id)} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Share">
-                        <Share2 className="w-4 h-4" />
+                      <button type="button" onClick={() => setShareModal(f.id)} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Share" aria-label={`Share ${f.original_name}`}>
+                        <Share2 className="w-4 h-4" aria-hidden="true" />
                       </button>
-                      <a href={`/file/${f.id}`} target="_blank" rel="noopener" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Download link">
-                        <ExternalLink className="w-4 h-4" />
+                      <a href={`/file/${f.id}`} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Download link" aria-label={`Open download link for ${f.original_name}`}>
+                        <ExternalLink className="w-4 h-4" aria-hidden="true" />
                       </a>
-                      <button onClick={() => handleDelete(f.id)} className="p-2 rounded-lg transition-colors" style={{ color: colors.danger }} title="Delete">
-                        <Trash2 className="w-4 h-4" />
+                      <button type="button" onClick={() => handleDelete(f.id)} className="p-2 rounded-lg transition-colors" style={{ color: colors.danger }} title="Delete" aria-label={`Delete ${f.original_name}`}>
+                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -317,11 +317,11 @@ export default function UserDashboard() {
                         {s.expires_at && <span><Clock className="w-3 h-3 inline" /> {formatDate(s.expires_at)}</span>}
                       </div>
                     </div>
-                    <button onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/s/${s.id}`); notify('success', 'Copied!'); }} className="p-2 rounded-lg" style={{ color: colors.textDim }} title="Copy link">
-                      <Copy className="w-4 h-4" />
+                    <button type="button" onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/s/${s.id}`); notify('success', 'Copied!'); }} className="p-2 rounded-lg" style={{ color: colors.textDim }} title="Copy link" aria-label="Copy share link">
+                      <Copy className="w-4 h-4" aria-hidden="true" />
                     </button>
-                    <button onClick={() => handleDeleteShare(s.id)} className="p-2 rounded-lg" style={{ color: colors.danger }} title="Delete share">
-                      <Trash2 className="w-4 h-4" />
+                    <button type="button" onClick={() => handleDeleteShare(s.id)} className="p-2 rounded-lg" style={{ color: colors.danger }} title="Delete share" aria-label="Delete share">
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>
                 ))}
@@ -376,28 +376,36 @@ export default function UserDashboard() {
 
       {/* Share Modal */}
       {shareModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}>
-          <div className="glass-card w-full max-w-sm p-6 animate-scale-in" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create share link"
+        >
+          <div className="glass-card modal-panel w-full max-w-sm p-6 animate-scale-in" style={{ background: colors.cardBg, border: `1px solid ${colors.border}` }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold" style={{ color: colors.text }}>Create Share Link</h3>
-              <button onClick={() => setShareModal(null)} style={{ color: colors.textDim }}><X className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setShareModal(null)} className="p-1 rounded-md" style={{ color: colors.textDim }} aria-label="Close">
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Password (optional)</label>
+                <label htmlFor="share-password" className="block text-xs mb-1" style={{ color: colors.textDim }}>Password (optional)</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
-                  <input type="password" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="input w-full pl-9 text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Optional password" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} aria-hidden="true" />
+                  <input id="share-password" type="password" autoComplete="new-password" value={sharePassword} onChange={(e) => setSharePassword(e.target.value)} className="input w-full pl-9 text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Optional password" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Expires in days</label>
-                  <input type="number" value={shareExpiry} onChange={(e) => setShareExpiry(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Never" min="1" />
+                  <label htmlFor="share-expiry-days" className="block text-xs mb-1" style={{ color: colors.textDim }}>Expires in days</label>
+                  <input id="share-expiry-days" type="number" inputMode="numeric" value={shareExpiry} onChange={(e) => setShareExpiry(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Never" min="1" />
                 </div>
                 <div>
-                  <label className="block text-xs mb-1" style={{ color: colors.textDim }}>Download limit</label>
-                  <input type="number" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
+                  <label htmlFor="share-download-limit" className="block text-xs mb-1" style={{ color: colors.textDim }}>Download limit</label>
+                  <input id="share-download-limit" type="number" inputMode="numeric" value={shareLimit} onChange={(e) => setShareLimit(e.target.value)} className="input w-full text-xs" style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }} placeholder="Unlimited" min="1" />
                 </div>
               </div>
               <button onClick={handleCreateShare} className="btn btn-primary w-full text-xs" style={{ background: colors.gradient, color: colors.bg }}>

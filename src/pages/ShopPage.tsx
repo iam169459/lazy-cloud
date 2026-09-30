@@ -81,7 +81,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen" style={{ background: colors.bg, color: colors.text }}>
       {notif && (
-        <div className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
+        <div role={notif.type === 'error' ? 'alert' : 'status'} aria-live="polite" className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-lg text-sm font-medium animate-slide-up" style={{ background: notif.type === 'success' ? `${colors.success}18` : `${colors.danger}18`, color: notif.type === 'success' ? colors.success : colors.danger, border: `1px solid ${notif.type === 'success' ? colors.success : colors.danger}33` }}>
           {notif.msg}
         </div>
       )}
@@ -95,8 +95,8 @@ export default function ShopPage() {
           <h1 className="text-sm font-bold" style={{ color: colors.text }}>Shop</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} className="p-1.5 rounded-lg" style={{ color: colors.textDim }} title="Refresh">
-            <RefreshCw className="w-3.5 h-3.5" />
+          <button type="button" onClick={load} className="p-2 rounded-lg transition-colors" style={{ color: colors.textDim }} title="Refresh" aria-label="Refresh shop">
+            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
           <Link to="/coins" className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ background: `${colors.primary}15`, border: `1px solid ${colors.primary}30` }}>
             <Coins className="w-4 h-4" style={{ color: colors.primary }} />
@@ -134,11 +134,15 @@ export default function ShopPage() {
           {items.length > 0 && (
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: colors.textDim }} />
+              <label htmlFor="shop-search" className="sr-only">Search Files</label>
               <input
-                type="text"
+                id="shop-search"
+                type="search"
+                autoComplete="off"
+                spellCheck={false}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search files..."
+                placeholder="Search files…"
                 className="input w-full pl-9 text-xs"
                 style={{ background: colors.inputBg, borderColor: colors.border, color: colors.text }}
               />

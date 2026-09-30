@@ -187,11 +187,27 @@ export default function DataTable<T extends object>({
                     </th>
                   )}
                   {columns.map((col) => (
-                    <th key={col.key} scope="col" className="px-4 py-2.5 font-medium" style={{ width: col.width, textAlign: col.align || 'left', cursor: col.sortable ? 'pointer' : 'default', userSelect: col.sortable ? 'none' : undefined }} onClick={() => col.sortable && handleSort(col.key)}>
-                      <span className="inline-flex items-center gap-1">
-                        {col.label}
-                        {col.sortable && sortKey === col.key && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" aria-hidden="true" /> : <ChevronDown className="w-3 h-3" aria-hidden="true" />)}
-                      </span>
+                    <th
+                      key={col.key}
+                      scope="col"
+                      className="px-4 py-2.5 font-medium"
+                      style={{ width: col.width, textAlign: col.align || 'left' }}
+                      aria-sort={col.sortable ? (sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined}
+                    >
+                      {col.sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(col.key)}
+                          className="inline-flex items-center gap-1 uppercase hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary rounded"
+                          style={{ cursor: 'pointer', userSelect: 'none', font: 'inherit', color: 'inherit', letterSpacing: 'inherit' }}
+                          title={`Sort by ${col.label}`}
+                        >
+                          {col.label}
+                          {sortKey === col.key && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" aria-hidden="true" /> : <ChevronDown className="w-3 h-3" aria-hidden="true" />)}
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">{col.label}</span>
+                      )}
                     </th>
                   ))}
                   {actions && actions.length > 0 && <th scope="col" className="px-4 py-2.5 w-12" />}
@@ -205,9 +221,7 @@ export default function DataTable<T extends object>({
                     <tr key={id} className={`data-table-row transition-colors ${isSelected ? 'bg-primary/5' : ''}`} style={{ borderBottom: `1px solid ${colors.border}` }}>
                       {selectable && (
                         <td className="px-4 py-2.5">
-                          <label className="inline-flex items-center justify-center cursor-pointer">
-                            <input type="checkbox" checked={isSelected} onChange={() => toggleRow(id)} className="w-4 h-4 rounded border" style={{ borderColor: 'var(--border)', accentColor: 'var(--primary)' }} aria-label="Select row" />
-                          </label>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleRow(id)} className="w-4 h-4 rounded" style={{ accentColor: 'var(--primary)' }} aria-label="Select row" />
                         </td>
                       )}
                       {columns.map((col) => (

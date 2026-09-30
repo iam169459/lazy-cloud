@@ -33,9 +33,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
   const [status, setStatus] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [, setCopied] = useState(false);
-  const logRef = useRef<HTMLDivElement>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);  const logRef = useRef<HTMLDivElement>(null);
 
   const addLog = useCallback(async (text: string, type: LogEntry['type'] = 'info') => {
     const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -44,7 +42,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
 
   const checkUpdate = useCallback(async () => {
     setChecking(true); setLogs([]);
-    addLog('Checking for updates...');
+    addLog('Checking for updates…');
     try {
       const res = await fetch('/api/admin/system/check-update', {
         headers: { Authorization: `Bearer ${token}` },
@@ -115,11 +113,6 @@ export default function AdminSystem({ token, onNotify }: Props) {
     }
   }
 
-    const script = `curl -sSL https://raw.githubusercontent.com/iam169459/lazy-cloud/dev/install.sh | bash`;
-    navigator.clipboard.writeText(script).then(() => {
-      setCopied(true); sounds.copy();
-      setTimeout(() => setCopied(false), 2000);
-    });
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -150,7 +143,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
         {checking && !status ? (
           <div className="flex items-center gap-3 py-6">
             <Loader2 className="w-5 h-5 animate-spin" style={{ color: colors.primary }} />
-            <span className="text-sm" style={{ color: colors.textMuted }}>Checking for updates...</span>
+            <span className="text-sm" style={{ color: colors.textMuted }}>Checking for updates…</span>
           </div>
         ) : status ? (
           <div className="space-y-3">
@@ -185,7 +178,7 @@ export default function AdminSystem({ token, onNotify }: Props) {
               className="btn btn-primary w-full text-sm"
             >
               {updating ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+                <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Updating…</>
               ) : status.upToDate ? (
                 <><Check className="w-4 h-4" /> Up to date</>
               ) : (
