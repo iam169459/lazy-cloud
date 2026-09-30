@@ -239,6 +239,18 @@ export default function AdminPanel() {
             </div>
             <span className="font-semibold text-sm">LazyDrop</span>
           </div>
+          <a
+            href="/admin/index.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors"
+            style={{ color: colors.primary, background: colors.primaryGlow, border: `1px solid ${colors.border}` }}
+            title="Open standalone storefront"
+            aria-label="Open standalone storefront"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M2 6L4 18h16L22 6H2z"/><path d="M8 6v12"/><path d="M16 6v12"/></svg>
+            STOREFRONT
+          </a>
           <div className="w-9" />
         </header>
 

@@ -6,8 +6,9 @@ import './index.css'
 // Set theme immediately before React renders
 (function() {
   try {
-    var theme = localStorage.getItem('lazydrop-theme') || 'matrix';
-    var themes = {
+    const theme = localStorage.getItem('lazydrop-theme') || 'matrix';
+    interface ThemeEntry { [key: string]: string; }
+    const themes: Record<string, ThemeEntry> = {
       matrix: {
         bg: '#000d00',
         bgCard: 'rgba(0,255,65,0.02)',
@@ -47,30 +48,32 @@ import './index.css'
         voidGlow: 'rgba(0,255,65,0.05)',
       }
     };
-    var c = themes[theme] || themes.matrix;
-    var root = document.documentElement;
-    Object.entries(c).forEach(function(kv) {
+    const c: ThemeEntry = themes[theme] || themes.matrix;
+    const root = document.documentElement;
+    Object.entries(c).forEach((kv) => {
       root.style.setProperty('--' + kv[0].replace(/([A-Z])/g, '-$1').toLowerCase(), kv[1]);
     });
     root.setAttribute('data-theme', theme);
-  } catch(e) {}
+  } catch { /* ignore */ }
 })();
 
 // Set color-scheme for dark mode support
 document.documentElement.style.colorScheme = 'dark';
 
-// Set theme-color meta tag
-var metaThemeColor = document.createElement('meta');
-metaThemeColor.name = 'theme-color';
-metaThemeColor.content = '#00ff41';
-document.head.appendChild(metaThemeColor);
+// Set theme-color meta tag if not already present
+if (!document.querySelector('meta[name="theme-color"]')) {
+  const metaThemeColor = document.createElement('meta');
+  metaThemeColor.name = 'theme-color';
+  metaThemeColor.content = '#00ff41';
+  document.head.appendChild(metaThemeColor);
+}
 
 // Viewport meta for safe areas
-var viewportMeta = document.querySelector('meta[name="viewport"]');
+const viewportMeta = document.querySelector('meta[name="viewport"]');
 if (viewportMeta) {
   viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover');
 } else {
-  var newViewportMeta = document.createElement('meta');
+  const newViewportMeta = document.createElement('meta');
   newViewportMeta.name = 'viewport';
   newViewportMeta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
   document.head.appendChild(newViewportMeta);
