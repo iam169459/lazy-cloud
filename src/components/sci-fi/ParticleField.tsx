@@ -95,7 +95,7 @@ export default function ParticleField({
       if (animationIdRef.current) cancelAnimationFrame(animationIdRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [colors.primary, count, speed, particleSize, reducedMotion]);
+  }, [colors.primary, color, count, speed, particleSize, reducedMotion]);
 
   return (
     <canvas 

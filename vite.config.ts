@@ -1,8 +1,12 @@
 import { defineConfig, loadEnv } from 'vite';
+import type { PluginOption, UserConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
-export default defineConfig(async ({ mode }) => {
+// The explicit `Promise<UserConfig>` return type keeps the literals below
+// contextually typed ('esbuild', 'none', …) instead of widening to `string`,
+// which is what made `tsc --build` reject this file.
+export default defineConfig(async ({ mode }): Promise<UserConfig> => {
   const env = loadEnv(mode, process.cwd(), '');
 
   for (const [key, value] of Object.entries(env)) {
@@ -12,7 +16,10 @@ export default defineConfig(async ({ mode }) => {
     }
   }
 
-  const plugins = [react()];
+  // `react()` already returns an array of plugins, so spread it — wrapping it
+  // in another array made `plugins` a PluginOption[][] and broke both the push
+  // below and the UserConfig type.
+  const plugins: PluginOption[] = [...react()];
 
   if (mode === 'development') {
     const { lazyDropApiPlugin } = await import('./server/plugin');

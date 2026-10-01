@@ -304,11 +304,12 @@ export default function AdminAdvanced({ token, onNotify }: Props) {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   try {
-                    await api.uploadBackground(file, token);
-                    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-                    const isVideo = file.type.startsWith('video/');
-                    const bgUrl = `/bg/background.${ext}`;
-                    setSettings((s) => ({ ...s, backgroundUrl: bgUrl, backgroundType: isVideo ? 'video' : 'image' }));
+                    // The server owns the file name it wrote (extension comes
+                    // from the MIME type), so use the URL it returns instead of
+                    // guessing one from the local file name.
+                    const { url, type } = await api.uploadBackground(file, token);
+                    const isVideo = (type || (file.type.startsWith('video/') ? 'video' : 'image')) === 'video';
+                    setSettings((s) => ({ ...s, backgroundUrl: url, backgroundType: isVideo ? 'video' : 'image' }));
                     sounds.success();
                     onNotify('success', 'Background uploaded');
                   } catch (err) { onNotify('error', errMsg(err)); }

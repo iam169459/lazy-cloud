@@ -1,7 +1,26 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || scryptSync('lazydrop-default-encryption-key-2024', 'lazydrop-salt', 32);
+
+/**
+ * AES-256 needs exactly 32 bytes. `ENCRYPTION_KEY` is a free-form string from
+ * .env, and handing that string straight to createCipheriv throws
+ * ("Invalid key length"), which broke encrypted uploads for anyone who set it.
+ * Accept a 64-char hex key as-is, otherwise derive one deterministically so
+ * the same env value always decrypts what it encrypted.
+ */
+function resolveKey(): Buffer {
+  const envKey = process.env.ENCRYPTION_KEY;
+  if (!envKey) {
+    return scryptSync('lazydrop-default-encryption-key-2024', 'lazydrop-salt', 32);
+  }
+  if (/^[0-9a-f]{64}$/i.test(envKey)) {
+    return Buffer.from(envKey, 'hex');
+  }
+  return scryptSync(envKey, 'lazydrop-salt', 32);
+}
+
+const ENCRYPTION_KEY = resolveKey();
 
 export function encryptFile(buffer: Buffer): { encrypted: Buffer; iv: string; authTag: string } {
   const iv = randomBytes(16);

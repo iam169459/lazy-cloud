@@ -2,6 +2,10 @@
 set -e
 echo "Building frontend..."
 npx vite build --mode production 2>&1
+# Vite only bundles index.html, so the standalone dashboard has to be copied
+# into dist by hand — otherwise /lazy-cloud.html falls back to index.html in
+# production and the "Control room" link opens the regular app.
+cp lazy-cloud.html dist/
 echo "Frontend built successfully!"
 echo "Building server..."
 npx esbuild server/production.ts server/db.ts server/api.ts server/s3.ts server/encryption.ts server/plugin.ts \
