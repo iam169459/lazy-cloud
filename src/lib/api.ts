@@ -259,7 +259,7 @@ export const api = {
     }) as Promise<{ settings: AppSettings }>,
 
   uploadBackground: (file: File, token: string) =>
-    uploadRequest(file, '/api/admin/background', token),
+    uploadRequest<{ message: string; url: string; type: 'image' | 'video' }>(file, '/api/admin/background', token),
 
   removeBackground: (token: string) =>
     request('/api/admin/background', {
@@ -655,12 +655,12 @@ export const api = {
     }) as Promise<{ count: number }>,
 };
 
-function uploadRequest(
+function uploadRequest<T = { id: string; name: string; size: number }>(
   file: File,
   url: string,
   token: string | null,
   onProgress?: (pct: number) => void
-): Promise<{ id: string; name: string; size: number }> {
+): Promise<T> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();

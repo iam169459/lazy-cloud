@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import { useTheme } from '@/lib/theme';
 
@@ -11,6 +11,19 @@ export default function LoadingBar() {
   const springProgress = useSpring(progress, { stiffness: 500, damping: 30 });
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const trickleRef = useRef<ReturnType<typeof setInterval>>();
+
+  const startTrickle = useCallback(() => {
+    if (trickleRef.current) clearInterval(trickleRef.current);
+    let current = 0.1;
+    trickleRef.current = setInterval(() => {
+      if (current >= 0.9) {
+        clearInterval(trickleRef.current!);
+        return;
+      }
+      current += Math.random() * 0.05;
+      progress.set(Math.min(current, 0.9));
+    }, 200);
+  }, [progress]);
 
   useEffect(() => {
     const handleStart = () => {
@@ -41,20 +54,7 @@ export default function LoadingBar() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (trickleRef.current) clearInterval(trickleRef.current);
     };
-  }, []);
-
-  function startTrickle() {
-    if (trickleRef.current) clearInterval(trickleRef.current);
-    let current = 0.1;
-    trickleRef.current = setInterval(() => {
-      if (current >= 0.9) {
-        clearInterval(trickleRef.current!);
-        return;
-      }
-      current += Math.random() * 0.05;
-      progress.set(Math.min(current, 0.9));
-    }, 200);
-  }
+  }, [progress, startTrickle]);
 
   if (!isLoading) return null;
 
@@ -80,7 +80,11 @@ export default function LoadingBar() {
           background: `linear-gradient(90deg, ${colors.primary}, ${colors.secondary}, ${colors.accent})`,
           backgroundSize: '200% 100%',
           animation: 'loading-bar-flow 1.5s linear infinite',
-          transform: `scaleX(${springProgress.get()})`,
+          // A MotionValue in `style` keeps the bar animated; interpolating
+          // springProgress.get() into a transform string only read the value on
+          // render, so the bar never actually moved.
+          scaleX: springProgress,
+          transformOrigin: 'left',
         }}
       />
       <style>{`

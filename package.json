@@ -8,6 +8,7 @@
     "build": "bash build.sh",
     "start": "node dist-server/production.js",
     "lint": "eslint .",
+    "test": "node tests/run.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:server": "tsc --noEmit -p tsconfig.server.json",

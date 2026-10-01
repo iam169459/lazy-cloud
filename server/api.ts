@@ -99,6 +99,22 @@ function jwtVerify(token: string): JwtPayload | null {
   } catch { return null; }
 }
 
+/**
+ * Same-origin URL for the decrypting stream endpoint, valid for 5 minutes.
+ * Encrypted files can never be handed out as presigned URLs (that would leak
+ * raw ciphertext), so the browser downloads through this token-gated endpoint
+ * instead. Relative on purpose: it has to work behind any host/port/proxy.
+ */
+function encryptedStreamUrl(fileId: string): string {
+  const token = jwtSign({
+    fileId,
+    type: 'encrypted_download',
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 300,
+  });
+  return `/api/download/encrypted/stream?token=${encodeURIComponent(token)}`;
+}
+
 async function checkUserAuth(req: IncomingMessage): Promise<{ id: string; role: string } | null> {
   const auth = req.headers.authorization;
   if (!auth) return null;
@@ -359,10 +375,21 @@ async function handleUpload(req: IncomingMessage, res: ServerResponse): Promise<
           return;
         }
 
-        const providers = await listProviders();
-        const providerUsed = providers[0];
+        const allProviders = await listProviders();
+        const providers = allProviders.filter((p) => p.is_active);
+        // Route like the rest of the app: the bucket with the most free space.
+        // `providers[0]` was ordered by name, so uploads could land in a
+        // disabled or already-full bucket. The exact size is unknown until the
+        // stream finishes, so rank by remaining capacity instead of a fit check.
+        const providerUsed = providers
+          .filter((p) => Number(p.max_bytes) - Number(p.current_bytes) > 0)
+          .sort((a, b) => (Number(b.max_bytes) - Number(b.current_bytes)) - (Number(a.max_bytes) - Number(a.current_bytes)))[0];
         if (!providerUsed) {
-          uploadError = 'No storage providers configured. Go to Storage Settings and add a bucket first.';
+          uploadError = allProviders.length === 0
+            ? 'No storage providers configured. Go to Storage Settings and add a bucket first.'
+            : providers.length === 0
+              ? 'All storage providers are disabled. Enable one in Storage Settings first.'
+              : 'No storage provider with enough space.';
           file.resume();
           return;
         }
@@ -666,6 +693,12 @@ export async function handleApiRequest(
       if (settings.enableDownloadCounter !== false) {
         await incrementDownloadCount(fileId);
       }
+      // Encrypted files must be decrypted server-side — a presigned URL would
+      // hand the browser raw ciphertext.
+      if (file.encrypted) {
+        sendJson(res, 200, { url: encryptedStreamUrl(file.id) });
+        return true;
+      }
       const url = await getPresignedDownloadUrl(provider, file.r2_key, file.original_name, file.mime_type || 'application/octet-stream');
       sendJson(res, 200, { url });
       return true;
@@ -770,10 +803,7 @@ export async function handleApiRequest(
       if (settings.enableDownloadCounter !== false) {
         await incrementDownloadCount(fileId);
       }
-      // Generate a short-lived token for the streaming endpoint (valid for 5 minutes)
-      const token = jwtSign({ fileId, type: 'encrypted_download', iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 });
-      const streamUrl = `${new URL(req.url || '', 'http://localhost').origin}/api/download/encrypted/stream?token=${encodeURIComponent(token)}`;
-      sendJson(res, 200, { url: streamUrl, name: file.original_name, size: file.file_size });
+      sendJson(res, 200, { url: encryptedStreamUrl(file.id), name: file.original_name, size: file.file_size });
       return true;
     }
 
@@ -799,10 +829,9 @@ export async function handleApiRequest(
       const providers = await listProviders();
       const provider = providers.find((p) => p.id === file.provider_id);
       if (!provider) { sendError(res, 500, 'Storage provider not found'); return true; }
-      const settings = await getAppSettings();
-      if (settings.enableDownloadCounter !== false) {
-        await incrementDownloadCount(fileId);
-      }
+      // The download counter was already incremented when the token was issued
+      // (same as presigned URLs), so it is deliberately not incremented here —
+      // otherwise every encrypted download was counted twice.
       try {
         const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
         if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
@@ -1030,43 +1059,61 @@ export async function handleApiRequest(
     // ── Admin: Upload background image/video ──
     if (path === '/api/admin/background' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { writeFileSync, mkdirSync, existsSync, unlinkSync } = await import('fs');
+      const { writeFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } = await import('fs');
       const { join } = await import('path');
-      const { tmpdir } = await import('os');
       const bb = busboy({ headers: req.headers, limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+      // `/bg/*` is served from `public/bg` by Vite in dev and from `dist/bg`
+      // by the production server — the same dirs the DELETE handler cleans.
       const bgDirs = [
-        join(tmpdir(), 'lazy-cloud-bg'),
+        join(process.cwd(), 'public', 'bg'),
+        join(process.cwd(), 'dist', 'bg'),
       ];
       for (const d of bgDirs) { if (!existsSync(d)) mkdirSync(d, { recursive: true }); }
 
       let saved = false;
+      let savedUrl = '';
+      let savedType: 'image' | 'video' = 'image';
       let fileDone: Promise<void> = Promise.resolve();
       bb.on('file', (_fieldname, file, info) => {
         const mime = info.mimeType || '';
         const isImage = mime.startsWith('image/');
         const isVideo = mime.startsWith('video/');
         if (!isImage && !isVideo) { file.resume(); return; }
-        const ext = isVideo ? '.mp4' : '.' + (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+        // Derive the extension from the MIME type so the written file, the
+        // returned URL and the served Content-Type always agree (a .jpeg upload
+        // used to be saved as background.jpg while the client asked for
+        // background.jpeg, and every WebM video was written as background.mp4).
+        const subtype = (mime.split('/')[1] || '').split(';')[0].toLowerCase();
+        const ext = '.' + (subtype === 'jpeg' ? 'jpg' : subtype || (isVideo ? 'mp4' : 'jpg'));
         const fileName = 'background' + ext;
         const chunks: Buffer[] = [];
         file.on('data', (chunk: Buffer) => chunks.push(chunk));
         fileDone = new Promise<void>((doneFile) => {
           file.on('end', () => {
             const buf = Buffer.concat(chunks);
-            // Remove old backgrounds from all dirs
-            for (const d of bgDirs) {
-              for (const e of ['.jpg', '.png', '.mp4', '.webm']) {
-                try { unlinkSync(join(d, 'background' + e)); } catch { /* ignore */ }
+            void (async () => {
+              try {
+                // Remove every previous background, whatever its extension
+                for (const d of bgDirs) {
+                  for (const e of readdirSync(d)) {
+                    if (e.startsWith('background.')) {
+                      try { unlinkSync(join(d, e)); } catch { /* ignore */ }
+                    }
+                  }
+                }
+                for (const d of bgDirs) {
+                  writeFileSync(join(d, fileName), buf);
+                }
+                const bgUrl = `/bg/${fileName}`;
+                await updateAppSettings({ backgroundUrl: bgUrl, backgroundType: isVideo ? 'video' : 'image' });
+                savedUrl = bgUrl;
+                savedType = isVideo ? 'video' : 'image';
+                saved = true;
+              } catch (e) {
+                console.error('[lazydrop] background save failed:', errMsg(e));
               }
-            }
-            for (const d of bgDirs) {
-              writeFileSync(join(d, fileName), buf);
-            }
-            const bgUrl = `/bg/${fileName}`;
-            const bgType = isVideo ? 'video' : 'image';
-            updateAppSettings({ backgroundUrl: bgUrl, backgroundType: bgType });
-            saved = true;
-            doneFile();
+              doneFile();
+            })();
           });
           file.on('error', () => doneFile());
         });
@@ -1076,7 +1123,7 @@ export async function handleApiRequest(
         bb.on('close', () => {
           void (async () => {
             try { await fileDone; } catch { /* ignore */ }
-            if (saved) sendJson(res, 200, { message: 'Background updated' });
+            if (saved) sendJson(res, 200, { message: 'Background updated', url: savedUrl, type: savedType });
             else sendError(res, 400, 'No valid image or video uploaded');
             resolve();
           })();
@@ -1089,16 +1136,19 @@ export async function handleApiRequest(
     // ── Admin: Remove background ──
     if (path === '/api/admin/background' && req.method === 'DELETE') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
-      const { unlinkSync, existsSync } = await import('fs');
+      const { existsSync, readdirSync, unlinkSync } = await import('fs');
       const { join } = await import('path');
       const bgDirs = [
         join(process.cwd(), 'public', 'bg'),
         join(process.cwd(), 'dist', 'bg'),
       ];
       for (const d of bgDirs) {
-        for (const ext of ['.jpg', '.png', '.mp4', '.webm']) {
-          const f = join(d, 'background' + ext);
-          if (existsSync(f)) unlinkSync(f);
+        if (!existsSync(d)) continue;
+        // Any extension, not just the four hard-coded ones
+        for (const e of readdirSync(d)) {
+          if (e.startsWith('background.')) {
+            try { unlinkSync(join(d, e)); } catch { /* ignore */ }
+          }
         }
       }
       await updateAppSettings({ backgroundUrl: '', backgroundType: '' });
@@ -1530,16 +1580,9 @@ export async function handleApiRequest(
       await incrementDownloadCount(file.id);
       await incrementShareDownloadCount(shareId);
       if (file.encrypted) {
-        try {
-          const encryptedBuf = await downloadFromProvider(provider, file.r2_key);
-          if (!encryptedBuf) { sendError(res, 500, 'Failed to retrieve file'); return true; }
-          const decrypted = decryptFile(encryptedBuf, file.enc_iv!, file.enc_auth_tag!);
-          const blob = new Blob([decrypted]);
-          const url = URL.createObjectURL(blob);
-          sendJson(res, 200, { url, name: file.original_name, size: decrypted.length });
-        } catch (e) {
-          sendError(res, 500, `Decryption failed: ${errMsg(e)}`);
-        }
+        // Hand out the decrypting stream endpoint. A blob URL minted here on
+        // the server would be a `blob:nodedata:` URL the browser cannot open.
+        sendJson(res, 200, { url: encryptedStreamUrl(file.id), name: file.original_name, size: file.file_size });
         return true;
       }
       const url = await getPresignedDownloadUrl(provider, file.r2_key, file.original_name, file.mime_type || 'application/octet-stream');

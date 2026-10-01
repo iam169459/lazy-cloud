@@ -81,7 +81,9 @@ export default function SharePage() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(data.url);
+      // Only blob: URLs need revoking — calling it on the app's own (or a
+      // presigned) http URL is meaningless.
+      if (data.url.startsWith('blob:')) URL.revokeObjectURL(data.url);
     } catch (e) {
       setError(errMsg(e));
     } finally {
