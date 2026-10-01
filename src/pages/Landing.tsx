@@ -194,6 +194,10 @@ export default function Landing() {
         <Link to="/admin/login" className="inline-block mt-2 text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
           Admin panel
         </Link>
+        <span className="mx-2 text-xs" style={{ color: colors.textDim }}>·</span>
+        <a href="/lazy-cloud.html" className="inline-block mt-2 text-xs" style={{ color: colors.textDim }} onClick={() => sounds.click()}>
+          Control room
+        </a>
       </footer>
     </div>
   );

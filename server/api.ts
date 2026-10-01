@@ -8,7 +8,7 @@ import {
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
-import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, incrementUserStorageUsed, decrementUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD, DEFAULT_USER_STORAGE_LIMIT } from './db';
+import { initDatabase, findProviderForSize, addProvider, listProviders, deleteProvider, updateProviderBytes, toggleProviderActive, createFileRecord, getFileRecord, listFiles, deleteFileRecord, incrementDownloadCount, getStats, generateId, getAdminCredentials, updateAdminCredentials, isAdminSetup, getAppSettings, updateAppSettings, listExpiredFiles, getDb, createShare, getShareById, getSharesByFileId, validateShare, incrementShareDownloadCount, deleteShare, createApiKey, listApiKeys, getApiKeyByHash, deleteApiKey, updateApiKeyLastUsed, createAuditLog, listAuditLogs, createUser, getUserByUsername, getUserById, listUsers, updateUser, deleteUser, incrementUserStorageUsed, decrementUserStorageUsed, countUsers, listUserFiles, countUserFiles, listUserShares, createWebAuthnCredential, getWebAuthnCredentialByCredentialId, listWebAuthnCredentialsByUserId, updateWebAuthnCredentialCounter, deleteWebAuthnCredential, getUserByEmail, addCoins, claimDailyBonus, listCoinTransactions, recordLinkVisit, countShareVisits, setFilePrice, listShopFiles, listCatalog, updateFileMeta, listPurchases, deletePurchase, listSharesWithFile, updateProviderMeta, hasPurchased, purchaseFile, COIN_SIGNUP_BONUS, COIN_DAILY_BONUS, COIN_VISIT_REWARD, DEFAULT_USER_STORAGE_LIMIT } from './db';
 import type { AppSettings } from './db';
 import { uploadToProvider, deleteFromProvider, getPresignedDownloadUrl, downloadFromProvider, listObjects, getBucketSize } from './s3';
 import { encryptFile, decryptFile, getEncryptionStatus } from './encryption';
@@ -847,6 +847,35 @@ export async function handleApiRequest(
       return true;
     }
 
+    // ── Files: patch metadata (rename, folder, merchandising) ──
+    if (path === '/api/admin/files/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody<Record<string, unknown>>(req);
+      const id = typeof body.id === 'string' ? body.id : '';
+      if (!id) { sendError(res, 400, 'id required'); return true; }
+      const updated = await updateFileMeta(id, {
+        original_name: body.original_name !== undefined ? sanitize(body.original_name) : undefined,
+        description: body.description !== undefined ? String(body.description).slice(0, 500) : undefined,
+        folder: body.folder !== undefined ? sanitize(String(body.folder)).slice(0, 40) : undefined,
+        price_coins: body.price_coins !== undefined ? Math.max(0, Math.floor(Number(body.price_coins) || 0)) : undefined,
+        old_price: body.old_price !== undefined ? Math.max(0, Math.floor(Number(body.old_price) || 0)) : undefined,
+        listed: typeof body.listed === 'boolean' ? body.listed : undefined,
+        featured: typeof body.featured === 'boolean' ? body.featured : undefined,
+        max_downloads: body.max_downloads !== undefined ? Math.max(1, Math.floor(Number(body.max_downloads) || 1)) : undefined,
+        expiry_days: body.expiry_days !== undefined ? Math.max(0, Math.floor(Number(body.expiry_days) || 0)) : undefined,
+      });
+      if (!updated) { sendError(res, 404, 'File not found'); return true; }
+      sendJson(res, 200, { file: updated });
+      return true;
+    }
+
+    // ── Catalog: every file + merchandising + sale counts (Lazy Cloud dashboard) ──
+    if (path === '/api/admin/catalog' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      sendJson(res, 200, { items: await listCatalog() });
+      return true;
+    }
+
     if (path === '/api/admin/providers' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const providers = await listProviders();
@@ -914,6 +943,25 @@ export async function handleApiRequest(
       return true;
     }
 
+    if (path === '/api/admin/providers/update' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody<Record<string, unknown>>(req);
+      const id = typeof body.id === 'string' ? body.id : '';
+      if (!id) { sendError(res, 400, 'id required'); return true; }
+      const updated = await updateProviderMeta(id, {
+        provider_name: body.provider_name !== undefined ? sanitize(body.provider_name) : undefined,
+        endpoint_url: body.endpoint_url !== undefined ? String(body.endpoint_url).slice(0, 300) : undefined,
+        bucket_name: body.bucket_name !== undefined ? sanitize(String(body.bucket_name)).slice(0, 120) : undefined,
+        access_key_id: body.access_key_id !== undefined ? String(body.access_key_id).slice(0, 200) : undefined,
+        secret_access_key: body.secret_access_key !== undefined && body.secret_access_key !== '--------'
+          ? String(body.secret_access_key).slice(0, 200) : undefined,
+        region: body.region !== undefined ? sanitize(String(body.region)).slice(0, 60) : undefined,
+      });
+      if (!updated) { sendError(res, 404, 'Provider not found'); return true; }
+      sendJson(res, 200, { provider: { ...updated, secret_access_key: updated.secret_access_key ? '--------' : '' } });
+      return true;
+    }
+
     if (path === '/api/admin/providers/test' && req.method === 'POST') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const body = await parseJsonBody(req);
@@ -962,6 +1010,12 @@ export async function handleApiRequest(
 
     if (path === '/api/settings' && req.method === 'GET') {
       sendJson(res, 200, await getAppSettings());
+      return true;
+    }
+
+    if (path === '/api/admin/settings' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      sendJson(res, 200, { settings: await getAppSettings() });
       return true;
     }
 
@@ -1513,8 +1567,13 @@ export async function handleApiRequest(
     if (path === '/api/admin/shares' && req.method === 'GET') {
       if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
       const fileId = new URL(req.url || '', 'http://localhost').searchParams.get('fileId');
-      if (!fileId) { sendError(res, 400, 'Missing fileId'); return true; }
-      const shares = await getSharesByFileId(fileId);
+      if (fileId) {
+        const shares = await getSharesByFileId(fileId);
+        sendJson(res, 200, { shares });
+        return true;
+      }
+      // No fileId → every share in the store (Lazy Cloud dashboard link list)
+      const shares = await listSharesWithFile();
       sendJson(res, 200, { shares });
       return true;
     }
@@ -1573,6 +1632,23 @@ export async function handleApiRequest(
       const offset = parseInt(url.searchParams.get('offset') || '0');
       const logs = await listAuditLogs(limit, offset);
       sendJson(res, 200, { logs });
+      return true;
+    }
+
+    // ── Purchases: full store ledger (Lazy Cloud dashboard) ──
+    if (path === '/api/admin/purchases' && req.method === 'GET') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      sendJson(res, 200, { purchases: await listPurchases() });
+      return true;
+    }
+
+    if (path === '/api/admin/purchases/refund' && req.method === 'POST') {
+      if (!(await checkAuth(req))) { sendError(res, 401, 'Unauthorized'); return true; }
+      const body = await parseJsonBody(req);
+      if (!body.id) { sendError(res, 400, 'id required'); return true; }
+      await deletePurchase(body.id);
+      await createAuditLog({ admin_id: null, action: 'refund', details: `Refunded purchase ${body.id}`, ip_address: null, user_agent: null });
+      sendJson(res, 200, { success: true });
       return true;
     }
 

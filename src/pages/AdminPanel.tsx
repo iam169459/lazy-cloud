@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Zap, LogOut, FileText, HardDrive, Download, Cloud, Loader2, Check, AlertCircle,
-  Sliders, Scan, Menu, ChevronsLeft, ChevronsRight, Terminal, Key, Activity, Users
+  Sliders, Scan, Menu, ChevronsLeft, ChevronsRight, Terminal, Key, Activity, Users,
+  LayoutDashboard, Store
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from '@/lib/theme';
@@ -183,6 +184,36 @@ export default function AdminPanel() {
               {!collapsed && <span>Collapse</span>}
             </button>
 
+            <a
+              href="/lazy-cloud.html"
+              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150"
+              style={{
+                padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                color: colors.textMuted,
+              }}
+              onClick={() => { sounds.click(); setMobileOpen(false); }}
+              title={collapsed ? 'Control room' : 'Open the Lazy Cloud control room'}
+            >
+              <span style={{ color: colors.textDim, flexShrink: 0 }}><LayoutDashboard className="w-[18px] h-[18px]" /></span>
+              {!collapsed && <span>Control room</span>}
+            </a>
+
+            <Link
+              to="/shop"
+              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150"
+              style={{
+                padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                color: colors.textMuted,
+              }}
+              onClick={() => { sounds.click(); setMobileOpen(false); }}
+              title={collapsed ? 'Storefront' : undefined}
+            >
+              <span style={{ color: colors.textDim, flexShrink: 0 }}><Store className="w-[18px] h-[18px]" /></span>
+              {!collapsed && <span>Storefront</span>}
+            </Link>
+
             <Link
               to="/"
               className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150"
@@ -240,16 +271,14 @@ export default function AdminPanel() {
             <span className="font-semibold text-sm">LazyDrop</span>
           </div>
           <a
-            href="/admin/index.html"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/lazy-cloud.html"
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono transition-colors"
             style={{ color: colors.primary, background: colors.primaryGlow, border: `1px solid ${colors.border}` }}
-            title="Open standalone storefront"
-            aria-label="Open standalone storefront"
+            title="Open the Lazy Cloud control room"
+            aria-label="Open the Lazy Cloud control room"
           >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M2 6L4 18h16L22 6H2z"/><path d="M8 6v12"/><path d="M16 6v12"/></svg>
-            STOREFRONT
+            <LayoutDashboard className="w-3.5 h-3.5" aria-hidden="true" />
+            DASHBOARD
           </a>
           <div className="w-9" />
         </header>

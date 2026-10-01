@@ -47,6 +47,14 @@ export interface FileRecord {
   enc_iv: string | null;
   enc_auth_tag: string | null;
   price_coins?: number;
+  /** Storefront merchandising (Lazy Cloud dashboard) */
+  listed?: boolean;
+  description?: string | null;
+  folder?: string | null;
+  old_price?: number | null;
+  featured?: boolean;
+  max_downloads?: number | null;
+  expiry_days?: number | null;
 }
 
 export interface UserRecord {
@@ -340,6 +348,21 @@ export async function initDatabase() {
 
   // Only the admin sells (site files have no owner). Clear prices set by users.
   await sql`UPDATE files SET price_coins = 0 WHERE user_id IS NOT NULL AND price_coins > 0`;
+
+  // ── Storefront merchandising columns (Lazy Cloud dashboard) ──
+  const hadListed = (await sql`SELECT 1 AS ok FROM information_schema.columns WHERE table_name = 'files' AND column_name = 'listed'`) as unknown[];
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS listed BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS folder TEXT DEFAULT 'General'`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS old_price INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS featured BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS max_downloads INTEGER DEFAULT 3`;
+  await sql`ALTER TABLE files ADD COLUMN IF NOT EXISTS expiry_days INTEGER DEFAULT 30`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_files_listed ON files (listed) WHERE listed`;
+  // One-time backfill: before this column existed, price > 0 meant "listed in the shop".
+  if (hadListed.length === 0) {
+    await sql`UPDATE files SET listed = true WHERE price_coins > 0 AND user_id IS NULL`;
+  }
 }
 
 export interface AdminCredentials {
@@ -445,6 +468,12 @@ export interface AppSettings {
   ipWhitelist: string;
   backgroundUrl: string;
   backgroundType: 'image' | 'video' | '';
+  /** Lazy Cloud dashboard preferences (payment/security toggles, credentials, folder list) */
+  dashboard?: {
+    stripe?: boolean; paypal?: boolean; crypto?: boolean; bkash?: boolean;
+    ipBinding?: boolean; password?: boolean; throttle?: string; folders?: string[];
+    stripeKey?: string; paypalEmail?: string; cryptoAddress?: string; bkashNumber?: string;
+  };
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -1077,7 +1106,7 @@ export async function listShopFiles(): Promise<FileRecord[]> {
   const sql = getSql();
   const rows = await sql`
     SELECT * FROM files
-    WHERE price_coins > 0 AND user_id IS NULL
+    WHERE listed AND user_id IS NULL
     ORDER BY created_at DESC
     LIMIT 200
   ` as unknown;
@@ -1087,6 +1116,153 @@ export async function listShopFiles(): Promise<FileRecord[]> {
 export async function setFilePrice(fileId: string, priceCoins: number): Promise<void> {
   const sql = getSql();
   await sql`UPDATE files SET price_coins = ${priceCoins} WHERE id = ${fileId}`;
+}
+
+/* ═══════════ Lazy Cloud dashboard: catalog, ledger, maintenance ═══════════ */
+
+export interface CatalogItem extends FileRecord {
+  description: string;
+  folder: string;
+  listed: boolean;
+  old_price: number;
+  featured: boolean;
+  max_downloads: number;
+  expiry_days: number;
+  sales: number;
+}
+
+/** Every hosted file joined with its merchandising fields and sale counts. */
+export async function listCatalog(): Promise<CatalogItem[]> {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT f.*, COALESCE(p.cnt, 0) AS sales
+    FROM files f
+    LEFT JOIN (
+      SELECT file_id, COUNT(*)::INT AS cnt FROM file_purchases GROUP BY file_id
+    ) p ON p.file_id = f.id
+    ORDER BY f.created_at DESC
+  `) as unknown[];
+  return rows.map((r) => {
+    const row = r as Record<string, unknown>;
+    const bool = (v: unknown) => v === true || v === 't' || v === 1;
+    return {
+      ...row,
+      file_size: Number(row.file_size) || 0,
+      download_count: Number(row.download_count) || 0,
+      price_coins: Number(row.price_coins) || 0,
+      old_price: Number(row.old_price) || 0,
+      max_downloads: Number(row.max_downloads ?? 3) || 3,
+      expiry_days: Number(row.expiry_days ?? 30) || 0,
+      sales: Number(row.sales) || 0,
+      listed: bool(row.listed),
+      featured: bool(row.featured),
+      description: row.description || '',
+      folder: row.folder || 'General',
+    } as CatalogItem;
+  });
+}
+
+export interface FileMetaPatch {
+  original_name?: string;
+  description?: string;
+  folder?: string;
+  price_coins?: number;
+  old_price?: number;
+  listed?: boolean;
+  featured?: boolean;
+  max_downloads?: number;
+  expiry_days?: number;
+}
+
+/** Patch file metadata; omitted fields keep their current value (COALESCE). */
+export async function updateFileMeta(fileId: string, patch: FileMetaPatch): Promise<FileRecord | null> {
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE files SET
+      original_name = COALESCE(${patch.original_name ?? null}, original_name),
+      description   = COALESCE(${patch.description ?? null}, description),
+      folder        = COALESCE(${patch.folder ?? null}, folder),
+      price_coins   = COALESCE(${patch.price_coins ?? null}, price_coins),
+      old_price     = COALESCE(${patch.old_price ?? null}, old_price),
+      listed        = COALESCE(${patch.listed ?? null}, listed),
+      featured      = COALESCE(${patch.featured ?? null}, featured),
+      max_downloads = COALESCE(${patch.max_downloads ?? null}, max_downloads),
+      expiry_days   = COALESCE(${patch.expiry_days ?? null}, expiry_days)
+    WHERE id = ${fileId}
+    RETURNING *
+  `) as unknown[];
+  return (rows[0] as FileRecord) ?? null;
+}
+
+export interface PurchaseRow {
+  id: string;
+  file_id: string;
+  buyer_id: string;
+  price_paid: number;
+  created_at: string;
+  file_name: string;
+  buyer_username: string;
+  buyer_email: string | null;
+}
+
+/** Full store ledger: every purchase joined with file + buyer. */
+export async function listPurchases(limit = 500): Promise<PurchaseRow[]> {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT p.id, p.file_id, p.buyer_id, p.price_paid, p.created_at,
+           f.original_name AS file_name,
+           u.username AS buyer_username, u.email AS buyer_email
+    FROM file_purchases p
+    JOIN files f ON f.id = p.file_id
+    JOIN users u ON u.id = p.buyer_id
+    ORDER BY p.created_at DESC
+    LIMIT ${limit}
+  `) as unknown[];
+  return rows.map((r) => {
+    const row = r as Record<string, unknown>;
+    return { ...row, price_paid: Number(row.price_paid) || 0 } as PurchaseRow;
+  });
+}
+
+export async function deletePurchase(id: string): Promise<void> {
+  const sql = getSql();
+  await sql`DELETE FROM file_purchases WHERE id = ${id}`;
+}
+
+/** All share links joined with the file they point at. */
+export async function listSharesWithFile(): Promise<(ShareRecord & { file_name: string })[]> {
+  const sql = getSql();
+  return (await sql`
+    SELECT s.*, f.original_name AS file_name
+    FROM shares s
+    JOIN files f ON f.id = s.file_id
+    ORDER BY s.created_at DESC
+  `) as unknown[] as (ShareRecord & { file_name: string })[];
+}
+
+export interface ProviderPatch {
+  provider_name?: string;
+  endpoint_url?: string;
+  bucket_name?: string;
+  access_key_id?: string;
+  secret_access_key?: string;
+  region?: string;
+}
+
+export async function updateProviderMeta(id: string, patch: ProviderPatch): Promise<StorageProvider | null> {
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE storage_providers SET
+      provider_name     = COALESCE(${patch.provider_name ?? null}, provider_name),
+      endpoint_url      = COALESCE(${patch.endpoint_url ?? null}, endpoint_url),
+      bucket_name       = COALESCE(${patch.bucket_name ?? null}, bucket_name),
+      access_key_id     = COALESCE(${patch.access_key_id ?? null}, access_key_id),
+      secret_access_key = COALESCE(${patch.secret_access_key ?? null}, secret_access_key),
+      region            = COALESCE(${patch.region ?? null}, region)
+    WHERE id = ${id}
+    RETURNING *
+  `) as unknown[];
+  return (rows[0] as StorageProvider) ?? null;
 }
 
 export async function hasPurchased(fileId: string, buyerId: string): Promise<boolean> {

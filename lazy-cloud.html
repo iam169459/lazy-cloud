@@ -204,6 +204,73 @@
   .row-hover { transition: background-color .15s ease; }
   .row-hover:hover { background: rgba(30,41,59,0.45); }
 
+  /* ═══════════ Mobile refinements (≤640px) ═══════════ */
+
+  @media (max-width: 640px) {
+    /* iOS zooms the viewport when a focused field is under 16px */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* Data tables become stacked cards instead of sideways-scrolling grids */
+    table.t-wide { min-width: 0 !important; }
+    table.t-wide thead { display: none; }
+    table.t-wide, table.t-wide tbody, table.t-wide tr { display: block; }
+    table.t-wide tbody { padding: 0.25rem; }
+    table.t-wide tbody tr {
+      border: 1px solid rgba(30,41,59,0.75); border-radius: 0.9rem;
+      background: rgba(2,6,23,0.45); margin: 0.5rem; padding: 0.35rem 0.9rem;
+    }
+    table.t-wide td {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.85rem;
+      padding: 0.35rem 0 !important; border: 0 !important;
+      max-width: none !important; white-space: normal !important; overflow: visible !important;
+    }
+    table.t-wide td::before {
+      content: attr(data-label); flex: none; color: #64748b; font-size: 10px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    table.t-wide td[data-label=""]::before { content: none; }
+    table.t-wide tr td:first-child {
+      border-bottom: 1px solid rgba(30,41,59,0.85) !important;
+      padding-bottom: 0.7rem !important; margin-bottom: 0.3rem;
+    }
+    table.t-wide tr td:last-child {
+      border-top: 1px solid rgba(30,41,59,0.85) !important;
+      padding-top: 0.7rem !important; margin-top: 0.3rem; justify-content: flex-end;
+    }
+
+    /* KPI cards: two compact columns, decorative icon off the clock */
+    article.kpi { padding: 1rem; }
+    article.kpi p[data-countup] { font-size: 1.25rem; }
+    article.kpi .relative.flex.items-start > span { display: none; }
+
+    /* Toasts read better edge-to-edge like snackbars */
+    #toasts { left: 1rem; }
+    #toasts > div { max-width: none !important; }
+  }
+
+  @media (max-width: 360px) {
+    article.kpi p[data-countup] { font-size: 1rem; }
+  }
+
+  /* Bigger hit targets on touch screens */
+  @media (pointer: coarse) {
+    .icon-btn { width: 36px; height: 36px; }
+    .chip { padding: 0.5rem 0.9rem; }
+  }
+
+  /* Drawer transforms live in this STABLE stylesheet. Toggling Tailwind's
+     translate classes makes the CDN delete its rule while the transition is
+     running, which strands the animation at its start value (drawer never
+     slides in). Static #id rules are never regenerated, so it always lands. */
+  @media (max-width: 1023px) {
+    #sidebar { height: 100dvh; transform: translateX(-100%); }
+    #sidebar.drawer-open { transform: translateX(0); }
+  }
+  #notifDrawer { height: 100dvh; transform: translateX(100%); }
+  #notifDrawer.drawer-open { transform: translateX(0); }
+  #productModal > .glass { max-height: 92dvh; }
+  #storefront, #productModal > .glass { overscroll-behavior: contain; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   }
@@ -214,14 +281,17 @@
 <div class="ambient" aria-hidden="true"></div>
 <div class="grid-veil" aria-hidden="true"></div>
 
-<!-- ═══════════════ MOBILE SIDEBAR BACKDROP ═══════════════ -->
-<div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm hidden lg:hidden" aria-hidden="true"></div>
-
 <!-- ═══════════════ APP SHELL ═══════════════ -->
 <div class="relative z-10 flex min-h-screen">
 
+  <!-- ─────────── MOBILE SIDEBAR BACKDROP ─────────── -->
+  <!-- Must live inside this z-10 shell so the drawer (z-50) stays ABOVE it
+       while the header (z-30) and content stay below. Outside the shell the
+       backdrop would paint over the drawer and swallow every tap. -->
+  <div id="sidebarBackdrop" class="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm hidden lg:hidden" aria-hidden="true"></div>
+
   <!-- ─────────── SIDEBAR ─────────── -->
-  <aside id="sidebar" class="fixed lg:sticky top-0 z-50 h-screen w-72 -translate-x-full lg:translate-x-0 transition-transform duration-300 flex flex-col glass !rounded-none lg:!rounded-none border-y-0 lg:border-y border-l-0">
+  <aside id="sidebar" class="fixed lg:sticky top-0 z-50 h-screen w-72 transition-transform duration-300 flex flex-col glass !rounded-none lg:!rounded-none border-y-0 lg:border-y border-l-0">
     <!-- Logo -->
     <div class="px-5 py-6 border-b border-slate-800/80 flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -273,6 +343,14 @@
           <i data-lucide="badge-plus" class="w-4.5 h-4.5"></i><span>New Product</span>
         </button>
       </div>
+
+      <div class="pt-4 mt-4 border-t border-slate-800/80">
+        <p class="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Workspace</p>
+        <a href="/" class="nav-item group"><i data-lucide="globe" class="w-4.5 h-4.5"></i><span>LazyDrop app</span></a>
+        <a href="/admin" class="nav-item group"><i data-lucide="shield-check" class="w-4.5 h-4.5"></i><span>Admin panel</span></a>
+        <a href="/shop" class="nav-item group"><i data-lucide="shopping-bag" class="w-4.5 h-4.5"></i><span>Public storefront</span></a>
+        <a href="/coins" class="nav-item group"><i data-lucide="coins" class="w-4.5 h-4.5"></i><span>Coins &amp; rewards</span></a>
+      </div>
     </nav>
 
     <!-- Storage meter -->
@@ -280,12 +358,12 @@
       <div class="rounded-xl bg-slate-900/70 border border-slate-800/80 p-3.5">
         <div class="flex items-center justify-between text-xs mb-2">
           <span class="text-slate-400 font-medium">Cloud storage</span>
-          <span class="font-mono text-emerald-400">21%</span>
+          <span class="font-mono text-emerald-400" id="sideStoragePct">—</span>
         </div>
-        <div class="h-2 rounded-full bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow="21" aria-valuemin="0" aria-valuemax="100" aria-label="Storage used">
-          <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 shadow-glow" style="width:21%"></div>
+        <div class="h-2 rounded-full bg-slate-800 overflow-hidden" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Storage used">
+          <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-sky-400 shadow-glow" id="sideStorageBar" style="width:0%"></div>
         </div>
-        <p class="mt-2 text-[11px] font-mono text-slate-500">420 GB <span class="text-slate-600">of</span> 2 TB</p>
+        <p class="mt-2 text-[11px] font-mono text-slate-500" id="sideStorageText">— <span class="text-slate-600">of</span> —</p>
       </div>
     </div>
   </aside>
@@ -316,7 +394,7 @@
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 live-dot" aria-hidden="true"></span>
             <div class="leading-none">
               <p class="text-[10px] uppercase tracking-wider text-emerald-400/90 font-semibold">Store revenue</p>
-              <p class="text-sm font-bold font-mono text-emerald-300" id="revenueWidget" data-value="48250.75" data-format="money">$0.00</p>
+              <p class="text-sm font-bold font-mono text-emerald-300" id="revenueWidget" data-countup data-value="0" data-format="money">—</p>
             </div>
           </div>
 
@@ -341,10 +419,12 @@
               </span>
               <i data-lucide="chevron-down" class="hidden xl:block w-3.5 h-3.5 text-slate-500"></i>
             </button>
-            <div id="profileMenu" class="hidden absolute right-0 mt-2 w-52 glass p-1.5 z-40">
-              <button class="menu-item" data-menu="profile"><i data-lucide="user" class="w-4 h-4"></i> My profile</button>
-              <button class="menu-item" data-menu="billing"><i data-lucide="credit-card" class="w-4 h-4"></i> Billing &amp; plan</button>
-              <button class="menu-item" data-menu="api"><i data-lucide="terminal" class="w-4 h-4"></i> API console</button>
+            <div id="profileMenu" class="hidden absolute right-0 mt-2 w-56 glass p-1.5 z-40">
+              <a href="/admin" class="menu-item"><i data-lucide="layout-dashboard" class="w-4 h-4"></i> Admin panel</a>
+              <a href="/dashboard" class="menu-item"><i data-lucide="hard-drive" class="w-4 h-4"></i> My files</a>
+              <a href="/shop" class="menu-item"><i data-lucide="store" class="w-4 h-4"></i> Storefront</a>
+              <a href="/coins" class="menu-item"><i data-lucide="coins" class="w-4 h-4"></i> Coin wallet</a>
+              <a href="/" class="menu-item"><i data-lucide="home" class="w-4 h-4"></i> LazyDrop home</a>
               <div class="my-1 h-px bg-slate-800/80"></div>
               <button class="menu-item !text-rose-400 hover:!bg-rose-500/10" data-menu="signout"><i data-lucide="log-out" class="w-4 h-4"></i> Sign out</button>
             </div>
@@ -369,60 +449,60 @@
       <!-- ══════════ VIEW: OVERVIEW ══════════ -->
       <section id="view-overview" class="view" role="tabpanel" aria-label="Overview and sales">
         <!-- KPI grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-          <article class="glass glass-hover p-5 relative overflow-hidden">
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <article class="glass glass-hover p-5 relative overflow-hidden kpi">
             <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-emerald-500/10 blur-2xl" aria-hidden="true"></div>
             <div class="relative flex items-start justify-between">
               <div>
                 <p class="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">Total revenue</p>
-                <p class="mt-2 text-2xl font-extrabold font-mono text-emerald-300" data-countup data-value="48250.75" data-format="money">$0</p>
+                <p class="mt-2 text-2xl font-extrabold font-mono text-emerald-300" data-countup data-value="0" data-format="money" id="kpiRevenue">—</p>
               </div>
               <span class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-400"><i data-lucide="circle-dollar-sign" class="w-4.5 h-4.5"></i></span>
             </div>
-            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400"><i data-lucide="trending-up" class="w-3.5 h-3.5"></i> +12.4% <span class="text-slate-500">vs last month</span></p>
+            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400" id="kpiTrend"><i data-lucide="trending-up" class="w-3.5 h-3.5"></i> — <span class="text-slate-500">vs last month</span></p>
           </article>
 
-          <article class="glass glass-hover p-5 relative overflow-hidden">
+          <article class="glass glass-hover p-5 relative overflow-hidden kpi">
             <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-sky-500/10 blur-2xl" aria-hidden="true"></div>
             <div class="relative flex items-start justify-between">
               <div>
                 <p class="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">Files hosted</p>
-                <p class="mt-2 text-2xl font-extrabold font-mono text-sky-300" data-countup data-value="1284">0</p>
+                <p class="mt-2 text-2xl font-extrabold font-mono text-sky-300" data-countup data-value="0" id="kpiFiles">—</p>
               </div>
               <span class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 grid place-items-center text-sky-400"><i data-lucide="files" class="w-4.5 h-4.5"></i></span>
             </div>
-            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500"><i data-lucide="hard-drive" class="w-3.5 h-3.5 text-sky-400"></i> 420 GB of 2 TB used</p>
+            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500" id="kpiStorageSub"><i data-lucide="hard-drive" class="w-3.5 h-3.5 text-sky-400"></i> —</p>
           </article>
 
-          <article class="glass glass-hover p-5 relative overflow-hidden">
+          <article class="glass glass-hover p-5 relative overflow-hidden kpi">
             <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl" aria-hidden="true"></div>
             <div class="relative flex items-start justify-between">
               <div>
                 <p class="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">Downloads / bandwidth</p>
-                <p class="mt-2 text-2xl font-extrabold font-mono text-indigo-300" data-countup data-value="92410">0</p>
+                <p class="mt-2 text-2xl font-extrabold font-mono text-indigo-300" data-countup data-value="0" id="kpiDownloads">—</p>
               </div>
               <span class="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 grid place-items-center text-indigo-400"><i data-lucide="download" class="w-4.5 h-4.5"></i></span>
             </div>
-            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500"><i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400"></i> 1.84 TB served this month</p>
+            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500" id="kpiBwSub"><i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400"></i> —</p>
           </article>
 
-          <article class="glass glass-hover p-5 relative overflow-hidden">
+          <article class="glass glass-hover p-5 relative overflow-hidden kpi">
             <div class="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl" aria-hidden="true"></div>
             <div class="relative flex items-start justify-between">
               <div>
                 <p class="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">Active sales</p>
-                <p class="mt-2 text-2xl font-extrabold font-mono text-amber-300" data-countup data-value="34">0</p>
+                <p class="mt-2 text-2xl font-extrabold font-mono text-amber-300" data-countup data-value="0" id="kpiSales">—</p>
               </div>
               <span class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 grid place-items-center text-amber-400"><i data-lucide="zap" class="w-4.5 h-4.5"></i></span>
             </div>
-            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500"><i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-amber-400"></i> 6 products listed</p>
+            <p class="relative mt-3 flex items-center gap-1.5 text-[11px] text-slate-500" id="kpiProductsSub"><i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-amber-400"></i> —</p>
           </article>
         </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
           <!-- Revenue chart -->
           <article class="glass p-5 xl:col-span-2">
-            <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center justify-between gap-3 flex-wrap mb-5">
               <div>
                 <h2 class="font-bold tracking-tight">Revenue pulse</h2>
                 <p class="text-xs text-slate-400 mt-0.5">Gross sales, last 12 weeks</p>
@@ -435,9 +515,9 @@
             </div>
             <div class="flex items-end gap-1.5 sm:gap-2.5 h-44" id="revenueChart" role="img" aria-label="Bar chart of weekly revenue for the last 12 weeks"></div>
             <div class="mt-4 pt-4 border-t border-slate-800/70 grid grid-cols-3 gap-3 text-center">
-              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Avg / week</p><p class="font-mono font-bold text-emerald-300 mt-0.5">$4,020</p></div>
-              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Best week</p><p class="font-mono font-bold text-sky-300 mt-0.5">$6,480</p></div>
-              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Refunds</p><p class="font-mono font-bold text-rose-300 mt-0.5">1.2%</p></div>
+              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Avg / week</p><p class="font-mono font-bold text-emerald-300 mt-0.5" id="chartAvg">—</p></div>
+              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Best week</p><p class="font-mono font-bold text-sky-300 mt-0.5" id="chartBest">—</p></div>
+              <div><p class="text-[10px] uppercase tracking-wider text-slate-500">Refunds</p><p class="font-mono font-bold text-rose-300 mt-0.5" id="chartRefund">—</p></div>
             </div>
           </article>
 
@@ -446,30 +526,29 @@
             <div class="flex items-center justify-between mb-4">
               <div>
                 <h2 class="font-bold tracking-tight">Storage gauge</h2>
-                <p class="text-xs text-slate-400 mt-0.5">Cloudflare R2 · bucket lazy-prod</p>
+                <p class="text-xs text-slate-400 mt-0.5" id="gaugeProvider">—</p>
               </div>
-              <span class="text-[10px] font-mono px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">HEALTHY</span>
+              <span class="text-[10px] font-mono px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400" id="gaugeBadge">HEALTHY</span>
             </div>
             <div class="flex flex-col items-center">
-              <div class="gauge w-44 h-44 grid place-items-center" style="--gauge-deg: 75.6deg" role="img" aria-label="420 gigabytes of 2 terabytes used, 21 percent">
+              <div class="gauge w-44 h-44 grid place-items-center" style="--gauge-deg: 0deg" role="img" aria-label="Storage gauge" id="gaugeRing">
                 <div class="relative z-10 text-center">
-                  <p class="text-3xl font-extrabold font-mono">21<span class="text-base text-slate-400">%</span></p>
-                  <p class="text-[11px] text-slate-400 font-mono mt-0.5">420 GB / 2 TB</p>
+                  <p class="text-3xl font-extrabold font-mono" id="gaugePct">—</p>
+                  <p class="text-[11px] text-slate-400 font-mono mt-0.5" id="gaugeBytes">—</p>
                 </div>
-              </div>
-              <div class="w-full mt-5 space-y-2.5 text-xs">
-                <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Videos</span><span class="font-mono text-slate-300">248 GB</span></div>
-                <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-sky-400"></span>Archives</span><span class="font-mono text-slate-300">104 GB</span></div>
-                <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-indigo-400"></span>Documents</span><span class="font-mono text-slate-300">51 GB</span></div>
-                <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-slate-500"></span>Other</span><span class="font-mono text-slate-300">17 GB</span></div>
-              </div>
+              </div>                <div class="w-full mt-5 space-y-2.5 text-xs">
+                  <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-emerald-400"></span>Videos</span><span class="font-mono text-slate-300" id="gaugeVideos">—</span></div>
+                  <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-sky-400"></span>Archives</span><span class="font-mono text-slate-300" id="gaugeArchives">—</span></div>
+                  <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-indigo-400"></span>Documents</span><span class="font-mono text-slate-300" id="gaugeDocs">—</span></div>
+                  <div class="flex items-center justify-between"><span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-slate-500"></span>Other</span><span class="font-mono text-slate-300" id="gaugeOther">—</span></div>
+                </div>
             </div>
           </article>
         </div>
 
         <!-- Recent sales stream -->
         <article class="glass overflow-hidden">
-          <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/70">
+          <div class="flex items-center justify-between gap-3 flex-wrap px-5 py-4 border-b border-slate-800/70">
             <div>
               <h2 class="font-bold tracking-tight">Recent sales activity</h2>
               <p class="text-xs text-slate-400 mt-0.5">Customer purchases and access link status</p>
@@ -477,7 +556,7 @@
             <button class="btn btn-ghost" data-nav="orders">View ledger <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[760px]">
+            <table class="w-full text-sm min-w-[760px] t-wide">
               <thead class="bg-slate-900/50"><tr>
                 <th class="table-th">Customer</th><th class="table-th">File purchased</th>
                 <th class="table-th">Price</th><th class="table-th">When</th><th class="table-th">Access link</th>
@@ -497,7 +576,7 @@
             <i data-lucide="cloud-upload" class="w-6 h-6 text-emerald-400"></i>
           </div>
           <p class="font-semibold">Drop files here <span class="text-slate-500 font-normal">or</span> <span class="text-emerald-400">browse</span></p>
-          <p class="text-xs text-slate-500 mt-1.5 font-mono">ZIP, PDF, MP4, PNG · batch upload supported · simulated edge sync</p>
+          <p class="text-xs text-slate-500 mt-1.5 font-mono">ZIP, PDF, MP4, PNG · batch upload supported · streams to your storage provider</p>
           <div id="uploadQueue" class="hidden mt-5 pt-5 border-t border-slate-800/70 text-left space-y-3 max-w-2xl mx-auto"></div>
         </div>
 
@@ -517,7 +596,7 @@
             </div>
           </div>
           <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[900px]">
+            <table class="w-full text-sm min-w-[900px] t-wide">
               <thead class="bg-slate-900/50"><tr>
                 <th class="table-th pl-5">File</th><th class="table-th">Size</th><th class="table-th">MIME type</th>
                 <th class="table-th">Uploaded</th><th class="table-th">Visibility</th><th class="table-th text-right pr-5">Actions</th>
@@ -556,26 +635,26 @@
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           <div class="glass p-4"><p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Completed</p><p class="mt-1.5 font-mono font-bold text-emerald-300 text-lg" id="statCompleted">—</p></div>
           <div class="glass p-4"><p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Refunded</p><p class="mt-1.5 font-mono font-bold text-rose-300 text-lg" id="statRefunded">—</p></div>
-          <div class="glass p-4"><p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Expired</p><p class="mt-1.5 font-mono font-bold text-amber-300 text-lg" id="statExpired">—</p></div>
+          <div class="glass p-4"><p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Customers</p><p class="mt-1.5 font-mono font-bold text-indigo-300 text-lg" id="statCustomers">—</p></div>
           <div class="glass p-4"><p class="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Net collected</p><p class="mt-1.5 font-mono font-bold text-sky-300 text-lg" id="statNet">—</p></div>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div class="flex flex-wrap gap-1.5" id="orderFilters" role="group" aria-label="Filter orders by status">
-            <button class="chip active" data-ofilter="all">All</button>
-            <button class="chip" data-ofilter="completed">Completed</button>
-            <button class="chip" data-ofilter="refunded">Refunded</button>
-            <button class="chip" data-ofilter="expired">Expired</button>
+            <button class="chip active" data-ofilter="all">All time</button>
+            <button class="chip" data-ofilter="today">Today</button>
+            <button class="chip" data-ofilter="7d">7 days</button>
+            <button class="chip" data-ofilter="30d">30 days</button>
           </div>
           <button class="btn btn-ghost" id="btnExportOrders"><i data-lucide="file-down" class="w-4 h-4"></i> Export CSV</button>
         </div>
 
         <article class="glass overflow-hidden">
           <div class="overflow-x-auto">
-            <table class="w-full text-sm min-w-[940px]">
+            <table class="w-full text-sm min-w-[940px] t-wide">
               <thead class="bg-slate-900/50"><tr>
                 <th class="table-th pl-5">Order ID</th><th class="table-th">Customer email</th><th class="table-th">Product</th>
-                <th class="table-th">Payment</th><th class="table-th">Amount</th><th class="table-th">Status</th>
+                <th class="table-th">Amount</th><th class="table-th">Status</th>
                 <th class="table-th">Date</th><th class="table-th text-right pr-5">Actions</th>
               </tr></thead>
               <tbody id="orderTable" class="divide-y divide-slate-800/60"></tbody>
@@ -583,7 +662,7 @@
           </div>
           <div id="orderEmpty" class="hidden p-12 text-center">
             <i data-lucide="receipt" class="w-10 h-10 mx-auto text-slate-600"></i>
-            <p class="mt-3 text-sm text-slate-400">No orders with this status.</p>
+            <p class="mt-3 text-sm text-slate-400">No purchases in this period yet.</p>
           </div>
         </article>
       </section>
@@ -603,10 +682,6 @@
                 <label for="keyFile" class="field-label">Hosted file</label>
                 <select id="keyFile" class="field" required></select>
               </div>
-              <div>
-                <label for="keyEmail" class="field-label">Customer email <span class="text-slate-600">(optional)</span></label>
-                <input id="keyEmail" type="email" class="field" placeholder="customer@example.com" />
-              </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label for="keyExpiry" class="field-label">Expires in</label>
@@ -620,11 +695,7 @@
                   <input id="keyMax" type="number" min="1" max="999" value="3" class="field" />
                 </div>
               </div>
-              <label class="flex items-center gap-2.5 text-xs text-slate-400 cursor-pointer select-none">
-                <input type="checkbox" id="keyIpBind" class="w-4 h-4 rounded accent-emerald-500" />
-                Bind to requester IP address
-              </label>
-              <button type="submit" class="btn btn-primary w-full"><i data-lucide="sparkles" class="w-4 h-4"></i> Generate access key</button>
+              <button type="submit" class="btn btn-primary w-full"><i data-lucide="sparkles" class="w-4 h-4"></i> Generate access link</button>
             </form>
           </article>
 
@@ -659,21 +730,7 @@
               </div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="providerCards" role="radiogroup" aria-label="Storage provider">
-              <button type="button" class="provider-card" data-provider="r2" role="radio" aria-checked="true">
-                <i data-lucide="cloud" class="w-5 h-5 text-orange-400"></i>
-                <span class="font-semibold text-sm">Cloudflare R2</span>
-                <span class="text-[11px] text-slate-500">Zero egress · S3 API</span>
-              </button>
-              <button type="button" class="provider-card" data-provider="s3" role="radio" aria-checked="false">
-                <i data-lucide="server" class="w-5 h-5 text-amber-400"></i>
-                <span class="font-semibold text-sm">AWS S3</span>
-                <span class="text-[11px] text-slate-500">Standard object storage</span>
-              </button>
-              <button type="button" class="provider-card" data-provider="local" role="radio" aria-checked="false">
-                <i data-lucide="hard-drive" class="w-5 h-5 text-emerald-400"></i>
-                <span class="font-semibold text-sm">Local disk</span>
-                <span class="text-[11px] text-slate-500">Self-hosted volume</span>
-              </button>
+              <!-- populated from /api/admin/providers at boot -->
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 pt-5 border-t border-slate-800/70" id="providerFields">
               <div>
@@ -708,28 +765,28 @@
               <div class="setting-row">
                 <div class="flex items-center gap-3 min-w-0">
                   <span class="w-9 h-9 rounded-xl bg-indigo-500/15 border border-indigo-500/30 grid place-items-center text-indigo-300 shrink-0"><i data-lucide="credit-card" class="w-4.5 h-4.5"></i></span>
-                  <div class="min-w-0"><p class="font-semibold text-sm">Stripe</p><p class="text-[11px] text-slate-500 font-mono truncate">pk_live_51O…9xQ</p></div>
+                  <div class="min-w-0 flex-1"><p class="font-semibold text-sm">Stripe</p><input id="gwStripe" name="gwStripe" class="field !py-1.5 !px-2.5 mt-1 text-[11px] font-mono" placeholder="pk_live_… publishable key" autocomplete="off" aria-label="Stripe publishable key"></div>
                 </div>
                 <button type="button" class="switch" role="switch" aria-checked="true" data-toggle="stripe" aria-label="Enable Stripe"></button>
               </div>
               <div class="setting-row">
                 <div class="flex items-center gap-3 min-w-0">
                   <span class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 grid place-items-center text-sky-300 shrink-0"><i data-lucide="wallet" class="w-4.5 h-4.5"></i></span>
-                  <div class="min-w-0"><p class="font-semibold text-sm">PayPal</p><p class="text-[11px] text-slate-500 font-mono truncate">ops@lazycloud.io</p></div>
+                  <div class="min-w-0 flex-1"><p class="font-semibold text-sm">PayPal</p><input id="gwPaypal" name="gwPaypal" class="field !py-1.5 !px-2.5 mt-1 text-[11px] font-mono" placeholder="merchant@email.com" autocomplete="off" aria-label="PayPal merchant email"></div>
                 </div>
                 <button type="button" class="switch" role="switch" aria-checked="true" data-toggle="paypal" aria-label="Enable PayPal"></button>
               </div>
               <div class="setting-row">
                 <div class="flex items-center gap-3 min-w-0">
                   <span class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 grid place-items-center text-amber-300 shrink-0"><i data-lucide="bitcoin" class="w-4.5 h-4.5"></i></span>
-                  <div class="min-w-0"><p class="font-semibold text-sm">Crypto (BTC / USDT)</p><p class="text-[11px] text-slate-500 font-mono truncate">bc1q…7f4d</p></div>
+                  <div class="min-w-0 flex-1"><p class="font-semibold text-sm">Crypto (BTC / USDT)</p><input id="gwCrypto" name="gwCrypto" class="field !py-1.5 !px-2.5 mt-1 text-[11px] font-mono" placeholder="BTC or USDT wallet address" autocomplete="off" aria-label="Crypto wallet address"></div>
                 </div>
                 <button type="button" class="switch" role="switch" aria-checked="false" data-toggle="crypto" aria-label="Enable crypto payments"></button>
               </div>
               <div class="setting-row">
                 <div class="flex items-center gap-3 min-w-0">
                   <span class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-300 shrink-0"><i data-lucide="smartphone" class="w-4.5 h-4.5"></i></span>
-                  <div class="min-w-0"><p class="font-semibold text-sm">bKash / Nagad</p><p class="text-[11px] text-slate-500 font-mono truncate">017XX-XXXXXX</p></div>
+                  <div class="min-w-0 flex-1"><p class="font-semibold text-sm">bKash / Nagad</p><input id="gwBkash" name="gwBkash" class="field !py-1.5 !px-2.5 mt-1 text-[11px] font-mono" placeholder="01XXXXXXXXX" autocomplete="off" aria-label="bKash or Nagad number"></div>
                 </div>
                 <button type="button" class="switch" role="switch" aria-checked="true" data-toggle="bkash" aria-label="Enable bKash"></button>
               </div>
@@ -787,7 +844,7 @@
 
 <!-- ═══════════════ NOTIFICATION DRAWER ═══════════════ -->
 <div id="notifBackdrop" class="fixed inset-0 z-[60] bg-slate-950/60 backdrop-blur-sm hidden" aria-hidden="true"></div>
-<aside id="notifDrawer" class="fixed top-0 right-0 z-[70] h-full w-full sm:w-96 translate-x-full transition-transform duration-300 glass !rounded-none flex flex-col" aria-label="Notifications">
+<aside id="notifDrawer" class="fixed top-0 right-0 z-[70] h-full w-full sm:w-96 transition-transform duration-300 glass !rounded-none flex flex-col" aria-label="Notifications">
   <div class="flex items-center justify-between px-5 py-4 border-b border-slate-800/80">
     <div class="flex items-center gap-2.5">
       <i data-lucide="bell-ring" class="w-4.5 h-4.5 text-emerald-400"></i>
@@ -838,8 +895,7 @@
         <textarea id="pDesc" class="field resize-y min-h-[72px]" maxlength="280" placeholder="What's inside, who it's for…"></textarea>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label for="pPrice" class="field-label">Price (USD)</label>
+        <div>            <label for="pPrice" class="field-label">Price (coins)</label>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-mono">$</span>
             <input id="pPrice" type="number" min="0" step="0.01" value="0" class="field pl-7 font-mono" />
@@ -864,7 +920,7 @@
         </div>
       </div>
       <div class="pt-1">
-        <p class="field-label"> merchandising</p>
+        <p class="field-label">Merchandising</p>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label class="toggle-card"><input type="checkbox" id="pFeatured" class="w-4 h-4 rounded accent-amber-400" /><span><strong>Featured</strong><em>Pin to storefront hero</em></span></label>
           <label class="toggle-card"><input type="checkbox" id="pDiscount" class="w-4 h-4 rounded accent-sky-400" /><span><strong>Discounted</strong><em>Show strike-through price</em></span></label>
@@ -963,7 +1019,7 @@
       <p class="mt-4 text-sm sm:text-base text-slate-400 max-w-xl mx-auto">Source code, courses, ebooks and design assets — pay once, download forever. No subscription.</p>
       <div class="mt-7 flex flex-wrap justify-center gap-3">
         <a href="#storeGrid" class="btn btn-primary !py-2.5 !px-6">Browse files <i data-lucide="arrow-down" class="w-4 h-4"></i></a>
-        <span class="inline-flex items-center gap-2 text-xs text-slate-500 font-mono self-center"><i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> 2,940+ happy buyers</span>
+        <span class="inline-flex items-center gap-2 text-xs text-slate-500 font-mono self-center"><i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i> <span id="storeBuyers">—</span></span>
       </div>
     </section>
 
@@ -978,7 +1034,48 @@
 
     <footer class="border-t border-slate-800/70 py-6 text-center text-[11px] text-slate-500 font-mono">
       © 2026 LazyStore · secured by Lazy Cloud edge network
+      <p class="mt-2"><a href="/shop" class="text-emerald-300 hover:underline">Open the live LazyDrop store →</a></p>
     </footer>
+  </div>
+</div>
+
+<!-- ═══════════════ BOOT + LOGIN ═══════════════ -->
+<div id="bootScreen" class="fixed inset-0 z-[120] bg-slate-950/92 backdrop-blur-sm grid place-items-center">
+  <div class="text-center">
+    <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br from-emerald-400 to-sky-500 grid place-items-center shadow-glow animate-pulse">
+      <i data-lucide="cloud" class="w-6 h-6 text-slate-950"></i>
+    </div>
+    <p class="mt-4 text-sm font-semibold">Connecting to Lazy Cloud…</p>
+    <p class="mt-1 text-xs text-slate-500 font-mono">syncing database · files · ledger</p>
+  </div>
+</div>
+
+<div id="loginModal" class="fixed inset-0 z-[95] hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <div class="glass w-full max-w-sm p-6 view-enter">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-sky-500 grid place-items-center shrink-0"><i data-lucide="cloud" class="w-5 h-5 text-slate-950"></i></span>
+      <div>
+        <h2 id="loginTitle" class="font-bold">Admin sign in</h2>
+        <p class="text-xs text-slate-400">Dashboard access to the Lazy Cloud database</p>
+      </div>
+    </div>
+    <form id="loginForm" class="space-y-3.5">
+      <div>
+        <label for="loginUser" class="field-label">Username</label>
+        <input id="loginUser" class="field" autocomplete="username" required />
+      </div>
+      <div>
+        <label for="loginPass" class="field-label">Password</label>
+        <input id="loginPass" type="password" class="field" autocomplete="current-password" required />
+      </div>
+      <div id="loginTotpWrap" class="hidden">
+        <label for="loginTotp" class="field-label">Authenticator code</label>
+        <input id="loginTotp" inputmode="numeric" maxlength="6" class="field font-mono" placeholder="123456" />
+      </div>
+      <p id="loginError" class="hidden text-xs text-rose-300"></p>
+      <button type="submit" class="btn btn-primary w-full"><i data-lucide="log-in" class="w-4 h-4"></i> Sign in &amp; sync</button>
+    </form>
+    <p class="mt-4 text-[11px] text-slate-500 text-center">Same admin account as the <a href="/admin" class="text-sky-300 hover:underline">admin panel</a>.</p>
   </div>
 </div>
 
@@ -994,7 +1091,7 @@
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const uid = (p) => `${p}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-  const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' ◎';
   const bytes = (b) => {
     if (b < 1024) return b + ' B';
     const u = ['KB', 'MB', 'GB', 'TB']; let i = -1;
@@ -1019,7 +1116,12 @@
   const fileIcon = (mime) => mime.startsWith('video/') ? 'file-video' : mime.startsWith('image/') ? 'file-image'
     : mime.startsWith('audio/') ? 'file-audio' : mime.includes('pdf') ? 'file-text'
     : mime.includes('zip') || mime.includes('compress') ? 'file-archive' : 'file';
-  const tokenGen = () => 'LC-' + Array.from({ length: 2 }, () => Math.random().toString(36).slice(2, 6).toUpperCase()).join('-');
+  const tagOf = (f) => !f ? 'Digital file'
+    : f.mime.startsWith('video/') ? 'Video course'
+    : f.mime.includes('pdf') ? 'Ebook'
+    : f.mime.includes('zip') || f.mime.includes('compress') ? 'Source code'
+    : f.mime.startsWith('image/') || f.mime.includes('photoshop') || f.mime.includes('figma') ? 'Design assets'
+    : 'Digital file';
 
   function toast(msg, kind = 'success') {
     const tone = kind === 'error' ? 'border-rose-500/45 !text-rose-300'
@@ -1042,55 +1144,174 @@
   const now = Date.now();
   const state = {
     tab: 'overview', folder: 'All', pFilter: 'all', oFilter: 'all',
-    revenue: 48250.75,
+    revenue: 0,
     chartRange: '12w',
-    charts: {
-      '12w': [2100, 3400, 2900, 4100, 3700, 5200, 4600, 6480, 5100, 4300, 3900, 2450],
-      '6m':  [11200, 14800, 13100, 17600, 19400, 21350],
-      '1y':  [9800, 12400, 11100, 15800, 14200, 17900, 16400, 20100, 19300, 22400, 21700, 24600],
-    },
-    folders: ['Courses', 'Software', 'Design', 'Ebooks'],
-    files: [
-      { id:'f-01', name:'react-saas-starter-v3.zip', folder:'Software', size:84_300_000, mime:'application/zip', date: now - 2 * DAY, privacy:'public' },
-      { id:'f-02', name:'ultimate-node-course-4k.mp4', folder:'Courses', size:4_210_000_000, mime:'video/mp4', date: now - 5 * DAY, privacy:'private' },
-      { id:'f-03', name:'ui-kit-design-assets.fig', folder:'Design', size:126_400_000, mime:'application/octet-stream', date: now - 9 * DAY, privacy:'public' },
-      { id:'f-04', name:'seo-growth-ebook.pdf', folder:'Ebooks', size:8_912_000, mime:'application/pdf', date: now - 12 * DAY, privacy:'public' },
-      { id:'f-05', name:'analytics-dashboard-pro.zip', folder:'Software', size:52_440_000, mime:'application/zip', date: now - 16 * DAY, privacy:'private' },
-      { id:'f-06', name:'brand-motion-templates.zip', folder:'Design', size:311_000_000, mime:'application/zip', date: now - 21 * DAY, privacy:'public' },
-    ],
-    products: [
-      { id:'PRD-1041', title:'React SaaS Starter Kit', desc:'Next.js 15 + TypeScript boilerplate with auth, billing and admin.', price:49, old:79, fileId:'f-01', maxDl:3, expiry:30, featured:true, discounted:true, unlisted:false, sales:142, tag:'Source code' },
-      { id:'PRD-1042', title:'The Ultimate Node Course', desc:'12-hour 4K course: APIs, queues, testing and production deploys.', price:89, old:0, fileId:'f-02', maxDl:5, expiry:60, featured:true, discounted:false, unlisted:false, sales:76, tag:'Video course' },
-      { id:'PRD-1043', title:'Figma UI Kit — Nebula', desc:'120+ responsive components, variants, tokens and auto-layout.', price:29, old:0, fileId:'f-03', maxDl:5, expiry:30, featured:false, discounted:false, unlisted:false, sales:210, tag:'Design assets' },
-      { id:'PRD-1044', title:'SEO Growth Playbook 2026', desc:'84-page ebook with checklists, scripts and templates.', price:0, old:0, fileId:'f-04', maxDl:10, expiry:0, featured:false, discounted:false, unlisted:false, sales:1032, tag:'Ebook' },
-      { id:'PRD-1045', title:'Analytics Dashboard Pro', desc:'Export-ready admin dashboard source with charts and tables.', price:39, old:59, fileId:'f-05', maxDl:3, expiry:30, featured:false, discounted:true, unlisted:false, sales:58, tag:'Source code' },
-      { id:'PRD-1046', title:'Brand Motion Templates', desc:'After Effects + Lottie motion pack for product launches.', price:59, old:0, fileId:'f-06', maxDl:2, expiry:14, featured:false, discounted:false, unlisted:true, sales:12, tag:'Design assets' },
-    ],
-    orders: [
-      { id:'ORD-7741', email:'sara.k@gmail.com', productId:'PRD-1041', amount:49, method:'Card', status:'completed', date: now - 2 * 3600e3 },
-      { id:'ORD-7740', email:'dev.rafi@proton.me', productId:'PRD-1042', amount:89, method:'PayPal', status:'completed', date: now - 7 * 3600e3 },
-      { id:'ORD-7739', email:'nadia.t@gmail.com', productId:'PRD-1043', amount:29, method:'bKash', status:'completed', date: now - 26 * 3600e3 },
-      { id:'ORD-7738', email:'omar.h@yahoo.com', productId:'PRD-1045', amount:39, method:'Card', status:'refunded', date: now - 2 * DAY },
-      { id:'ORD-7737', email:'jules@example.com', productId:'PRD-1041', amount:49, method:'Crypto', status:'completed', date: now - 2.4 * DAY },
-      { id:'ORD-7736', email:'mim.akter@gmail.com', productId:'PRD-1042', amount:89, method:'bKash', status:'expired', date: now - 3 * DAY },
-      { id:'ORD-7735', email:'tom.p@mailbox.org', productId:'PRD-1043', amount:29, method:'Card', status:'completed', date: now - 4 * DAY },
-      { id:'ORD-7734', email:'lina.w@studio.io', productId:'PRD-1045', amount:39, method:'PayPal', status:'expired', date: now - 5 * DAY },
-    ],
-    links: [
-      { token:'LC-Q7F3-K9QZ', fileId:'f-01', email:'sara.k@gmail.com', downloads:1, maxDl:3, expires: now + 6 * DAY, status:'active', ip:false },
-      { token:'LC-M2XB-4T1P', fileId:'f-04', email:'jules@example.com', downloads:2, maxDl:10, expires: now + 28 * DAY, status:'active', ip:true },
-      { token:'LC-H8WD-R6VN', fileId:'f-03', email:'nadia.t@gmail.com', downloads:5, maxDl:5, expires: now + 4 * DAY, status:'active', ip:false },
-      { token:'LC-Z3KL-8C2M', fileId:'f-02', email:'omar.h@yahoo.com', downloads:0, maxDl:5, expires: now - 1 * DAY, status:'expired', ip:false },
-    ],
-    notifs: [
-      { id:'n1', icon:'shopping-bag', tone:'emerald', title:'New sale · $49.00', body:'sara.k bought React SaaS Starter Kit', date: now - 12 * 60e3, read:false },
-      { id:'n2', icon:'hard-drive', tone:'sky', title:'Storage milestone', body:'Bucket lazy-prod crossed 400 GB', date: now - 3 * 3600e3, read:false },
-      { id:'n3', icon:'shield-alert', tone:'rose', title:'Link revoked', body:'LC-Z3KL-8C2M expired without full downloads', date: now - 6 * 3600e3, read:false },
-      { id:'n4', icon:'badge-check', tone:'indigo', title:'Payout processed', body:'$1,240.00 settled to bank ••4291', date: now - DAY, read:true },
-      { id:'n5', icon:'upload-cloud', tone:'amber', title:'Batch upload finished', body:'6 files synced to Cloudflare R2', date: now - 2 * DAY, read:true },
-    ],
-    settings: { provider:'r2', stripe:true, paypal:true, crypto:false, bkash:true, ipBinding:false, password:false, throttle:'off' },
+    charts: { '12w': new Array(12).fill(0), '6m': new Array(6).fill(0), '1y': new Array(12).fill(0) },
+    folders: [],
+    files: [],       // ← /api/admin/catalog   (1 hosted file = 1 storefront listing)
+    products: [],    // same objects as files, kept for the product renders
+    orders: [],      // ← /api/admin/purchases (store ledger)
+    links: [],       // ← /api/admin/shares    (revocable download links)
+    notifs: [],
+    users: [],       // ← /api/admin/users
+    audit: [],       // ← /api/admin/audit-log
+    refunds: 0,
+    providers: [],   // ← /api/admin/providers
+    selectedProviderId: null,
+    stats: { files: 0, bytes: 0, downloads: 0, served: 0, used: 0, capacity: 0 },
+    settings: { stripe: false, paypal: false, crypto: false, bkash: false, ipBinding: false, password: false, throttle: 'off', folders: [], stripeKey: '', paypalEmail: '', cryptoAddress: '', bkashNumber: '' },
+    readNotifs: new Set(),
   };
+
+  /* ═══════════ Database access ═══════════ */
+
+  const TOKEN_KEY = 'admin_token';
+  const token = () => localStorage.getItem(TOKEN_KEY) || '';
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+        ...(opts.headers || {}),
+      },
+    });
+    if (res.status === 401) { const e = new Error('Unauthorized'); e.status = 401; throw e; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { const e = new Error(data.error || `Request failed (${res.status})`); e.status = res.status; throw e; }
+    return data;
+  }
+
+  /** Pull every dynamic view straight from the database. */
+  async function refresh() {
+    const [cat, pur, shr, usr, stt, prv, aud, sts] = await Promise.all([
+      api('/api/admin/catalog'),
+      api('/api/admin/purchases'),
+      api('/api/admin/shares'),
+      api('/api/admin/users'),
+      api('/api/admin/settings'),
+      api('/api/admin/providers'),
+      api('/api/admin/audit-log?limit=50'),
+      api('/api/admin/stats'),
+    ]);
+
+    // ── Files + storefront listings ──
+    state.files = (cat.items || []).map((f) => ({
+      id: f.id,
+      fileId: f.id,
+      name: f.original_name,
+      title: f.original_name,
+      folder: f.folder || 'General',
+      size: Number(f.file_size) || 0,
+      mime: f.mime_type || 'application/octet-stream',
+      date: new Date(f.created_at).getTime(),
+      listed: !!f.listed,
+      description: f.description || '',
+      desc: f.description || '',
+      price: Number(f.price_coins) || 0,
+      old: Number(f.old_price) || 0,
+      featured: !!f.featured,
+      maxDl: Number(f.max_downloads) || 3,
+      expiry: Number(f.expiry_days) || 0,
+      sales: Number(f.sales) || 0,
+      downloads: Number(f.download_count) || 0,
+    }));
+    state.products = state.files;
+
+    // ── Store ledger ──
+    state.orders = (pur.purchases || []).map((p) => ({
+      id: p.id,
+      ref: 'ORD-' + String(p.id).replace(/-/g, '').slice(0, 8).toUpperCase(),
+      email: p.buyer_email || p.buyer_username || 'unknown',
+      buyer: p.buyer_username || '',
+      productId: p.file_id,
+      amount: Number(p.price_paid) || 0,
+      status: 'completed',
+      date: new Date(p.created_at).getTime(),
+    }));
+    state.revenue = state.orders.reduce((s, o) => s + (o.status === 'completed' ? o.amount : 0), 0);
+
+    // ── Revocable download links ──
+    state.links = (shr.shares || []).map((s) => ({
+      token: s.id,
+      fileId: s.file_id,
+      fileName: s.file_name,
+      downloads: Number(s.download_count) || 0,
+      maxDl: Number(s.download_limit) || 0,
+      expires: s.expires_at ? new Date(s.expires_at).getTime() : null,
+      status: 'active',
+    }));
+
+    // ── People, providers, preferences ──
+    state.users = usr || [];
+    state.providers = prv.providers || [];
+    if (!state.providers.some((p) => p.id === state.selectedProviderId)) {
+      const active = state.providers.find((p) => p.is_active) || state.providers[0];
+      state.selectedProviderId = active ? active.id : null;
+    }
+    state.settings = { ...state.settings, ...(stt.settings && stt.settings.dashboard) };
+    state.audit = aud.logs || [];
+    state.refunds = state.audit.filter((l) => String(l.action || '').includes('refund')).length;
+    state.folders = [...new Set([...(state.settings.folders || []), ...state.files.map((f) => f.folder)])].filter(Boolean);
+
+    // ── Aggregate stats ──
+    state.stats = {
+      files: Number(sts.files.total_files) || 0,
+      bytes: Number(sts.files.total_bytes) || 0,
+      downloads: Number(sts.files.total_downloads) || 0,
+      used: Number(sts.providers.used_bytes) || 0,
+      capacity: Number(sts.providers.capacity_bytes) || 0,
+      served: state.files.reduce((s, f) => s + f.size * f.downloads, 0),
+    };
+
+    state.notifs = buildNotifs();
+    computeCharts();
+  }
+
+  /** Activity feed = audit log + real sales + real uploads. */
+  function buildNotifs() {
+    const items = [];
+    state.audit.forEach((l) => items.push({
+      id: 'log:' + l.id, icon: 'scroll-text', tone: 'indigo',
+      title: String(l.action || 'activity').replace(/[._-]/g, ' '),
+      body: l.details || 'Recorded in the audit log',
+      date: new Date(l.created_at).getTime(),
+    }));
+    state.orders.slice(0, 6).forEach((o) => items.push({
+      id: 'sale:' + o.id, icon: 'shopping-bag', tone: 'emerald',
+      title: `New sale · ${money(o.amount)}`,
+      body: `${o.buyer} bought ${fileName(o.productId)}`,
+      date: o.date,
+    }));
+    state.files.slice(0, 6).forEach((f) => items.push({
+      id: 'file:' + f.id, icon: 'upload-cloud', tone: 'sky',
+      title: 'File synced', body: `${f.name} → /${f.folder.toLowerCase()}`,
+      date: f.date,
+    }));
+    items.sort((a, b) => b.date - a.date);
+    return items.slice(0, 14).map((n) => ({ ...n, read: state.readNotifs.has(n.id) }));
+  }
+
+  /** Bucket real purchases into the 12w / 6m / 1y chart ranges. */
+  function computeCharts() {
+    const now = Date.now(), week = 7 * DAY, m30 = 30 * DAY;
+    const c12 = new Array(12).fill(0), c6 = new Array(6).fill(0), c1y = new Array(12).fill(0);
+    const today = new Date();
+    state.orders.forEach((o) => {
+      if (o.status !== 'completed') return;
+      const age = now - o.date;
+      const wi = 11 - Math.floor(age / week);
+      if (wi >= 0 && wi < 12) c12[wi] += o.amount;
+      const bi = 5 - Math.floor(age / m30);
+      if (bi >= 0 && bi < 6) c6[bi] += o.amount;
+      const d = new Date(o.date);
+      const back = (today.getFullYear() - d.getFullYear()) * 12 + (today.getMonth() - d.getMonth());
+      const yi = 11 - back;
+      if (yi >= 0 && yi < 12) c1y[yi] += o.amount;
+    });
+    state.charts = { '12w': c12, '6m': c6, '1y': c1y };
+  }
 
   const productById = (id) => state.products.find((p) => p.id === id);
   const fileById = (id) => state.files.find((f) => f.id === id);
@@ -1119,26 +1340,26 @@
     $('#fileEmpty').classList.toggle('hidden', rows.length > 0);
     $('#fileTable').innerHTML = rows.map((f) => `
       <tr class="row-hover" data-row="${f.id}">
-        <td class="pl-5 py-3">
+        <td data-label="" class="pl-5 py-3">
           <div class="flex items-center gap-3 min-w-0">
             <span class="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-700/70 grid place-items-center text-sky-300 shrink-0"><i data-lucide="${fileIcon(f.mime)}" class="w-4 h-4"></i></span>
             <div class="min-w-0">
               <p class="font-medium truncate max-w-[240px]">${esc(f.name)}</p>
-              <p class="text-[11px] text-slate-500 font-mono truncate">/${esc(f.folder.toLowerCase())}/${f.id}</p>
+              <p class="text-[11px] text-slate-500 font-mono truncate">/${esc(f.folder.toLowerCase())}/${f.id.slice(0, 8)}</p>
             </div>
           </div>
         </td>
-        <td class="font-mono text-xs text-slate-300 whitespace-nowrap">${bytes(f.size)}</td>
-        <td><code class="text-[10.5px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/70 text-slate-400 whitespace-nowrap">${esc(f.mime)}</code></td>
-        <td class="text-xs text-slate-400 whitespace-nowrap">${dateFmt(f.date)}</td>
-        <td>
+        <td data-label="Size" class="font-mono text-xs text-slate-300 whitespace-nowrap">${bytes(f.size)}</td>
+        <td data-label="MIME type"><code class="text-[10.5px] font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/70 text-slate-400 whitespace-nowrap">${esc(f.mime)}</code></td>
+        <td data-label="Uploaded" class="text-xs text-slate-400 whitespace-nowrap">${dateFmt(f.date)}</td>
+        <td data-label="Visibility">
           <div class="flex items-center gap-2">
-            <button class="switch" role="switch" aria-checked="${f.privacy === 'public'}" data-action="privacy" data-id="${f.id}"
-              aria-label="${f.privacy === 'public' ? 'Public — click to make private' : 'Private — click to make public'}"></button>
-            <span class="text-[11px] font-mono ${f.privacy === 'public' ? 'text-emerald-300' : 'text-slate-500'}">${f.privacy}</span>
+            <button class="switch" role="switch" aria-checked="${f.listed}" data-action="privacy" data-id="${f.id}"
+              aria-label="${f.listed ? 'Listed in store — click to move to draft' : 'Draft — click to list in store'}"></button>
+            <span class="text-[11px] font-mono ${f.listed ? 'text-emerald-300' : 'text-slate-500'}">${f.listed ? 'listed' : 'draft'}</span>
           </div>
         </td>
-        <td class="pr-5 py-3">
+        <td data-label="" class="pr-5 py-3">
           <div class="flex items-center justify-end gap-1.5">
             <button class="icon-btn" data-action="link" data-id="${f.id}" title="One-time download link" aria-label="Generate one-time link for ${esc(f.name)}"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
             <button class="icon-btn" data-action="price" data-id="${f.id}" title="Set price tag" aria-label="Set price for ${esc(f.name)}"><i data-lucide="tag" class="w-3.5 h-3.5"></i></button>
@@ -1158,8 +1379,8 @@
 
   function productMatches(p) {
     if (state.pFilter === 'featured') return p.featured;
-    if (state.pFilter === 'discounted') return p.discounted;
-    if (state.pFilter === 'unlisted') return p.unlisted;
+    if (state.pFilter === 'discounted') return p.old > 0 && p.old > p.price;
+    if (state.pFilter === 'unlisted') return !p.listed;
     if (state.pFilter === 'free') return p.price === 0;
     return true;
   }
@@ -1171,8 +1392,8 @@
       const f = fileById(p.fileId);
       const badges = [
         p.featured ? '<span class="badge-amber"><i data-lucide="star" class="w-3 h-3"></i>Featured</span>' : '',
-        p.discounted && p.old ? `<span class="badge-sky">-${Math.round((1 - p.price / p.old) * 100)}%</span>` : '',
-        p.unlisted ? '<span class="badge-slate"><i data-lucide="eye-off" class="w-3 h-3"></i>Unlisted</span>' : '',
+        p.old > 0 && p.old > p.price ? `<span class="badge-sky">-${Math.round((1 - p.price / p.old) * 100)}%</span>` : '',
+        !p.listed ? '<span class="badge-slate"><i data-lucide="eye-off" class="w-3 h-3"></i>Draft</span>' : '',
       ].join('');
       return `<article class="glass glass-hover overflow-hidden flex flex-col">
         <div class="relative h-24 bg-gradient-to-br ${COVERS[i % COVERS.length]} border-b border-slate-800/70">
@@ -1180,19 +1401,19 @@
             <span class="w-12 h-12 rounded-2xl bg-slate-950/60 border border-slate-700/70 grid place-items-center text-emerald-300"><i data-lucide="${fileIcon(f ? f.mime : 'application/octet-stream')}" class="w-6 h-6"></i></span>
           </div>
           <div class="absolute top-2.5 left-2.5 flex gap-1.5">${badges}</div>
-          <span class="absolute top-2.5 right-2.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/70 border border-slate-700/70 text-slate-300">${esc(p.tag)}</span>
+          <span class="absolute top-2.5 right-2.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/70 border border-slate-700/70 text-slate-300">${esc(tagOf(p))}</span>
         </div>
         <div class="p-4 flex-1 flex flex-col">
           <div class="flex items-start justify-between gap-2">
             <h3 class="font-semibold text-sm leading-snug">${esc(p.title)}</h3>
             <span class="font-mono font-bold text-sm whitespace-nowrap ${p.price === 0 ? 'text-emerald-300' : 'text-white'}">
-              ${p.discounted && p.old ? `<s class="text-slate-500 font-normal mr-1">$${p.old}</s>` : ''}
+              ${p.old > 0 && p.old > p.price ? `<s class="text-slate-500 font-normal mr-1">${money(p.old)}</s>` : ''}
               ${p.price === 0 ? 'FREE' : money(p.price)}
             </span>
           </div>
-          <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">${esc(p.desc)}</p>
+          <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed">${esc(p.description || 'Hosted digital file, delivered instantly after checkout.')}</p>
           <div class="mt-3 flex flex-wrap gap-1.5 text-[10.5px] font-mono">
-            <span class="px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/70 text-slate-400 truncate max-w-[150px]">${esc(f ? f.name : 'missing')}</span>
+            <span class="px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/70 text-slate-400 truncate max-w-[150px]">/${esc(p.folder.toLowerCase())}</span>
             <span class="px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/70 text-slate-400">${p.maxDl} dl</span>
             <span class="px-1.5 py-0.5 rounded bg-slate-800/70 border border-slate-700/70 text-slate-400">${p.expiry ? p.expiry + 'd' : '∞'}</span>
           </div>
@@ -1211,34 +1432,29 @@
   }
 
   function renderOrders() {
-    const counts = { completed: 0, refunded: 0, expired: 0 };
-    let net = 0;
-    state.orders.forEach((o) => { counts[o.status] = (counts[o.status] || 0) + 1; if (o.status === 'completed') net += o.amount; });
-    $('#statCompleted').textContent = counts.completed;
-    $('#statRefunded').textContent = counts.refunded;
-    $('#statExpired').textContent = counts.expired;
-    $('#statNet').textContent = money(net);
-
+    const cuts = { today: Date.now() - new Date().setHours(0, 0, 0, 0), '7d': 7 * DAY, '30d': 30 * DAY };
     const list = state.orders
-      .filter((o) => state.oFilter === 'all' || o.status === state.oFilter)
+      .filter((o) => state.oFilter === 'all' || (Date.now() - o.date) <= cuts[state.oFilter])
       .sort((a, b) => b.date - a.date);
+    $('#statCompleted').textContent = state.orders.filter((o) => o.status === 'completed').length;
+    $('#statRefunded').textContent = state.refunds;
+    $('#statCustomers').textContent = state.users.length;
+    $('#statNet').textContent = money(state.revenue);
     $('#orderEmpty').classList.toggle('hidden', list.length > 0);
     $('#orderTable').innerHTML = list.map((o) => {
       const p = productById(o.productId);
-      const methodIcon = o.method === 'Card' ? 'credit-card' : o.method === 'PayPal' ? 'wallet' : o.method === 'Crypto' ? 'bitcoin' : 'smartphone';
       return `<tr class="row-hover">
-        <td class="pl-5 py-3 font-mono text-xs text-emerald-300 whitespace-nowrap">${o.id}</td>
-        <td class="text-xs">${esc(o.email)}</td>
-        <td class="text-xs font-medium max-w-[180px] truncate">${esc(p ? p.title : '—')}</td>
-        <td class="text-xs"><span class="inline-flex items-center gap-1.5 text-slate-400 whitespace-nowrap"><i data-lucide="${methodIcon}" class="w-3.5 h-3.5"></i>${esc(o.method)}</span></td>
-        <td class="font-mono text-xs ${o.status === 'refunded' ? 'text-rose-300' : 'text-slate-200'} whitespace-nowrap">${o.status === 'refunded' ? '-' : ''}${money(o.amount)}</td>
-        <td>${statusPill(o.status)}</td>
-        <td class="text-[11px] text-slate-500 whitespace-nowrap">${timeAgo(o.date)}</td>
-        <td class="pr-5">
+        <td data-label="" class="pl-5 py-3 font-mono text-xs text-emerald-300 whitespace-nowrap">${o.ref}</td>
+        <td data-label="Customer" class="text-xs">${esc(o.email)}</td>
+        <td data-label="Product" class="text-xs font-medium max-w-[180px] truncate">${esc(p ? p.title : '—')}</td>
+        <td data-label="Amount" class="font-mono text-xs text-slate-200 whitespace-nowrap">${money(o.amount)}</td>
+        <td data-label="Status">${statusPill(o.status)}</td>
+        <td data-label="Date" class="text-[11px] text-slate-500 whitespace-nowrap">${timeAgo(o.date)}</td>
+        <td data-label="" class="pr-5">
           <div class="flex items-center justify-end gap-1.5">
-            <button class="icon-btn" data-oaction="view" data-id="${o.id}" title="Order details" aria-label="View ${o.id}"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
-            <button class="icon-btn" data-oaction="copy" data-id="${o.id}" title="Copy access link" aria-label="Copy access link for ${o.id}"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
-            <button class="icon-btn danger" data-oaction="refund" data-id="${o.id}" title="Refund" aria-label="Refund ${o.id}" ${o.status !== 'completed' ? 'disabled style="opacity:.35;cursor:not-allowed"' : ''}><i data-lucide="undo-2" class="w-3.5 h-3.5"></i></button>
+            <button class="icon-btn" data-oaction="view" data-id="${o.id}" title="Order details" aria-label="View ${o.ref}"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+            <button class="icon-btn" data-oaction="copy" data-id="${o.id}" title="Copy access link" aria-label="Copy access link for ${o.ref}"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
+            <button class="icon-btn danger" data-oaction="refund" data-id="${o.id}" title="Refund" aria-label="Refund ${o.ref}" ${o.status !== 'completed' ? 'disabled style="opacity:.35;cursor:not-allowed"' : ''}><i data-lucide="undo-2" class="w-3.5 h-3.5"></i></button>
           </div>
         </td>
       </tr>`;
@@ -1258,15 +1474,14 @@
         <span class="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-700/70 grid place-items-center text-emerald-300 shrink-0"><i data-lucide="${st === 'active' ? 'link' : 'link-2-off'}" class="w-4 h-4"></i></span>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <code class="font-mono text-xs text-emerald-300">${l.token}</code>
+            <code class="font-mono text-xs text-emerald-300 truncate">${esc(String(l.token).slice(0, 13))}…</code>
             ${statusPill(st)}
-            ${l.ip ? '<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">IP-bound</span>' : ''}
           </div>
-          <p class="text-[11px] text-slate-500 mt-1 truncate">${esc(fileName(l.fileId))} · ${l.email ? esc(l.email) : 'anonymous'} · ${l.downloads}/${l.maxDl} downloads · expires ${l.expires ? dateFmt(l.expires) : 'never'}</p>
+          <p class="text-[11px] text-slate-500 mt-1 truncate">${esc(l.fileName || fileName(l.fileId))} · ${l.downloads}/${l.maxDl || '∞'} downloads · expires ${l.expires ? dateFmt(l.expires) : 'never'}</p>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">
-          <button class="icon-btn" data-laction="copy" data-token="${l.token}" title="Copy link" aria-label="Copy link ${l.token}"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
-          <button class="icon-btn danger" data-laction="revoke" data-token="${l.token}" title="Revoke link" aria-label="Revoke link ${l.token}" ${l.status !== 'active' ? 'disabled style="opacity:.35;cursor:not-allowed"' : ''}><i data-lucide="ban" class="w-3.5 h-3.5"></i></button>
+          <button class="icon-btn" data-laction="copy" data-token="${l.token}" title="Copy link" aria-label="Copy link"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+          <button class="icon-btn danger" data-laction="revoke" data-token="${l.token}" title="Revoke link" aria-label="Revoke link" ${l.status !== 'active' ? 'disabled style="opacity:.35;cursor:not-allowed"' : ''}><i data-lucide="ban" class="w-3.5 h-3.5"></i></button>
         </div>
       </div>`;
     }).join('');
@@ -1275,32 +1490,47 @@
 
   function renderSalesStream() {
     const list = [...state.orders].sort((a, b) => b.date - a.date).slice(0, 6);
+    if (!list.length) {
+      $('#salesStream').innerHTML = '<tr><td data-label="" colspan="5" class="px-5 py-8 text-center text-xs text-slate-500 font-mono">No sales yet — purchases appear here the moment they land.</td></tr>';
+      icons();
+      return;
+    }
     $('#salesStream').innerHTML = list.map((o) => {
       const p = productById(o.productId);
       const linkState = o.status === 'completed' ? 'active' : o.status === 'refunded' ? 'revoked' : 'expired';
       return `<tr class="row-hover">
-        <td class="px-5 py-3 text-xs font-mono text-slate-300">${esc(o.email)}</td>
-        <td class="px-5 py-3 text-xs font-medium">${esc(p ? p.title : '—')}</td>
-        <td class="px-5 py-3 font-mono text-xs ${o.amount ? 'text-emerald-300' : 'text-slate-500'}">${money(o.amount)}</td>
-        <td class="px-5 py-3 text-[11px] text-slate-500">${timeAgo(o.date)}</td>
-        <td class="px-5 py-3">${statusPill(linkState)}</td>
+        <td data-label="" class="px-5 py-3 text-xs font-mono text-slate-300">${esc(o.email)}</td>
+        <td data-label="File purchased" class="px-5 py-3 text-xs font-medium">${esc(p ? p.title : '—')}</td>
+        <td data-label="Price" class="px-5 py-3 font-mono text-xs ${o.amount ? 'text-emerald-300' : 'text-slate-500'}">${money(o.amount)}</td>
+        <td data-label="When" class="px-5 py-3 text-[11px] text-slate-500">${timeAgo(o.date)}</td>
+        <td data-label="Access link" class="px-5 py-3">${statusPill(linkState)}</td>
       </tr>`;
     }).join('');
     icons();
   }
 
   function renderChart() {
-    const data = state.charts[state.chartRange];
+    const data = state.charts[state.chartRange] || [];
     const max = Math.max(...data);
-    $('#revenueChart').innerHTML = data.map((v, i) => `
-      <div class="flex-1 h-full flex flex-col justify-end group relative" title="Week ${i + 1}: ${money(v)}">
+    const host = $('#revenueChart');
+    if (!max) {
+      host.innerHTML = '<div class="h-44 grid place-items-center text-xs font-mono text-slate-600">no sales recorded in this range yet</div>';
+      return;
+    }
+    host.innerHTML = data.map((v, i) => `
+      <div class="flex-1 h-full flex flex-col justify-end group relative" title="Period ${i + 1}: ${money(v)}">
         <div class="rounded-t-md bg-gradient-to-t ${i === data.indexOf(max) ? 'from-emerald-500 to-sky-300 shadow-glow' : 'from-emerald-500/60 to-sky-400/40'} group-hover:to-sky-300 transition-all"
-          style="height:${Math.max(6, (v / max) * 100)}%" role="img" aria-label="Week ${i + 1}, ${money(v)}"></div>
+          style="height:${Math.max(6, (v / max) * 100)}%" role="img" aria-label="Period ${i + 1}, ${money(v)}"></div>
       </div>`).join('');
-    $$('#revenueChart [data-aria]');
   }
 
   function renderNotifs() {
+    if (!state.notifs.length) {
+      $('#notifList').innerHTML = '<p class="p-6 text-center text-xs text-slate-500">No activity yet — uploads and sales will appear here.</p>';
+      $('#notifUnread').textContent = '0';
+      $('#notifDot').classList.add('hidden');
+      return;
+    }
     const tone = { emerald:'text-emerald-300 bg-emerald-500/12 border-emerald-500/30', sky:'text-sky-300 bg-sky-500/12 border-sky-500/30',
       rose:'text-rose-300 bg-rose-500/12 border-rose-500/30', indigo:'text-indigo-300 bg-indigo-500/12 border-indigo-500/30',
       amber:'text-amber-300 bg-amber-500/12 border-amber-500/30' };
@@ -1320,8 +1550,20 @@
   }
 
   function renderStore() {
-    const list = state.products.filter((p) => !p.unlisted);
-    $('#storeCount').textContent = `${list.length} items`;
+    const list = state.products.filter((p) => p.listed);
+    $('#storeCount').textContent = `${list.length} item${list.length === 1 ? '' : 's'}`;
+    const buyers = state.users.length;
+    const storeBuyers = $('#storeBuyers');
+    if (storeBuyers) storeBuyers.textContent = `${buyers} member${buyers === 1 ? '' : 's'} · ${state.orders.length} order${state.orders.length === 1 ? '' : 's'} delivered`;
+    if (!list.length) {
+      $('#storeGrid').innerHTML = `<div class="glass p-10 text-center sm:col-span-2 lg:col-span-3">
+        <i data-lucide="store" class="w-9 h-9 mx-auto text-slate-600"></i>
+        <p class="mt-3 text-sm text-slate-300">Nothing is listed yet.</p>
+        <p class="mt-1 text-xs text-slate-500 font-mono">Publish a product from the File Store tab and it appears here instantly.</p>
+      </div>`;
+      icons();
+      return;
+    }
     $('#storeGrid').innerHTML = list.map((p, i) => {
       const f = fileById(p.fileId);
       return `<article class="glass glass-hover overflow-hidden flex flex-col">
@@ -1329,18 +1571,18 @@
           <span class="w-12 h-12 rounded-2xl bg-slate-950/60 border border-slate-700/70 grid place-items-center text-emerald-300"><i data-lucide="${fileIcon(f ? f.mime : 'application/zip')}" class="w-6 h-6"></i></span>
           <div class="absolute top-2.5 left-2.5 flex gap-1.5">
             ${p.featured ? '<span class="badge-amber"><i data-lucide="star" class="w-3 h-3"></i>Featured</span>' : ''}
-            ${p.discounted && p.old ? `<span class="badge-sky">-${Math.round((1 - p.price / p.old) * 100)}%</span>` : ''}
+            ${p.old > 0 && p.old > p.price ? `<span class="badge-sky">-${Math.round((1 - p.price / p.old) * 100)}%</span>` : ''}
           </div>
-          <span class="absolute bottom-2.5 right-2.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/70 border border-slate-700/70 text-slate-300">${esc(p.tag)}</span>
+          <span class="absolute bottom-2.5 right-2.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950/70 border border-slate-700/70 text-slate-300">${esc(tagOf(p))}</span>
         </div>
         <div class="p-4 flex-1 flex flex-col">
           <div class="flex items-start justify-between gap-2">
             <h3 class="font-semibold text-sm">${esc(p.title)}</h3>
             <span class="font-mono font-bold text-sm whitespace-nowrap ${p.price === 0 ? 'text-emerald-300' : ''}">
-              ${p.discounted && p.old ? `<s class="text-slate-500 font-normal mr-1">$${p.old}</s>` : ''}${p.price === 0 ? 'FREE' : money(p.price)}
+              ${p.old > 0 && p.old > p.price ? `<s class="text-slate-500 font-normal mr-1">${money(p.old)}</s>` : ''}${p.price === 0 ? 'FREE' : money(p.price)}
             </span>
           </div>
-          <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed flex-1">${esc(p.desc)}</p>
+          <p class="text-xs text-slate-400 mt-1.5 line-clamp-2 leading-relaxed flex-1">${esc(p.description || 'Hosted digital file, delivered instantly after checkout.')}</p>
           <div class="mt-3 flex items-center justify-between text-[11px] text-slate-500">
             <span class="inline-flex items-center gap-1"><i data-lucide="download" class="w-3 h-3"></i>${p.sales.toLocaleString()} sold</span>
             <span class="font-mono">${p.maxDl}× downloads · ${p.expiry ? p.expiry + 'd' : 'no expiry'}</span>
@@ -1360,9 +1602,108 @@
     $('#pFile').innerHTML = opts;
   }
 
+  /** Re-pull the database and repaint every view. */
+  async function reload() {
+    await refresh();
+    renderAll();
+  }
+
+  /** KPI strip, storage gauge, sidebar meter, header revenue — all live numbers. */
+  function renderStats() {
+    const s = state.stats;
+    const live = state.products.filter((p) => p.listed).length;
+    const pct = s.capacity ? Math.min(100, (s.used / s.capacity) * 100) : 0;
+
+    const setKpi = (id, val, isMoney) => {
+      const el = $('#' + id);
+      if (!el) return;
+      el.dataset.value = String(val);
+      el.dataset.format = isMoney ? 'money' : 'number';
+    };
+    setKpi('kpiRevenue', state.revenue, true);
+    setKpi('kpiFiles', state.files.length, false);
+    setKpi('kpiDownloads', s.downloads, false);
+    setKpi('kpiSales', state.orders.length, false);
+
+    const nowT = Date.now();
+    const sum = (from, to) => state.orders.filter((o) => o.date >= from && o.date < to).reduce((a, o) => a + o.amount, 0);
+    const tm = sum(nowT - 30 * DAY, nowT + DAY);
+    const lm = sum(nowT - 60 * DAY, nowT - 30 * DAY);
+    const trend = lm > 0 ? Math.round(((tm - lm) / lm) * 100) : (tm > 0 ? 100 : 0);
+    $('#kpiTrend').innerHTML = `<i data-lucide="${trend >= 0 ? 'trending-up' : 'trending-down'}" class="w-3.5 h-3.5"></i> ${trend >= 0 ? '+' : ''}${trend}% <span class="text-slate-500">vs last month</span>`;
+    $('#kpiStorageSub').innerHTML = `<i data-lucide="hard-drive" class="w-3.5 h-3.5 text-sky-400"></i> ${bytes(s.bytes)} stored · ${s.files} file${s.files === 1 ? '' : 's'}`;
+    $('#kpiBwSub').innerHTML = `<i data-lucide="gauge" class="w-3.5 h-3.5 text-indigo-400"></i> ${bytes(s.served)} served`;
+    $('#kpiProductsSub').innerHTML = `<i data-lucide="shopping-bag" class="w-3.5 h-3.5 text-amber-400"></i> ${live} live listing${live === 1 ? '' : 's'}`;
+
+    const data = state.charts[state.chartRange] || [];
+    const best = data.length ? Math.max(...data) : 0;
+    const avg = data.length ? data.reduce((a, b) => a + b, 0) / data.length : 0;
+    $('#chartAvg').textContent = money(avg);
+    $('#chartBest').textContent = money(best);
+    $('#chartRefund').textContent = String(state.refunds);
+
+    $('#gaugePct').textContent = pct.toFixed(1) + '%';
+    $('#gaugeBytes').textContent = `${bytes(s.used)} / ${bytes(s.capacity)}`;
+    if ($('#gaugeRing')) $('#gaugeRing').style.setProperty('--gauge-deg', (pct * 3.6).toFixed(1) + 'deg');
+    const pv = state.providers.find((x) => x.id === state.selectedProviderId);
+    $('#gaugeProvider').textContent = pv ? `${pv.provider_name} · ${pv.bucket_name}` : 'No provider configured';
+    const healthy = !!pv && pct < 80;
+    const gb = $('#gaugeBadge');
+    gb.textContent = healthy ? 'HEALTHY' : pv ? 'NEAR CAPACITY' : 'NO PROVIDER';
+    gb.className = `text-[10px] font-mono px-2 py-1 rounded-md ${healthy ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' : 'bg-amber-500/10 border border-amber-500/30 text-amber-300'}`;
+
+    const byType = { video: 0, archive: 0, doc: 0, other: 0 };
+    state.files.forEach((f) => {
+      if (f.mime.startsWith('video/')) byType.video++;
+      else if (f.mime.includes('zip') || f.mime.includes('compress') || f.mime.includes('octet')) byType.archive++;
+      else if (f.mime.includes('pdf') || f.mime.startsWith('text/') || f.mime.includes('document')) byType.doc++;
+      else byType.other++;
+    });
+    $('#gaugeVideos').textContent = byType.video;
+    $('#gaugeArchives').textContent = byType.archive;
+    $('#gaugeDocs').textContent = byType.doc;
+    $('#gaugeOther').textContent = byType.other;
+
+    $('#sideStoragePct').textContent = pct.toFixed(1) + '%';
+    $('#sideStorageBar').style.width = pct + '%';
+    $('#sideStorageText').innerHTML = `${bytes(s.used)} <span class="text-slate-600">of</span> ${bytes(s.capacity)}`;
+
+    const rw = $('#revenueWidget');
+    rw.dataset.value = String(state.revenue);
+    rw.dataset.format = 'money';
+
+    icons();
+    animateCountups($('#view-' + state.tab));
+  }
+
+  /** Storage provider cards, straight from /api/admin/providers. */
+  function renderProviders() {
+    const host = $('#providerCards');
+    if (!host) return;
+    if (!state.providers.length) {
+      host.innerHTML = '<p class="text-xs text-slate-500 sm:col-span-3">No storage provider connected yet. Add a bucket in the <a href="/admin" class="text-sky-300 hover:underline">admin panel</a> to start uploading.</p>';
+      return;
+    }
+    host.innerHTML = state.providers.map((p) => {
+      const on = p.id === state.selectedProviderId;
+      const ic = p.provider_type === 'r2' ? 'cloud' : p.provider_type === 'local' ? 'hard-drive' : 'database';
+      return `<button type="button" class="provider-card" data-provider="${p.id}" role="radio" aria-checked="${on}">
+        <span class="flex items-center gap-2">
+          <span class="w-8 h-8 rounded-lg border grid place-items-center shrink-0 ${on ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-slate-800/80 border-slate-700 text-slate-400'}"><i data-lucide="${ic}" class="w-4 h-4"></i></span>
+          ${p.is_active ? '' : '<span class="text-[9px] font-mono text-amber-400 ml-auto">OFF</span>'}
+        </span>
+        <span class="text-sm font-semibold truncate w-full">${esc(p.provider_name)}</span>
+        <span class="text-[10px] font-mono text-slate-500 truncate w-full">${esc(p.bucket_name)}</span>
+        <span class="text-[10px] font-mono text-slate-500">${bytes(Number(p.current_bytes) || 0)} used</span>
+      </button>`;
+    }).join('');
+    icons();
+  }
+
   function renderAll() {
     renderFiles(); renderProducts(); renderOrders(); renderLinks();
     renderSalesStream(); renderChart(); renderNotifs(); renderStore(); fillSelects();
+    renderStats(); renderProviders();
     icons();
   }
 
@@ -1392,9 +1733,17 @@
     });
   }
 
+  const lockScroll = (on) => {
+    if (on && window.innerWidth >= 1024) return; // desktop keeps native scrolling
+    const v = on ? 'hidden' : '';
+    document.documentElement.style.overflow = v;
+    document.body.style.overflow = v;
+  };
+
   function closeSidebar() {
+    lockScroll(false);
     if (window.innerWidth < 1024) {
-      $('#sidebar').classList.add('-translate-x-full');
+      $('#sidebar').classList.remove('drawer-open');
       $('#sidebarBackdrop').classList.add('hidden');
     }
   }
@@ -1422,8 +1771,9 @@
   });
 
   $('#sidebarOpen').addEventListener('click', () => {
-    $('#sidebar').classList.remove('-translate-x-full');
+    $('#sidebar').classList.add('drawer-open');
     $('#sidebarBackdrop').classList.remove('hidden');
+    lockScroll(true);
   });
   $('#sidebarClose').addEventListener('click', closeSidebar);
   $('#sidebarBackdrop').addEventListener('click', closeSidebar);
@@ -1481,29 +1831,31 @@
 
   /* ── Notifications drawer ── */
   function openNotif() {
-    $('#notifDrawer').classList.remove('translate-x-full');
+    $('#notifDrawer').classList.add('drawer-open');
     $('#notifBackdrop').classList.remove('hidden');
     $('#btnNotif').setAttribute('aria-expanded', 'true');
+    lockScroll(true);
   }
   function closeNotif() {
-    $('#notifDrawer').classList.add('translate-x-full');
+    $('#notifDrawer').classList.remove('drawer-open');
     $('#notifBackdrop').classList.add('hidden');
     $('#btnNotif').setAttribute('aria-expanded', 'false');
+    lockScroll(false);
   }
   $('#btnNotif').addEventListener('click', () => {
-    $('#notifDrawer').classList.contains('translate-x-full') ? openNotif() : closeNotif();
+    $('#notifDrawer').classList.contains('drawer-open') ? closeNotif() : openNotif();
   });
   $('#notifClose').addEventListener('click', closeNotif);
   $('#notifBackdrop').addEventListener('click', closeNotif);
   $('#btnMarkRead').addEventListener('click', () => {
-    state.notifs.forEach((n) => (n.read = true));
+    state.notifs.forEach((n) => { n.read = true; state.readNotifs.add(n.id); });
     renderNotifs(); toast('All notifications marked as read', 'info');
   });
   $('#notifList').addEventListener('click', (e) => {
     const item = e.target.closest('[data-notif]');
     if (!item) return;
     const n = state.notifs.find((x) => x.id === item.dataset.notif);
-    if (n && !n.read) { n.read = true; renderNotifs(); }
+    if (n && !n.read) { n.read = true; state.readNotifs.add(n.id); renderNotifs(); }
   });
 
   /* ── Profile menu ── */
@@ -1517,9 +1869,11 @@
     const item = e.target.closest('[data-menu]');
     if (!item) return;
     $('#profileMenu').classList.add('hidden');
-    const msg = { profile: 'Profile editor is not part of this demo', billing: 'Billing portal is not part of this demo',
-      api: 'API console is not part of this demo', signout: 'Signed out (demo only)' }[item.dataset.menu];
-    toast(msg, 'info');
+    if (item.dataset.menu === 'signout') {
+      localStorage.removeItem(TOKEN_KEY);
+      toast('Signed out of Lazy Cloud', 'info');
+      showLogin();
+    }
   });
 
   /* ── Clock + header revenue ── */
@@ -1530,8 +1884,8 @@
   tickClock(); setInterval(tickClock, 1000);
 
   /* ═══════════ Modal plumbing ═══════════ */
-  const showModal = (sel) => { const el = $(sel); el.classList.remove('hidden'); el.classList.add('flex'); icons(); };
-  const hideModal = (sel) => { const el = $(sel); el.classList.add('hidden'); el.classList.remove('flex'); };
+  const showModal = (sel) => { const el = $(sel); el.classList.remove('hidden'); el.classList.add('flex'); lockScroll(true); icons(); };
+  const hideModal = (sel) => { const el = $(sel); el.classList.add('hidden'); el.classList.remove('flex'); lockScroll(false); };
 
   function openAction({ icon = 'sparkles', title = '', body = '', footer = '' }) {
     $('#actionModalIcon').innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
@@ -1544,7 +1898,7 @@
   const closeBtn = '<button class="btn btn-ghost" data-close-modal>Cancel</button>';
   const confirmBtn = (label, maction, id = '', danger = false) =>
     `<button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-maction="${maction}" data-id="${id}">${label}</button>`;
-  const linkUrl = (token) => `${location.origin}/d/${token}`;
+  const linkUrl = (token) => `${location.origin}/s/${token}`;
 
   document.addEventListener('click', (e) => {
     const closer = e.target.closest('[data-close-modal]');
@@ -1568,20 +1922,21 @@
     renderFiles();
   });
 
-  function createLink(fileId, email, maxDl, days, ip = false) {
-    const link = { token: tokenGen(), fileId, email: email || '', downloads: 0, maxDl,
-      expires: days ? Date.now() + days * DAY : null, status: 'active', ip };
-    state.links.unshift(link);
-    return link;
+  async function createShare(fileId, opts = {}) {
+    const r = await api('/api/admin/shares', { method: 'POST', body: JSON.stringify({ fileId, ...opts }) });
+    await reload();
+    return r; // { share, shareUrl }
   }
 
-  function linkResultBody(link) {
-    return `<p class="text-xs text-slate-400 mb-3">Single-use link generated for <strong class="text-slate-200">${esc(fileName(link.fileId))}</strong>${link.expires ? ` · expires ${dateFmt(link.expires)}` : ''}</p>
+  function shareResultBody(label, share, url) {
+    const exp = share && share.expires_at ? ` · expires ${dateFmt(share.expires_at)}` : '';
+    const max = share && share.download_limit ? share.download_limit : 'unlimited';
+    return `<p class="text-xs text-slate-400 mb-3">Single-use link generated for <strong class="text-slate-200">${esc(label)}</strong>${exp}</p>
       <div class="rounded-xl bg-slate-950/70 border border-slate-800 p-3 flex items-center gap-2">
         <i data-lucide="link" class="w-4 h-4 text-emerald-400 shrink-0"></i>
-        <code class="flex-1 truncate text-xs font-mono text-emerald-300">${esc(linkUrl(link.token))}</code>
+        <code class="flex-1 truncate text-xs font-mono text-emerald-300">${esc(url)}</code>
       </div>
-      <p class="mt-2.5 text-[11px] font-mono text-slate-500">token: ${link.token} · max ${link.maxDl} download${link.maxDl > 1 ? 's' : ''}</p>`;
+      <p class="mt-2.5 text-[11px] font-mono text-slate-500">id: ${esc((share && share.id) || '—')} · max ${max} download${max === 1 ? '' : 's'}</p>`;
   }
 
   $('#fileTable').addEventListener('click', (e) => {
@@ -1592,19 +1947,24 @@
 
     switch (btn.dataset.action) {
       case 'privacy': {
-        f.privacy = f.privacy === 'public' ? 'private' : 'public';
-        renderFiles();
-        toast(`“${f.name}” is now ${f.privacy}`, 'info');
+        const listed = !f.listed;
+        api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: f.id, listed }) })
+          .then(() => { toast(`“${f.name}” is now ${listed ? 'listed in the store' : 'a draft'}`, 'info'); return reload(); })
+          .catch((e) => toast(e.message, 'error'));
         break;
       }
       case 'link': {
-        const link = createLink(f.id, '', 1, 7);
-        renderLinks();
-        openAction({
-          icon: 'link', title: 'One-time download link', body: linkResultBody(link),
-          footer: `${closeBtn}<button class="btn btn-primary" data-copy="${esc(linkUrl(link.token))}"><i data-lucide="copy" class="w-4 h-4"></i> Copy link</button>`,
-        });
-        toast('One-time link generated');
+        btn.disabled = true;
+        createShare(f.id, { downloadLimit: 1, expiresInDays: 7 })
+          .then((r) => {
+            openAction({
+              icon: 'link', title: 'One-time download link', body: shareResultBody(f.name, r.share, r.shareUrl),
+              footer: `${closeBtn}<button class="btn btn-primary" data-copy="${esc(r.shareUrl)}"><i data-lucide="copy" class="w-4 h-4"></i> Copy link</button>`,
+            });
+            toast('One-time link generated');
+          })
+          .catch((e) => toast(e.message, 'error'))
+          .finally(() => { btn.disabled = false; });
         break;
       }
       case 'price': {
@@ -1613,8 +1973,8 @@
           body: `<p class="text-xs text-slate-400 mb-3">Create a storefront listing bound to <strong class="text-slate-200">${esc(f.name)}</strong></p>
             <label class="field-label" for="priceTitleInput">Product title</label>
             <input id="priceTitleInput" class="field mb-3" value="${esc(f.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '))}" maxlength="80" />
-            <label class="field-label" for="priceAmountInput">Price (USD)</label>
-            <input id="priceAmountInput" type="number" min="0" step="0.01" value="19" class="field font-mono" />`,
+            <label class="field-label" for="priceAmountInput">Price (coins)</label>
+            <input id="priceAmountInput" type="number" min="0" step="1" value="19" class="field font-mono" />`,
           footer: `${closeBtn}${confirmBtn('Create listing', 'price-confirm', f.id)}`,
         });
         break;
@@ -1640,11 +2000,10 @@
         break;
       }
       case 'delete': {
-        const bound = state.products.filter((p) => p.fileId === f.id);
         openAction({
           icon: 'trash-2', title: 'Delete file?',
           body: `<p class="text-sm text-slate-300">You are about to permanently delete <strong class="text-slate-100">${esc(f.name)}</strong> (${bytes(f.size)}) from cloud storage.</p>
-            ${bound.length ? `<p class="mt-2 text-xs text-amber-300/90"><i data-lucide="triangle-alert" class="w-3.5 h-3.5 inline -mt-0.5"></i> ${bound.length} product(s) bound to this file will also be delisted.</p>` : ''}`,
+            <p class="mt-2 text-xs text-amber-300/90"><i data-lucide="triangle-alert" class="w-3.5 h-3.5 inline -mt-0.5"></i> Its storefront listing and sales history for this file are removed with it.</p>`,
           footer: `${closeBtn}${confirmBtn('Delete permanently', 'delete-confirm', f.id, true)}`,
         });
         break;
@@ -1666,41 +2025,35 @@
       case 'price-confirm': {
         if (!f) break;
         const title = ($('#priceTitleInput').value || f.name).trim();
-        const price = Math.max(0, parseFloat($('#priceAmountInput').value) || 0);
-        state.products.unshift({
-          id: 'PRD-' + Math.floor(2000 + Math.random() * 7999), title,
-          desc: 'Hosted file listing created from the cloud storage drive.',
-          price, old: 0, fileId: f.id, maxDl: 3, expiry: 30,
-          featured: false, discounted: false, unlisted: false, sales: 0,
-          tag: f.mime.startsWith('video') ? 'Video' : 'Digital file',
-        });
-        renderProducts(); renderStore();
-        toast(`“${title}” listed for ${price === 0 ? 'free' : money(price)}`);
+        const price = Math.max(0, Math.round(parseFloat($('#priceAmountInput').value) || 0));
+        api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: f.id, original_name: title, price_coins: price, listed: true }) })
+          .then(() => { toast(`“${title}” listed for ${price === 0 ? 'free' : money(price)}`); return reload(); })
+          .catch((e) => toast(e.message, 'error'));
         break;
       }
       case 'rename-confirm': {
         if (!f) break;
         const val = ($('#renameInput').value || '').trim();
         if (!val) { toast('File name cannot be empty', 'error'); return; }
-        const old = f.name; f.name = val; f.mime = mimeOf(val);
-        renderFiles(); renderProducts(); renderStore();
-        toast(`Renamed “${old}” → “${val}”`);
+        const old = f.name;
+        api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: f.id, original_name: val }) })
+          .then(() => { toast(`Renamed “${old}” → “${val}”`); return reload(); })
+          .catch((e) => toast(e.message, 'error'));
         break;
       }
       case 'move-confirm': {
         if (!f) break;
-        f.folder = $('#moveSelect').value;
-        renderFiles();
-        toast(`Moved to /${f.folder.toLowerCase()}`);
+        const dest = $('#moveSelect').value;
+        api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: f.id, folder: dest }) })
+          .then(() => { toast(`Moved to /${dest.toLowerCase()}`); return reload(); })
+          .catch((e) => toast(e.message, 'error'));
         break;
       }
       case 'delete-confirm': {
         if (!f) break;
-        state.files = state.files.filter((x) => x.id !== f.id);
-        state.products = state.products.filter((p) => p.fileId !== f.id);
-        state.links = state.links.filter((l) => l.fileId !== f.id);
-        renderAll();
-        toast(`“${f.name}” deleted`, 'info');
+        api('/api/admin/files/delete', { method: 'POST', body: JSON.stringify({ id: f.id }) })
+          .then(() => { toast(`“${f.name}” deleted`, 'info'); return reload(); })
+          .catch((e) => toast(e.message, 'error'));
         break;
       }
     }
@@ -1726,6 +2079,7 @@
     if (!val) { toast('Enter a folder name', 'error'); return; }
     if (!state.folders.includes(val)) state.folders.push(val);
     state.folder = val;
+    saveSettings({ folders: state.folders }).catch(() => { /* toast already shown */ });
     renderFiles();
     hideModal('#actionModal');
     toast(`Folder “${val}” created`);
@@ -1739,16 +2093,16 @@
     $('#pSubmitLabel').textContent = p ? 'Save changes' : 'Create product';
     $('#pId').value = p ? p.id : '';
     $('#pTitle').value = p ? p.title : '';
-    $('#pDesc').value = p ? p.desc : '';
+    $('#pDesc').value = p ? (p.description || '') : '';
     $('#pPrice').value = p ? p.price : 0;
     $('#pFree').checked = !p || p.price === 0;
     $('#pPrice').disabled = $('#pFree').checked;
-    if (p) $('#pFile').value = p.fileId;
+    if (p) { $('#pFile').value = p.id; $('#pFile').disabled = true; } else { $('#pFile').disabled = false; }
     $('#pMaxDl').value = p ? p.maxDl : 3;
     $('#pExpiry').value = p ? p.expiry : 30;
     $('#pFeatured').checked = p ? p.featured : false;
-    $('#pDiscount').checked = p ? p.discounted : false;
-    $('#pUnlisted').checked = p ? p.unlisted : false;
+    $('#pDiscount').checked = p ? (p.old > 0 && p.old > p.price) : false;
+    $('#pUnlisted').checked = p ? !p.listed : false;
     showModal('#productModal');
     setTimeout(() => $('#pTitle').focus(), 60);
   }
@@ -1763,29 +2117,30 @@
     e.preventDefault();
     const title = $('#pTitle').value.trim();
     if (!title) { toast('Give the product a title', 'error'); return; }
-    const price = Math.max(0, parseFloat($('#pPrice').value) || 0);
-    const data = {
-      title,
-      desc: $('#pDesc').value.trim() || 'Digital file, delivered instantly after checkout.',
-      price, fileId: $('#pFile').value,
-      maxDl: Math.max(1, parseInt($('#pMaxDl').value) || 3),
-      expiry: Math.max(0, parseInt($('#pExpiry').value) || 0),
-      featured: $('#pFeatured').checked,
-      discounted: $('#pDiscount').checked,
-      unlisted: $('#pUnlisted').checked,
-    };
+    const price = Math.max(0, Math.round(parseFloat($('#pPrice').value) || 0));
     const existingId = $('#pId').value;
-    if (existingId) {
-      Object.assign(productById(existingId), data);
-      toast(`“${title}” updated`);
-    } else {
-      state.products.unshift({ id: 'PRD-' + Math.floor(2000 + Math.random() * 7999),
-        old: data.discounted ? Math.round(data.price * 1.6) : 0, sales: 0,
-        tag: data.price === 0 ? 'Freebie' : 'Digital file', ...data });
-      toast(`“${title}” published to the store`);
-    }
-    renderProducts(); renderStore();
-    hideModal('#productModal');
+    const fileId = existingId || $('#pFile').value;
+    if (!fileId) { toast('Choose a hosted file first', 'error'); return; }
+    api('/api/admin/files/update', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: fileId,
+        original_name: title,
+        description: $('#pDesc').value.trim(),
+        price_coins: price,
+        old_price: $('#pDiscount').checked && price > 0 ? Math.round(price * 1.6) : 0,
+        listed: !$('#pUnlisted').checked,
+        featured: $('#pFeatured').checked,
+        max_downloads: Math.max(1, parseInt($('#pMaxDl').value) || 3),
+        expiry_days: Math.max(0, parseInt($('#pExpiry').value) || 0),
+      }),
+    })
+      .then(() => {
+        toast(existingId ? `“${title}” updated` : `“${title}” published to the store`);
+        hideModal('#productModal');
+        return reload();
+      })
+      .catch((err) => toast(err.message, 'error'));
   });
 
   $('#productGrid').addEventListener('click', (e) => {
@@ -1794,7 +2149,7 @@
     const p = productById(btn.dataset.id);
     if (!p) return;
     if (btn.dataset.paction === 'edit') openProductModal(p);
-    if (btn.dataset.paction === 'copy') copyText(`${location.origin}/p/${p.id}`, 'Product link copied');
+    if (btn.dataset.paction === 'copy') copyText(`${location.origin}/shop`, 'Store link copied');
     if (btn.dataset.paction === 'delete') {
       openAction({
         icon: 'package-x', title: 'Delete product?',
@@ -1807,10 +2162,10 @@
   $('#actionModal').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-maction="product-delete-confirm"]');
     if (!btn) return;
-    state.products = state.products.filter((p) => p.id !== btn.dataset.id);
-    renderProducts(); renderStore();
+    api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: btn.dataset.id, listed: false }) })
+      .then(() => { toast('Product delisted — the hosted file stays in storage', 'info'); return reload(); })
+      .catch((e) => toast(e.message, 'error'));
     hideModal('#actionModal');
-    toast('Product removed from storefront', 'info');
   });
 
   $('#productFilters').addEventListener('click', (e) => {
@@ -1839,29 +2194,32 @@
 
     if (btn.dataset.oaction === 'view') {
       openAction({
-        icon: 'receipt', title: `Order ${o.id}`,
+        icon: 'receipt', title: `Order ${o.ref}`,
         body: `<div class="space-y-2.5 text-xs">
             ${[
-              ['Customer', esc(o.email)], ['Product', esc(p ? p.title : '—')],
-              ['Amount', money(o.amount) + ' · ' + esc(o.method)], ['Status', statusPill(o.status)],
+              ['Customer', esc(o.email)], ['Buyer', esc(o.buyer || '—')],
+              ['Product', esc(p ? p.title : '—')],
+              ['Amount', money(o.amount)], ['Status', statusPill(o.status)],
               ['Placed', dateFmt(o.date) + ' · ' + timeAgo(o.date)],
-              ['Delivered file', esc(p ? fileName(p.fileId) : '—')],
+              ['Delivered file', esc(p ? p.name : '—')],
             ].map(([k, v]) => `<div class="flex items-start justify-between gap-4"><span class="text-slate-500">${k}</span><span class="text-slate-200 text-right font-mono">${v}</span></div>`).join('')}
           </div>`,
         footer: `<button class="btn btn-ghost" data-close-modal>Close</button>`,
       });
     }
     if (btn.dataset.oaction === 'copy') {
-      if (!p) { toast('Bound product no longer exists', 'error'); return; }
-      const link = createLink(p.fileId, o.email, p.maxDl, p.expiry);
-      renderLinks();
-      copyText(linkUrl(link.token), 'Access link copied to clipboard');
+      if (!p) { toast('Delivered file no longer exists', 'error'); return; }
+      btn.disabled = true;
+      createShare(p.id, { downloadLimit: p.maxDl, expiresInDays: p.expiry })
+        .then((r) => copyText(r.shareUrl, 'Access link copied to clipboard'))
+        .catch((e) => toast(e.message, 'error'))
+        .finally(() => { btn.disabled = false; });
     }
     if (btn.dataset.oaction === 'refund') {
       openAction({
         icon: 'undo-2', title: 'Refund this order?',
-        body: `<p class="text-sm text-slate-300">Refund <strong class="text-slate-100">${money(o.amount)}</strong> to ${esc(o.email)} and revoke their download access for “${esc(p ? p.title : '—')}”.</p>`,
-        footer: `${closeBtn}${confirmBtn('Refund & revoke', 'refund-confirm', o.id, true)}`,
+        body: `<p class="text-sm text-slate-300">Refund <strong class="text-slate-100">${money(o.amount)}</strong> to ${esc(o.email)} for “${esc(p ? p.title : '—')}” and remove their purchase record from the ledger.</p>`,
+        footer: `${closeBtn}${confirmBtn('Refund & remove', 'refund-confirm', o.id, true)}`,
       });
     }
   });
@@ -1870,23 +2228,16 @@
     const btn = e.target.closest('[data-maction="refund-confirm"]');
     if (!btn) return;
     const o = state.orders.find((x) => x.id === btn.dataset.id);
-    if (o) {
-      o.status = 'refunded';
-      state.revenue = Math.max(0, state.revenue - o.amount);
-      const p = productById(o.productId);
-      if (p && p.sales > 0) p.sales -= 1;
-      state.links.filter((l) => l.email === o.email).forEach((l) => (l.status = 'revoked'));
-      state.notifs.unshift({ id: uid('n'), icon: 'undo-2', tone: 'rose', title: `Refund · ${money(o.amount)}`,
-        body: `${o.email} refunded for ${p ? p.title : 'file'}`, date: Date.now(), read: false });
-      renderOrders(); renderSalesStream(); renderLinks(); renderProducts(); renderStore(); renderNotifs();
-      hideModal('#actionModal');
-      toast(`${o.id} refunded and access revoked`, 'info');
-    }
+    hideModal('#actionModal');
+    if (!o) return;
+    api('/api/admin/purchases/refund', { method: 'POST', body: JSON.stringify({ id: o.id }) })
+      .then(() => { toast(`${o.ref} refunded — purchase removed from the ledger`, 'info'); return reload(); })
+      .catch((e) => toast(e.message, 'error'));
   });
 
   $('#btnExportOrders').addEventListener('click', () => {
-    const rows = [['Order ID', 'Customer', 'Product', 'Amount', 'Method', 'Status', 'Date'],
-      ...state.orders.map((o) => [o.id, o.email, (productById(o.productId) || {}).title || '', o.amount, o.method, o.status, new Date(o.date).toISOString().slice(0, 10)]),
+    const rows = [['Order ID', 'Customer', 'Product', 'Amount (coins)', 'Status', 'Date'],
+      ...state.orders.map((o) => [o.ref, o.email, (productById(o.productId) || {}).title || '', o.amount, o.status, new Date(o.date).toISOString().slice(0, 10)]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
@@ -1902,16 +2253,18 @@
     const fileId = $('#keyFile').value;
     if (!fileId) { toast('Upload a file first', 'error'); return; }
     const days = parseInt($('#keyExpiry').value) || 0;
-    const link = createLink(fileId, $('#keyEmail').value.trim(),
-      Math.max(1, parseInt($('#keyMax').value) || 1), days, $('#keyIpBind').checked);
-    renderLinks();
-    openAction({
-      icon: 'key-round', title: 'Access key generated', body: linkResultBody(link),
-      footer: `${closeBtn}<button class="btn btn-primary" data-copy="${esc(linkUrl(link.token))}"><i data-lucide="copy" class="w-4 h-4"></i> Copy link</button>`,
-    });
-    toast('Access key is live');
-    e.target.reset();
-    $('#keyMax').value = 3;
+    const maxDl = Math.max(1, parseInt($('#keyMax').value) || 1);
+    createShare(fileId, { downloadLimit: maxDl, expiresInDays: days })
+      .then((r) => {
+        openAction({
+          icon: 'key-round', title: 'Access link generated', body: shareResultBody(fileName(fileId), r.share, r.shareUrl),
+          footer: `${closeBtn}<button class="btn btn-primary" data-copy="${esc(r.shareUrl)}"><i data-lucide="copy" class="w-4 h-4"></i> Copy link</button>`,
+        });
+        toast('Access link is live');
+        e.target.reset();
+        $('#keyMax').value = 3;
+      })
+      .catch((err) => toast(err.message, 'error'));
   });
 
   $('#linkList').addEventListener('click', (e) => {
@@ -1923,7 +2276,7 @@
     if (btn.dataset.laction === 'revoke') {
       openAction({
         icon: 'ban', title: 'Revoke access link?',
-        body: `<p class="text-sm text-slate-300">Revoking <code class="font-mono text-rose-300">${lk.token}</code> will immediately block further downloads${lk.email ? ` for ${esc(lk.email)}` : ''}.</p>`,
+        body: `<p class="text-sm text-slate-300">Revoking <code class="font-mono text-rose-300">${esc(String(lk.token).slice(0, 13))}…</code> will immediately block further downloads of ${esc(lk.fileName || fileName(lk.fileId))}.</p>`,
         footer: `${closeBtn}${confirmBtn('Revoke now', 'revoke-confirm', lk.token, true)}`,
       });
     }
@@ -1933,35 +2286,48 @@
     const btn = e.target.closest('[data-maction="revoke-confirm"]');
     if (!btn) return;
     const lk = state.links.find((l) => l.token === btn.dataset.id);
-    if (lk) lk.status = 'revoked';
-    renderLinks();
     hideModal('#actionModal');
-    toast('Link revoked — downloads are blocked', 'info');
+    if (!lk) return;
+    api('/api/admin/shares/delete', { method: 'POST', body: JSON.stringify({ id: lk.token }) })
+      .then(() => { toast('Link revoked — downloads are blocked', 'info'); return reload(); })
+      .catch((e) => toast(e.message, 'error'));
   });
 
   /* ═══════════ Settings ═══════════ */
-  const PROVIDERS = {
-    r2: { endpoint: 'https://abc123.r2.cloudflarestorage.com', bucket: 'lazy-prod', key: 'f4a9d1b0…c71e' },
-    s3: { endpoint: 'https://s3.eu-central-1.amazonaws.com', bucket: 'lazy-cloud-eu', key: 'AKIA…7B2Q' },
-    local: { endpoint: '/var/lib/lazycloud/data', bucket: 'local-volume', key: '—' },
-  };
+
+  /** Persist dashboard preferences (payments, security, throttle, folders) to app settings. */
+  async function saveSettings(extra = {}) {
+    state.settings = { ...state.settings, ...extra };
+    const r = await api('/api/admin/settings', {
+      method: 'POST',
+      body: JSON.stringify({ dashboard: state.settings }),
+    });
+    if (r && r.settings && r.settings.dashboard) state.settings = { ...state.settings, ...r.settings.dashboard };
+    return r;
+  }
 
   function applySettingsToDom() {
-    $$('#providerCards .provider-card').forEach((c) =>
-      c.setAttribute('aria-checked', String(c.dataset.provider === state.settings.provider)));
-    const pv = PROVIDERS[state.settings.provider];
-    $('#provEndpoint').value = pv.endpoint; $('#provBucket').value = pv.bucket; $('#provKey').value = pv.key;
+    renderProviders();
+    const pv = state.providers.find((x) => x.id === state.selectedProviderId);
+    if ($('#provEndpoint')) $('#provEndpoint').value = pv ? pv.endpoint_url : '';
+    if ($('#provBucket')) $('#provBucket').value = pv ? pv.bucket_name : '';
+    if ($('#provKey')) $('#provKey').value = pv ? (pv.access_key_id || '') : '';
+    if ($('#provSecret')) $('#provSecret').value = '';
     $$('[data-toggle]').forEach((s) => s.setAttribute('aria-checked', String(!!state.settings[s.dataset.toggle])));
-    $('#throttleSelect').value = state.settings.throttle;
-    $('#settingsDirtyNote').textContent = '';
+    const gw = (id, key) => { const el = $('#' + id); if (el) el.value = state.settings[key] || ''; };
+    gw('gwStripe', 'stripeKey'); gw('gwPaypal', 'paypalEmail'); gw('gwCrypto', 'cryptoAddress'); gw('gwBkash', 'bkashNumber');
+    if ($('#throttleSelect')) $('#throttleSelect').value = state.settings.throttle || 'off';
+    const note = $('#settingsDirtyNote'); if (note) note.textContent = '';
   }
 
   $('#providerCards').addEventListener('click', (e) => {
     const card = e.target.closest('[data-provider]');
     if (!card) return;
-    state.settings.provider = card.dataset.provider;
+    state.selectedProviderId = card.dataset.provider;
     applySettingsToDom();
-    toast(`Provider switched to ${card.querySelector('span').textContent}`, 'info');
+    renderStats();
+    const pv = state.providers.find((x) => x.id === state.selectedProviderId);
+    toast(`Provider switched to ${pv ? pv.provider_name : 'unknown'}`, 'info');
   });
 
   $$('[data-toggle]').forEach((sw) => sw.addEventListener('click', () => {
@@ -1975,14 +2341,32 @@
   $('#settingsForm').addEventListener('submit', (e) => {
     e.preventDefault();
     state.settings.throttle = $('#throttleSelect').value;
-    $('#settingsDirtyNote').textContent = '';
-    toast('Store settings saved');
+    state.settings.stripeKey = ($('#gwStripe') && $('#gwStripe').value.trim()) || '';
+    state.settings.paypalEmail = ($('#gwPaypal') && $('#gwPaypal').value.trim()) || '';
+    state.settings.cryptoAddress = ($('#gwCrypto') && $('#gwCrypto').value.trim()) || '';
+    state.settings.bkashNumber = ($('#gwBkash') && $('#gwBkash').value.trim()) || '';
+    const pv = state.providers.find((x) => x.id === state.selectedProviderId);
+    const jobs = [saveSettings()];
+    if (pv) {
+      const patch = {
+        id: pv.id, provider_name: pv.provider_name, region: pv.region,
+        endpoint_url: $('#provEndpoint').value.trim(),
+        bucket_name: $('#provBucket').value.trim(),
+        access_key_id: $('#provKey').value.trim(),
+      };
+      const secret = $('#provSecret').value.trim();
+      if (secret) patch.secret_access_key = secret;
+      jobs.push(api('/api/admin/providers/update', { method: 'POST', body: JSON.stringify(patch) }));
+    }
+    Promise.all(jobs)
+      .then(() => { $('#settingsDirtyNote').textContent = ''; toast('Store settings saved'); return reload(); })
+      .catch((err) => toast(err.message, 'error'));
   });
   $('#btnResetSettings').addEventListener('click', () => {
     applySettingsToDom(); toast('Changes reverted', 'info');
   });
 
-  /* ═══════════ Upload dropzone (simulated edge sync) ═══════════ */
+  /* ═══════════ Upload dropzone (streams into the storage provider) ═══════════ */
   const dz = $('#dropzone');
   const fi = $('#fileInput');
   dz.addEventListener('click', () => fi.click());
@@ -2001,15 +2385,15 @@
     if (!incoming.length) return;
     const queue = $('#uploadQueue');
     queue.classList.remove('hidden');
-    const dest = state.folder !== 'All' ? state.folder : (state.folders[0] || 'Uploads');
+    const dest = state.folder !== 'All' ? state.folder : (state.folders[0] || 'General');
     let done = 0;
-    let skipped = 0;
+    let failed = 0;
 
     incoming.forEach((file) => {
       const row = document.createElement('div');
       row.innerHTML = `
         <div class="flex items-center justify-between text-xs mb-1.5 gap-3">
-          <span class="truncate text-slate-300">${esc(file.name)}</span>
+          <span class="truncate text-slate-300">${esc(file.name)} <span class="text-slate-500 font-mono">· ${bytes(file.size)}</span></span>
           <span class="font-mono text-slate-500 shrink-0" data-pct>0%</span>
         </div>
         <div class="h-2 rounded-full bg-slate-800 overflow-hidden">
@@ -2018,32 +2402,59 @@
       queue.appendChild(row);
       const pctEl = row.querySelector('[data-pct]');
       const bar = row.querySelector('.bar-stripes');
-      let pct = 0;
-      const speed = 7 + Math.random() * 11;
-      const timer = setInterval(() => {
-        pct = Math.min(100, pct + speed * (0.5 + Math.random()));
+
+      const finish = () => {
+        if (done + failed < incoming.length) return;
+        if (done) toast(`${done} file${done === 1 ? '' : 's'} uploaded to /${dest.toLowerCase()}`, failed ? 'info' : 'success');
+        if (failed && !done) toast('Upload failed — check the storage provider', 'error');
+        setTimeout(() => { queue.innerHTML = ''; queue.classList.add('hidden'); }, 2600);
+      };
+
+      // Real multipart upload straight into the database + storage provider.
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/admin/upload');
+      if (token()) xhr.setRequestHeader('Authorization', `Bearer ${token()}`);
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        const pct = Math.round((ev.loaded / ev.total) * 100);
         bar.style.width = pct + '%';
-        pctEl.textContent = Math.floor(pct) + '%';
-        if (pct >= 100) {
-          clearInterval(timer);
+        pctEl.textContent = pct + '%';
+      };
+      xhr.onload = () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText); } catch { /* ignore */ }
+        if (xhr.status === 200 && data.id) {
+          bar.style.width = '100%';
           pctEl.textContent = 'synced ✓';
           pctEl.classList.add('text-emerald-300');
           bar.classList.remove('bar-stripes');
-          if (state.files.some((f) => f.name === file.name)) skipped++;
-          else state.files.push({ id: uid('f'), name: file.name, folder: dest,
-            size: file.size, mime: mimeOf(file.name), date: Date.now(), privacy: 'private' });
           done++;
-          if (done === incoming.length) {
-            renderFiles(); fillSelects();
-            state.notifs.unshift({ id: uid('n'), icon: 'upload-cloud', tone: 'sky', title: 'Batch upload finished',
-              body: `${done - skipped} file(s) synced to ${state.settings.provider === 'r2' ? 'Cloudflare R2' : state.settings.provider === 's3' ? 'AWS S3' : 'local disk'}`,
-              date: Date.now(), read: false });
-            renderNotifs();
-            toast(skipped ? `${done - skipped} uploaded, ${skipped} skipped (duplicate name)` : `${done} file(s) uploaded to /${dest.toLowerCase()}`, skipped ? 'info' : 'success');
-            setTimeout(() => { queue.innerHTML = ''; queue.classList.add('hidden'); }, 2600);
-          }
+          // Place the new file in the active folder, then re-sync every view.
+          api('/api/admin/files/update', { method: 'POST', body: JSON.stringify({ id: data.id, folder: dest }) })
+            .catch(() => {})
+            .then(() => reload())
+            .catch(() => {})
+            .then(finish);
+        } else {
+          if (xhr.status === 401) { showLogin(); }
+          failed++;
+          pctEl.textContent = data.error ? 'failed' : `error ${xhr.status}`;
+          pctEl.classList.add('text-rose-300');
+          bar.classList.add('bg-rose-500/80');
+          if (data.error) toast(data.error, 'error');
+          finish();
         }
-      }, 140);
+      };
+      xhr.onerror = () => {
+        failed++;
+        pctEl.textContent = 'network error';
+        pctEl.classList.add('text-rose-300');
+        bar.classList.add('bg-rose-500/80');
+        finish();
+      };
+      xhr.send(fd);
     });
   }
 
@@ -2088,7 +2499,7 @@
     showModal('#checkoutModal');
   });
 
-  $('#checkoutForm').addEventListener('submit', (e) => {
+  $('#checkoutForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const p = productById(checkoutProductId);
     if (!p) return;
@@ -2103,26 +2514,23 @@
       $('#coProcessorNote').textContent = notes[ni];
     }, 480);
 
-    setTimeout(() => {
-      clearInterval(noteTimer);
-      const link = createLink(p.fileId, email, p.maxDl, p.expiry);
-      checkoutLinkUrl = linkUrl(link.token);
-      const order = { id: 'ORD-' + Math.floor(7742 + Math.random() * 900), email, productId: p.id,
-        amount: p.price, method, status: 'completed', date: Date.now() };
-      state.orders.unshift(order);
-      p.sales += 1;
-      state.revenue += p.price;
-      state.notifs.unshift({ id: uid('n'), icon: 'shopping-bag', tone: 'emerald',
-        title: `New sale · ${p.price === 0 ? 'FREE' : money(p.price)}`,
-        body: `${email} bought ${p.title}`, date: Date.now(), read: false });
+    try {
+      // Provision a real, revocable download link for the preview buyer.
+      const r = await createShare(p.id, { downloadLimit: p.maxDl, expiresInDays: p.expiry });
+      checkoutLinkUrl = r.shareUrl;
       $('#coSuccessLink').textContent = checkoutLinkUrl;
-      $('#coOrderNote').textContent = `Order ${order.id} · ${method} · ${p.maxDl} downloads, expires ${p.expiry ? p.expiry + ' days' : 'never'}`;
+      $('#coOrderNote').textContent = `Preview · ${method} · ${p.maxDl} download${p.maxDl === 1 ? '' : 's'}, expires ${p.expiry ? p.expiry + ' days' : 'never'} · to ${email}`;
       $('#checkoutStep2').classList.add('hidden');
       $('#checkoutStep3').classList.remove('hidden');
       icons();
-      renderOrders(); renderSalesStream(); renderLinks(); renderProducts(); renderNotifs();
-      toast('Payment complete — order added to ledger');
-    }, 1600);
+      toast('Preview link generated — live purchases land through the LazyDrop app', 'info');
+    } catch (err) {
+      $('#checkoutStep2').classList.add('hidden');
+      $('#checkoutStep1').classList.remove('hidden');
+      toast(err.message || 'Could not provision the download link', 'error');
+    } finally {
+      clearInterval(noteTimer);
+    }
   });
 
   $('#coCopyLink').addEventListener('click', () => copyText(checkoutLinkUrl, 'Download link copied'));
@@ -2134,17 +2542,98 @@
     if (!$('#productModal').classList.contains('hidden')) { hideModal('#productModal'); return; }
     if (!$('#actionModal').classList.contains('hidden')) { hideModal('#actionModal'); return; }
     if (!$('#storefront').classList.contains('hidden')) { closeStorefront(); return; }
-    if (!$('#notifDrawer').classList.contains('translate-x-full')) { closeNotif(); return; }
+    if ($('#notifDrawer').classList.contains('drawer-open')) { closeNotif(); return; }
+    if (window.innerWidth < 1024 && $('#sidebar').classList.contains('drawer-open')) { closeSidebar(); return; }
     closeSearch();
   });
 
+  /* ═══════════ Boot + auth ═══════════ */
+  const hideBoot = () => { const b = $('#bootScreen'); if (b) b.remove(); };
+  function showLogin() {
+    hideBoot();
+    const m = $('#loginModal');
+    m.classList.remove('hidden'); m.classList.add('flex');
+    setTimeout(() => { const u = $('#loginUser'); if (u) u.focus(); }, 60);
+  }
+  function hideLogin() {
+    const m = $('#loginModal');
+    m.classList.add('hidden'); m.classList.remove('flex');
+    $('#loginForm').reset();
+    $('#loginError').classList.add('hidden');
+    $('#loginTotpWrap').classList.add('hidden');
+  }
+
+  /** Load every dynamic view; falls back to the sign-in screen on 401. */
+  async function boot() {
+    try {
+      await reload();
+      applySettingsToDom();
+      setTab('overview');
+      hideLogin();
+      hideBoot();
+    } catch (ex) {
+      if (ex && ex.status === 401) { showLogin(); return; }
+      hideBoot();
+      toast(ex && ex.message ? ex.message : 'Could not reach the database', 'error');
+      showLogin();
+    }
+  }
+
+  async function tokenWorks(t) {
+    if (!t) return false;
+    try {
+      const r = await fetch('/api/admin/stats', { headers: { Authorization: `Bearer ${t}` } });
+      return r.ok;
+    } catch { return false; }
+  }
+
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#loginError');
+    err.classList.add('hidden');
+    const username = $('#loginUser').value.trim();
+    const password = $('#loginPass').value;
+    const totp = $('#loginTotp').value.trim();
+    const btn = $('#loginForm button[type="submit"]');
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, totp }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.requiresTotp) {
+        $('#loginTotpWrap').classList.remove('hidden');
+        err.textContent = data.message || 'Enter your authenticator code';
+        err.classList.remove('hidden');
+        return;
+      }
+      let tokenToUse = data.token || '';
+      // Fallback: the API also accepts the admin password directly as a bearer token.
+      if (!res.ok || !tokenToUse) {
+        if (await tokenWorks(password)) tokenToUse = password;
+      }
+      if (!tokenToUse) {
+        err.textContent = data.error || 'Invalid username or password';
+        err.classList.remove('hidden');
+        return;
+      }
+      localStorage.setItem(TOKEN_KEY, tokenToUse);
+      hideLogin();
+      await boot();
+    } catch {
+      err.textContent = 'Network error — is the server running?';
+      err.classList.remove('hidden');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
+
   /* ═══════════ Init ═══════════ */
-  renderAll();
-  applySettingsToDom();
-  $('#revenueWidget').setAttribute('data-countup', '');
-  animateCountups(document);
   setTab('overview');
   icons();
+  if (token()) boot(); else showLogin();
 })();
 </script>
 <!-- CHUNK-MARKER -->
