@@ -335,6 +335,8 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
     );
   }
 
+  const version = 'v2.0.0';
+
   if (showUploadQueue) {
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center p-4 lg:items-center" style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
@@ -440,6 +442,9 @@ export default function AdminDashboard({ files, token, onRefresh, onNotify }: Pr
           emptyDescription="Upload your first file to get started"
         />
       </div>
+      <p className="text-xs text-dim mt-2" style={{ color: 'var(--text-dim)' }}>
+        {version}
+      </p>
     </div>
   );
 }
