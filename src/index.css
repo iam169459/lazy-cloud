@@ -102,6 +102,8 @@
   --shadow-glass-lg: 0 16px 48px 0 rgba(0, 0, 0, 0.45);
   --shadow-glass-xl: 0 24px 64px 0 rgba(0, 0, 0, 0.5);
   --shadow-inner-glow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  --shadow-glow-cyan: 0 0 32px 0 rgba(6, 182, 212, 0.2);
+  --shadow-glass-cyan: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 32px 0 rgba(6, 182, 212, 0.2);
 
   /* Transitions */
   --transition-fast: 150ms ease;
