@@ -1,3 +1,11 @@
+// Hallmark · v2.0.0 — Admin Panel redesign
+// Stamp: tokens.css imported via index.css
+// Material: Admin file management, user management, storage, security, audit
+// Audience: System administrators
+// Use: Manage files, users, storage, security, API keys, audit logs
+// Tone: Utilitarian/technical with editorial voice
+// Genre: SaaS → modern-minimal
+
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -41,7 +49,18 @@ const pageDescriptions: Record<Tab, string> = {
   'api-keys': 'Manage API keys for programmatic access.',
   'audit-log': 'View admin action audit trail.',
   scan: 'Scan storage for orphaned or mismatched files.',
-  system: 'System info, update, and maintenance.',
+  system: 'System info, update and maintenance.',
+};
+
+const pageTitles: Record<Tab, string> = {
+  dashboard: 'Files',
+  storage: 'Storage',
+  security: 'Credentials',
+  'api-keys': 'API Keys',
+  'audit-log': 'Audit Log',
+  advanced: 'Settings',
+  scan: 'Scan',
+  system: 'System',
 };
 
 export default function AdminPanel() {
@@ -84,12 +103,12 @@ export default function AdminPanel() {
   const sidebarWidth = collapsed ? 68 : 240;
 
   return (
-    <div className="min-h-screen flex" style={{ color: colors.text }}>
+    <div className="min-h-screen flex" style={{ color: 'var(--text)' }}>
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: `${colors.bg}cc`, backdropFilter: 'blur(4px)' }}
+          style={{ background: 'var(--bg)cc', backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />
@@ -97,29 +116,29 @@ export default function AdminPanel() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-200 lg:static lg:z-auto ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col transition-transform duration-200 lg:static lg:z-auto ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         style={{
           width: sidebarWidth,
           minWidth: sidebarWidth,
-          background: colors.cardBg,
+          background: 'var(--card-bg)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRight: `1px solid ${colors.border}`,
+          borderRight: '1px solid var(--border)',
         }}
         role="navigation"
         aria-label="Admin navigation"
       >
         {/* Logo */}
-        <div className="h-14 px-4 flex items-center shrink-0" style={{ borderBottom: `1px solid ${colors.border}` }}>
+        <div className="h-14 px-4 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <Link
             to="/"
             className="flex items-center gap-2.5 overflow-hidden"
             onClick={() => { sounds.click(); setMobileOpen(false); }}
             aria-label="LazyDrop — home"
           >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: colors.gradient }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--gradient)' }}>
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             {!collapsed && (
@@ -131,7 +150,7 @@ export default function AdminPanel() {
         {/* Primary Nav */}
         <nav className="flex-1 px-2 py-3">
           {!collapsed && (
-            <div className="text-[10px] font-mono uppercase tracking-wider px-2 mb-2" style={{ color: colors.textDim }}>
+            <div className="text-xs mb-2 px-2" style={{ color: 'var(--text-dim)' }}>
               Navigation
             </div>
           )}
@@ -142,17 +161,19 @@ export default function AdminPanel() {
                 <button
                   key={item.id}
                   onClick={() => { setTab(item.id); sounds.click(); setMobileOpen(false); }}
-                  className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 text-left"
+                  className="flex items-center gap-3 rounded-lg text-sm font-medium"
                   style={{
                     padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
                     justifyContent: collapsed ? 'center' : 'flex-start',
-                    background: isActive ? colors.primaryGlow : 'transparent',
-                    color: isActive ? colors.primary : colors.textMuted,
+                    background: isActive ? 'var(--primary-glow)' : 'transparent',
+                    color: isActive ? 'var(--primary)' : 'var(--text-muted)',
                   }}
                   aria-current={isActive ? 'page' : undefined}
                   title={collapsed ? item.label : undefined}
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+                  active:scale-95
                 >
-                  <span style={{ color: isActive ? colors.primary : colors.textDim, flexShrink: 0 }}>
+                  <span style={{ color: isActive ? 'var(--primary)' : 'var(--text-dim)', flexShrink: 0 }}>
                     {item.icon}
                   </span>
                   {!collapsed && <span className="truncate">{item.label}</span>}
@@ -163,19 +184,21 @@ export default function AdminPanel() {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="px-2 py-3 shrink-0" style={{ borderTop: `1px solid ${colors.border}` }}>
+        <div className="px-2 py-3 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="flex flex-col gap-0.5">
             {/* Collapse Toggle — desktop only */}
             <button
               onClick={() => { sounds.click(); setCollapsed(!collapsed); }}
-              className="hidden lg:flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 w-full"
+              className="hidden lg:flex items-center gap-3 rounded-lg text-sm font-medium w-full"
               style={{
                 padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                color: colors.textDim,
+                color: 'var(--text-dim)',
               }}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              active:scale-95
             >
               {collapsed ? <ChevronsRight className="w-[18px] h-[18px]" /> : <ChevronsLeft className="w-[18px] h-[18px]" />}
               {!collapsed && <span>Collapse</span>}
@@ -183,16 +206,18 @@ export default function AdminPanel() {
 
             <Link
               to="/"
-              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150"
+              className="flex items-center gap-3 rounded-lg text-sm font-medium"
               style={{
                 padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                color: colors.textMuted,
+                color: 'var(--text-muted)',
               }}
               onClick={() => { sounds.click(); setMobileOpen(false); }}
               title={collapsed ? 'View site' : undefined}
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              active:scale-95
             >
-              <span style={{ color: colors.textDim, flexShrink: 0 }}><FileText className="w-[18px] h-[18px]" /></span>
+              <span style={{ color: 'var(--text-dim)', flexShrink: 0 }}><FileText className="w-[18px] h-[18px]" /></span>
               {!collapsed && <span>View site</span>}
             </Link>
 
@@ -209,15 +234,17 @@ export default function AdminPanel() {
 
             <button
               onClick={() => { doLogout(); setMobileOpen(false); }}
-              className="flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-150 text-left w-full"
+              className="flex items-center gap-3 rounded-lg text-sm font-medium text-left w-full"
               style={{
                 padding: collapsed ? '0.625rem' : '0.625rem 0.75rem',
                 justifyContent: collapsed ? 'center' : 'flex-start',
-                color: colors.textMuted,
+                color: 'var(--text-muted)',
               }}
               title={collapsed ? 'Logout' : undefined}
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              active:scale-95
             >
-              <span style={{ color: colors.textDim, flexShrink: 0 }}><LogOut className="w-[18px] h-[18px]" /></span>
+              <span style={{ color: 'var(--text-dim)', flexShrink: 0 }}><LogOut className="w-[18px] h-[18px]" /></span>
               {!collapsed && <span>Logout</span>}
             </button>
           </div>
@@ -227,12 +254,12 @@ export default function AdminPanel() {
       {/* Main Content Area */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Mobile Top Bar */}
-        <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: `1px solid ${colors.border}`, background: colors.bg }}>
-          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg" style={{ color: colors.textMuted }} aria-label="Open navigation">
+        <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2 active:scale-95" style={{ color: 'var(--text-muted)' }} aria-label="Open navigation">
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: colors.gradient }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--gradient)' }}>
               <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
             </div>
             <span className="font-semibold text-sm">LazyDrop</span>
@@ -248,26 +275,26 @@ export default function AdminPanel() {
               <h1 className="text-xl font-semibold tracking-tight mb-1" style={{ fontFamily: "'Fira Code', monospace" }}>
                 {pageTitles[tab]}
               </h1>
-              <p className="text-sm" style={{ color: colors.textMuted }}>{pageDescriptions[tab]}</p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{pageDescriptions[tab]}</p>
             </div>
 
             {/* Summary Cards - only on dashboard */}
-            {tab === 'dashboard' && (
+            {tab === 'dashboard' && stats && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 <SummaryCard
                   icon={<FileText className="w-4 h-4" />}
                   label="Total files"
-                  value={stats ? stats.files.total_files : '—'}
+                  value={stats.files.total_files}
                 />
                 <SummaryCard
                   icon={<Download className="w-4 h-4" />}
                   label="Downloads"
-                  value={stats ? stats.files.total_downloads : '—'}
+                  value={stats.files.total_downloads}
                 />
                 <SummaryCard
                   icon={<Cloud className="w-4 h-4" />}
                   label="Buckets"
-                  value={stats ? stats.providers.total_providers : '—'}
+                  value={stats.providers.total_providers}
                 />
                 <SummaryCard
                   icon={<HardDrive className="w-4 h-4" />}
@@ -282,11 +309,11 @@ export default function AdminPanel() {
             {/* Main Content */}
             {loading ? (
               <div className="flex flex-col items-center py-24 gap-4">
-                <Loader2 className="w-8 h-8 animate-spin" style={{ color: colors.primary }} />
-                <p className="text-sm" style={{ color: colors.textMuted }}>Loading...</p>
+                <Loader2 className="w-8 h-8 motion-safe:animate-spin" style={{ color: 'var(--primary)' }} />
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading&#8230;</p>
               </div>
             ) : <div key={tab} className="tab-content">
-            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" style={{ color: colors.primary }} /></div>}>
+            <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 motion-safe:animate-spin" style={{ color: 'var(--primary)' }} /></div>}>
             {tab === 'dashboard' ? <AdminDashboard files={files} token={token!} onRefresh={refresh} onNotify={notify} />
             : tab === 'users' ? <AdminUsers token={token!} onNotify={notify} />
             : tab === 'storage' ? <AdminStorage providers={providers} token={token!} onRefresh={refresh} onNotify={notify} />
@@ -309,9 +336,9 @@ export default function AdminPanel() {
           role="alert"
           aria-live="assertive"
           style={{
-            background: notif.type === 'success' ? `${colors.success}14` : `${colors.danger}14`,
-            border: `1px solid ${notif.type === 'success' ? `${colors.success}33` : `${colors.danger}33`}`,
-            color: notif.type === 'success' ? colors.success : colors.danger,
+            background: notif.type === 'success' ? 'var(--success)14' : 'var(--danger)14',
+            border: `1px solid ${notif.type === 'success' ? 'var(--success)33' : 'var(--danger)33'}`,
+            color: notif.type === 'success' ? 'var(--success)' : 'var(--danger)',
             backdropFilter: 'blur(12px)',
           }}
         >
@@ -323,17 +350,6 @@ export default function AdminPanel() {
   );
 }
 
-const pageTitles: Record<Tab, string> = {
-  dashboard: 'Files',
-  storage: 'Storage',
-  security: 'Credentials',
-  'api-keys': 'API Keys',
-  'audit-log': 'Audit Log',
-  advanced: 'Settings',
-  scan: 'Scan',
-  system: 'System',
-};
-
 function SummaryCard({ icon, label, value, accent, progress }: {
   icon: React.ReactNode;
   label: string;
@@ -343,23 +359,23 @@ function SummaryCard({ icon, label, value, accent, progress }: {
 }) {
   const { colors } = useTheme();
   return (
-    <div className="glass-card p-4">
+    <div className="card p-4">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: colors.primaryGlow, color: colors.primary }}>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--primary-glow)', color: 'var(--primary)' }}>
           {icon}
         </div>
-        <span className="text-xs font-medium" style={{ color: colors.textMuted }}>{label}</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
       </div>
-      <div className="text-xl font-bold tracking-tight" style={{ color: accent || colors.text }}>{value}</div>
+      <div className="text-xl font-bold tracking-tight" style={{ color: accent || 'var(--text)' }}>{value}</div>
       {progress !== undefined && (
-        <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: `${colors.text}08` }}>
+        <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--text)08' }}>
           <div
-            className="h-full rounded-full transition-all duration-700"
-              style={{
+            className="h-full rounded-full transition-transform duration-700"
+            style={{
               width: `${Math.min(progress, 100)}%`,
               background: progress > 90
-                ? `linear-gradient(90deg, ${colors.warning}, ${colors.danger})`
-                : `linear-gradient(90deg, ${colors.success}, ${colors.accent})`,
+                ? `linear-gradient(90deg, var(--warning), var(--danger))`
+                : `linear-gradient(90deg, var(--success), var(--accent))`,
             }}
           />
         </div>
