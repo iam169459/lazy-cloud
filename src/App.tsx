@@ -53,8 +53,14 @@ function App() {
       <UserAuthProvider>
       <AuthProvider>
         <BrowserRouter>
-          <AmbientOrbs />
-          <Suspense fallback={<Loader />}>
+          <div className="relative min-h-screen overflow-hidden">
+            {/* Atmospheric Glowing Orbs - explicit */}
+            <div className="absolute top-10 left-1/4 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none animate-float" aria-hidden="true" />
+            <div className="absolute top-1/3 right-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[140px] pointer-events-none" style={{ animation: 'orb-float-2 30s ease-in-out infinite reverse' }} />
+            <div className="absolute bottom-20 right-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[120px] pointer-events-none" style={{ animation: 'orb-float-3 35s ease-in-out infinite' }} />
+            
+            <AmbientOrbs />
+            <Suspense fallback={<Loader />}>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/file/:fileId" element={<DownloadPage />} />
@@ -67,6 +73,7 @@ function App() {
               <Route path="/admin" element={<AdminPanel />} />
             </Routes>
           </Suspense>
+        </div>
         </BrowserRouter>
       </AuthProvider>
       </UserAuthProvider>
