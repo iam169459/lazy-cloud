@@ -3,9 +3,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hallmark Design Tokens — All colours and fonts go through these tokens */
+:root {
+  /* Base colours */
+  --bg: #06060c;
+  --bg-card: rgba(255,255,255,0.02);
+  --bg-hover: rgba(52,211,153,0.03);
+  --border: rgba(255,255,255,0.06);
+  --border-active: rgba(52,211,153,0.3);
+  --text: #ffffff;
+  --text-muted: #9ca3af;
+  --text-dim: #4b5563;
+  --primary: #34d399;
+  --primary-glow: rgba(52,211,153,0.15);
+  --secondary: #22d3ee;
+  --accent: #3b82f6;
+  --accent-glow: rgba(59,130,246,0.15);
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #34d399;
+  --gradient: linear-gradient(135deg, #34d399, #22d3ee, #3b82f6);
+  --card-bg: rgba(255,255,255,0.02);
+  --card-border: rgba(255,255,255,0.06);
+  --card-hover: rgba(52,211,153,0.05);
+  --input-bg: rgba(255,255,255,0.03);
+  --input-border: rgba(255,255,255,0.1);
+  --input-focus: rgba(52,211,153,0.4);
+  --scanline: rgba(52,211,153,0.015);
+  --grid-line: rgba(52,211,153,0.03);
+  --orb1: rgba(52,211,153,0.08);
+  --orb2: rgba(34,211,238,0.06);
+  --orb3: rgba(168,85,247,0.04);
+}
+
 @layer base {
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; overflow-x: clip; }
   body {
     margin: 0;
     font-family: 'Fira Sans', system-ui, sans-serif;
@@ -13,7 +46,7 @@
     background: var(--bg, #06060c);
     color: var(--text, #ffffff);
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 }
 
@@ -27,12 +60,61 @@
   color: var(--text, #ffffff);
 }
 
+/* Focus visible styles — Hallmark rule 26 */
+*:focus-visible {
+  outline: 2px solid var(--primary, #34d399);
+  outline-offset: 2px;
+}
+
+/* Active state — Hallmark rule 26b */
+:active {
+  transform: scale(0.97);
+}
+
+/* Disabled state — Hallmark rule 26b */
+:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Focus visible for links and buttons */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--primary, #34d399);
+  outline-offset: 2px;
+}
+
+/* Active state */
+button:active,
+a:active,
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Disabled state */
+button:disabled,
+a:disabled,
+[role="button"][aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Reduced motion — Hallmark rule 7 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @layer components {
   .card {
     background: var(--card-bg, rgba(255,255,255,0.02));
     border: 1px solid var(--card-border, rgba(255,255,255,0.06));
     border-radius: 12px;
-    transition: all 0.25s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .card:hover {
     background: var(--card-hover, rgba(52,211,153,0.05));
@@ -126,7 +208,7 @@
     font-size: 0.8125rem;
     font-family: 'Fira Sans', system-ui, sans-serif;
     outline: none;
-    transition: all 0.2s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   }
   .input::placeholder { color: var(--text-dim, #4b5563); }
   .input:focus {
@@ -193,7 +275,7 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 12px;
-    transition: all 0.25s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   }
   .glass-card:hover {
     background: rgba(27, 35, 54, 0.55);

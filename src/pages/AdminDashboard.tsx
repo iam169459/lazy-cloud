@@ -13,12 +13,6 @@ import { sounds } from '@/lib/sounds';
 import DataTable, { Column, BulkAction } from '@/components/DataTable';
 import UploadQueue from '@/components/UploadQueue';
 
-// Hallmark: Every colour and font goes through a token declared at :root.
-// No literal colour or `font-family` past the token block.
-// Hallmark: Never `transition: all`. Never animate `width`, `height`, `top` or `left`.
-import '@/styles/tokens.css';
-import '@/styles/base.css';
-
 interface Props {
   files: FileWithProvider[];
   token: string;

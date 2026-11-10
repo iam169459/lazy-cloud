@@ -35,20 +35,18 @@ export default function Landing() {
   const name = settings?.siteName || 'LazyDrop';
 
   return (
-    <div className="relative z-0 min-h-screen" style={{
+    <div className="relative z-0 min-h-screen focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2 group-active:outline-none group-active:ring-2 group-active:ring-offset-2 group-active:ring-2 disabled:opacity-50 disabled:cursor-not-allowed" style={{
       // Hallmark: No literal colours. All via CSS tokens.
       // Hallmark: overflow-x: clip on both html and body. Never hidden, never 100vw.
-    } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] group-active:outline-none group-active:ring-2 group-active:ring-offset-2 group-active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed} aria-label="landing page" role="button" tabIndex={0}>
+    }} aria-label="landing page" role="button" tabIndex={0}>
       {/* Announcement Bar */}
       <div
         className="text-center py-2 font-medium"
         role="status"
         aria-live="polite"
         style={{
-          // Hallmark: background uses var(--token), no literal colour
           background: 'var(--primary)10',
           borderBottom: '1px solid var(--border)',
-          // Hallmark: No `transition: all`. Removed any transition.
         }}
       >
         Fast, private file sharing, no accounts, no tracking, no limits.
@@ -59,30 +57,28 @@ export default function Landing() {
         aria-label="Main navigation"
         className="sticky top-0 z-30"
         style={{
-          // Hallmark: background uses var(--token), no literal colour
           background: 'var(--bg)cc',
           borderBottom: '1px solid var(--border)',
           backdropFilter: 'blur(16px)',
-          // Hallmark: No `transition: all`. Removed any transition.
         }}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-5 py-3.5">
-          <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()} aria-label={`${name} home`} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)]">
+          <Link to="/" className="flex items-center gap-2.5" onClick={() => sounds.click()} aria-label={`${name} home`}>
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'var(--gradient)' }} aria-hidden="true">
               <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
             <span className="text-lg font-semibold tracking-tight">{name}</span>
           </Link>
-          className="hidden md:flex items-center gap-6" role="list" group group-active:outline-none group-active:ring-2 group-active:ring-offset-2 group-active:ring-[var(--primary)] group-disabled:cursor-not-allowed group-disabled:opacity-50
-            <a href="#features" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)]>Features</a>
-            <a href="#how-it-works" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)]>How it works</a>
-            <a href="#faq" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)]>FAQ</a>
+          <div className="hidden md:flex items-center gap-6" role="list">
+            <a href="#features" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Features</a>
+            <a href="#how-it-works" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>How it works</a>
+            <a href="#faq" className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>FAQ</a>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()} aria-label="Sign in" focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed>
+            <Link to="/login" className="btn btn-ghost text-sm" onClick={() => sounds.click()}>
               Sign in
             </Link>
-            <Link to="/register" className="btn btn-primary text-sm" onClick={() => sounds.click()} aria-label="Get started" focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed>
+            <Link to="/register" className="btn btn-primary text-sm" onClick={() => sounds.click()}>
               Get started
               <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
             </Link>
@@ -92,30 +88,27 @@ export default function Landing() {
 
       <main>
         {/* Hero */}
-        // Hallmark: The hero's headline, one sentence and primary action are all visible at 1280 x 800 without scrolling.
-        // Hallmark: About 80 words on any one screen; the hero's text is the headline, one sentence and its actions.
-        // Hallmark: One idea per screen, set big.
         <section className="max-w-4xl mx-auto px-5 pt-20 pb-16 sm:pt-28 sm:pb-20" aria-labelledby="hero-heading">
-          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)]">
+          <h1 id="hero-heading" className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-[1.1] mb-5">
             Fast, private,
             <br />
             <span className="text-gradient">link-only file sharing</span>
           </h1>
-          <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)]">
+          <p className="text-base sm:text-lg max-w-xl mx-auto mb-8 leading-relaxed">
             Upload once, share with a link. Simple, secure, and instant.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()} aria-label="Get started" focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed>
+            <Link to="/register" className="btn btn-primary" onClick={() => sounds.click()}>
               Create account
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
-            <a href="#features" className="btn btn-secondary" focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed>See features</a>
+            <a href="#features" className="btn btn-secondary">See features</a>
           </div>
         </section>
 
         {/* Stats Banner */}
         <section className="max-w-3xl mx-auto px-5 pb-16" aria-label="Stats">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3" role="list">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Stat icon={<Shield className="w-4 h-4" />} value="E2E" label="Encrypted" />
             <Stat icon={<Zap className="w-4 h-4" />} value="<1s" label="Upload" />
             <Stat icon={<Upload className="w-4 h-4" />} value="0" label="Tracking" />
@@ -193,7 +186,6 @@ export default function Landing() {
           <div
             className="card p-10 sm:p-14 text-center rounded-xl"
             style={{
-              // Hallmark: background uses var(--token), no literal colour
               background: 'var(--primary)08',
               border: '1px solid var(--primary)20',
             }}
@@ -204,7 +196,7 @@ export default function Landing() {
             <p className="text-sm max-w-md mx-auto mb-6" style={{ color: 'var(--text-muted)' }}>
               No accounts, no limits, no tracking.
             </p>
-            <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()} aria-label="Open Admin Panel" focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--primary)] active:outline-none active:ring-2 active:ring-offset-2 active:ring-[var(--primary)] disabled:opacity-50 disabled:cursor-not-allowed>
+            <Link to="/admin" className="btn btn-primary" onClick={() => sounds.click()}>
               Open Admin Panel
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
@@ -214,7 +206,6 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="py-8 text-center" style={{
-        // Hallmark: border uses var(--token), no literal colour
         borderTop: '1px solid var(--border)',
       }}>
         <p className="text-sm" style={{ color: 'var(--text-dim)' }}>
@@ -227,27 +218,21 @@ export default function Landing() {
 
 /* ──────────────────── Sub-components ──────────────────── */
 
-function SectionHeader({ id, title, desc }: { id: string; title: string; desc?: string }) {
+function SectionHeader({ id, title, desc }) {
   const { colors } = useTheme();
   return (
     <div className="text-center">
-      <p className="text-sm font-medium" style={{ color: 'var(--primary)' }}>
-        {title}
-      </p>
       <h2 id={id} className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">{title}</h2>
       {desc && <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--text-muted)' }}>{desc}</p>}
     </div>
   );
 }
 
-function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
+function Stat({ icon, value, label }) {
   const { colors } = useTheme();
   return (
     <div className="card p-4 text-center">
-      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{
-        // Hallmark: background uses var(--token), no literal colour
-        background: 'var(--primary)12', color: 'var(--primary)'
-      }} aria-hidden="true">
+      <div className="w-9 h-9 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: 'var(--primary)12', color: 'var(--primary)' }} aria-hidden="true">
         {icon}
       </div>
       <div className="text-xl font-bold">{value}</div>
@@ -256,14 +241,11 @@ function Stat({ icon, value, label }: { icon: React.ReactNode; value: string; la
   );
 }
 
-function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; desc: string }) {
+function Feature({ icon, title, desc }) {
   const { colors } = useTheme();
   return (
     <div className="card p-5" role="listitem">
-      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{
-        // Hallmark: background uses var(--token), no literal colour
-        background: 'var(--primary)12', color: 'var(--primary)'
-      }} aria-hidden="true">
+      <div className="w-8 h-8 rounded-lg mb-3 flex items-center justify-center" style={{ background: 'var(--primary)12', color: 'var(--primary)' }} aria-hidden="true">
         {icon}
       </div>
       <h3 className="text-sm font-semibold mb-1">{title}</h3>
@@ -272,16 +254,13 @@ function Feature({ icon, title, desc }: { icon: React.ReactNode; title: string; 
   );
 }
 
-function Step({ number, title, desc }: { number: string; title: string; desc: string }) {
+function Step({ number, title, desc }) {
   const { colors } = useTheme();
   return (
     <div className="flex flex-col gap-3" role="listitem">
       <div
         className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold font-mono"
-        style={{
-          // Hallmark: background uses var(--token), no literal colour
-          background: 'var(--primary)12', color: 'var(--primary)'
-        }}
+        style={{ background: 'var(--primary)12', color: 'var(--primary)' }}
         aria-hidden="true"
       >
         {number}
@@ -292,11 +271,11 @@ function Step({ number, title, desc }: { number: string; title: string; desc: st
   );
 }
 
-function FAQItem({ question, answer }: { question: string; answer: string }) {
+function FAQItem({ question, answer }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       setOpen((prev) => !prev);
