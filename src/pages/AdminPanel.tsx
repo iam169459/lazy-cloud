@@ -170,7 +170,7 @@ export default function AdminPanel() {
                   }}
                   aria-current={isActive ? 'page' : undefined}
                   title={collapsed ? item.label : undefined}
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
                   active:scale-95
                 >
                   <span style={{ color: isActive ? 'var(--primary)' : 'var(--text-dim)', flexShrink: 0 }}>
@@ -197,7 +197,7 @@ export default function AdminPanel() {
               }}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
               active:scale-95
             >
               {collapsed ? <ChevronsRight className="w-[18px] h-[18px]" /> : <ChevronsLeft className="w-[18px] h-[18px]" />}
@@ -214,7 +214,7 @@ export default function AdminPanel() {
               }}
               onClick={() => { sounds.click(); setMobileOpen(false); }}
               title={collapsed ? 'View site' : undefined}
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
               active:scale-95
             >
               <span style={{ color: 'var(--text-dim)', flexShrink: 0 }}><FileText className="w-[18px] h-[18px]" /></span>
@@ -241,7 +241,7 @@ export default function AdminPanel() {
                 color: 'var(--text-muted)',
               }}
               title={collapsed ? 'Logout' : undefined}
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
               active:scale-95
             >
               <span style={{ color: 'var(--text-dim)', flexShrink: 0 }}><LogOut className="w-[18px] h-[18px]" /></span>
@@ -255,7 +255,7 @@ export default function AdminPanel() {
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Mobile Top Bar */}
         <header className="h-14 px-5 flex items-center justify-between shrink-0 lg:hidden" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
-          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-2 active:scale-95" style={{ color: 'var(--text-muted)' }} aria-label="Open navigation">
+          <button onClick={() => setMobileOpen(true)} className="p-2 -ml-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-95" style={{ color: 'var(--text-muted)' }} aria-label="Open navigation">
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2">

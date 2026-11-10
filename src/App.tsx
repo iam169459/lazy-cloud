@@ -4,6 +4,7 @@ import { AuthProvider } from '@/lib/auth';
 import { UserAuthProvider } from '@/lib/userAuth';
 import { ThemeProvider } from '@/lib/theme';
 import { api, AppSettings } from '@/lib/api';
+import { AmbientOrbs } from '@/components/AmbientOrbs';
 
 const Landing = lazy(() => import('@/pages/Landing'));
 const DownloadPage = lazy(() => import('@/pages/Download'));
@@ -22,35 +23,7 @@ function Loader() {
   );
 }
 
-function Background() {
-  const [bg, setBg] = useState<{ url: string; type: string }>({ url: '', type: '' });
 
-  useEffect(() => {
-    api.getSettings().then((s) => {
-      if (s.backgroundUrl) setBg({ url: s.backgroundUrl, type: s.backgroundType });
-    }).catch(() => {});
-  }, []);
-
-  if (!bg.url) return null;
-
-  return (
-    <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
-      {bg.type === 'video' ? (
-        <video
-          src={bg.url}
-          className="w-full h-full object-cover"
-          muted
-          autoPlay
-          loop
-          playsInline
-        />
-      ) : (
-        <img src={bg.url} alt="" className="w-full h-full object-cover" />
-      )}
-      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
-    </div>
-  );
-}
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -80,7 +53,7 @@ function App() {
       <UserAuthProvider>
       <AuthProvider>
         <BrowserRouter>
-          <Background />
+          <AmbientOrbs />
           <Suspense fallback={<Loader />}>
             <Routes>
               <Route path="/" element={<Landing />} />
